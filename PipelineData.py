@@ -25,8 +25,8 @@ ids_comuns = ids_pre.intersection(ids_pos)
 print(f"Total de IDs em df_pre: {len(ids_pre)}")
 print(f"Total de IDs em df_pos: {len(ids_pos)}")
 print(f"IDs em comum: {len(ids_comuns)}")
-print(f"IDs únicos em df_pre: {len(ids_pre - ids_pos)}")
-print(f"IDs únicos em df_pos: {len(ids_pos - ids_pre)}")
+# print(f"IDs únicos em df_pre: {len(ids_pre - ids_pos)}")
+# print(f"IDs únicos em df_pos: {len(ids_pos - ids_pre)}")
 
 # Se quiser ver os IDs em comum
 # print(f"Lista de IDs em comum: {sorted(list(ids_comuns))}")
@@ -42,17 +42,17 @@ print(f"Registros em df_pos_filtrado: {len(df_pos_filtrado)}")
 #print(df_pre_filtrado.info())
 #print(df_pos_filtrado.info())
 
-# Descrição estatística dos dados pré-intervenção
-print("\n" + "="*50)
-print("DESCRIÇÃO ESTATÍSTICA - PRÉ-INTERVENÇÃO")
-print("="*50)
-print(df_pre_filtrado.describe())
+# # Descrição estatística dos dados pré-intervenção
+# print("\n" + "="*50)
+# print("DESCRIÇÃO ESTATÍSTICA - PRÉ-INTERVENÇÃO")
+# print("="*50)
+# print(df_pre_filtrado.describe())
 
-# Descrição estatística dos dados pós-intervenção
-print("\n" + "="*50)
-print("DESCRIÇÃO ESTATÍSTICA - PÓS-INTERVENÇÃO")
-print("="*50)
-print(df_pos_filtrado.describe())
+# # Descrição estatística dos dados pós-intervenção
+# print("\n" + "="*50)
+# print("DESCRIÇÃO ESTATÍSTICA - PÓS-INTERVENÇÃO")
+# print("="*50)
+# print(df_pos_filtrado.describe())
 
 # Descrição estatística específica para as perguntas P1 a P40 e Score Final
 colunas_interesse = [col for col in df_pre_filtrado.columns if col.startswith('P') or 'Score' in col or 'score' in col]
