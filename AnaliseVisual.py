@@ -29,7 +29,7 @@ class AnaliseVisual:
         self.df_pos_filtrado = self.df_pos[self.df_pos['id'].isin(ids_comuns)]
         
         # Identificar colunas de interesse
-        self.colunas_p = [col for col in self.df_pre_filtrado.columns if col.startswith('P')]
+        self.colunas_p = [col for col in self.df_pre_filtrado.columns if col.startswith('Q')]
         self.colunas_score = [col for col in self.df_pre_filtrado.columns if 'Score' in col or 'score' in col]
         
         # Converter para dados booleanos
@@ -47,8 +47,9 @@ class AnaliseVisual:
         self.df_pos_bool_sorted = self.df_pos_bool.set_index(self.df_pos_filtrado['id']).sort_index()
         
         # Calcular acertos totais com dados ordenados
-        self.acertos_pre = self.df_pre_bool_sorted.sum(axis=1)
+        self.acertos_pre = self.df_pre_bool_sorted.sum(axis=1)        
         self.acertos_pos = self.df_pos_bool_sorted.sum(axis=1)
+       
     
     def grafico_comparacao_medias(self):
         """Gráfico de barras comparando médias pré vs pós"""
@@ -71,9 +72,9 @@ class AnaliseVisual:
                     f'{media:.1f}±{desvio:.1f}', ha='center', va='bottom', fontweight='bold')
         
         # Gráfico 2: Distribuição por scores (CORREÇÃO: usar tick_labels)
-        if self.colunas_score:
-            scores_pre = self.df_pre_filtrado[self.colunas_score[0]].dropna()
-            scores_pos = self.df_pos_filtrado[self.colunas_score[0]].dropna()
+        if (len(self.acertos_pre) == len(self.acertos_pos)) and len(self.acertos_pre) > 0:
+            scores_pre = self.acertos_pre
+            scores_pos = self.acertos_pos
             
             ax2.boxplot([scores_pre, scores_pos], tick_labels=['Pré-teste', 'Pós-teste'])
             ax2.set_ylabel('Score Final')
@@ -283,11 +284,11 @@ def carregar_e_analisar():
     # Carregar dados (adapte o caminho)
     current_dir = pathlib.Path(__file__).parent.resolve()
     data_dir = str(current_dir) + '/Data'
-    nome = "RESULTADOS Geração Impacto (WordGen) - TDE, Vocabulário (2023-2, Fase 2).xlsx"
+    nome = "RESULTADOS_WordGen_TDE_Vocabulario_2024-1_Fase_3.xlsx"
     arquivo_excel = os.path.join(data_dir, nome)
     
-    df_pre = pd.read_excel(arquivo_excel, sheet_name='2023-2 TDE pre')
-    df_pos = pd.read_excel(arquivo_excel, sheet_name='2023-2 TDE pos')
+    df_pre = pd.read_excel(arquivo_excel, sheet_name='pre')
+    df_pos = pd.read_excel(arquivo_excel, sheet_name='pos')
     
     # Criar análise visual
     analise = AnaliseVisual(df_pre, df_pos)

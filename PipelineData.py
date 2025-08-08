@@ -8,12 +8,12 @@ import numpy as np
 # Adiciona o diretório atual ao sys.path para permitir importações relativas
 current_dir = pathlib.Path(__file__).parent.resolve()
 current_dir = str(current_dir) + '/Data'
-nome = "RESULTADOS Geração Impacto (WordGen) - TDE, Vocabulário (2023-2, Fase 2).xlsx"
+nome = "RESULTADOS_WordGen_TDE_Vocabulario_2024-1_Fase_3.xlsx"
 arquivo_excel = os.path.join(current_dir, nome)
 print(f"Arquivo Excel localizado: {arquivo_excel}")
 # Carregar as duas abas do arquivo Excel
-df_pre = pandas.read_excel(arquivo_excel, sheet_name='2023-2 TDE pre')
-df_pos = pandas.read_excel(arquivo_excel, sheet_name='2023-2 TDE pos')
+df_pre = pandas.read_excel(arquivo_excel, sheet_name='pre')
+df_pos = pandas.read_excel(arquivo_excel, sheet_name='pos')
 
 print("Dados carregados com sucesso.")
 
@@ -43,23 +43,23 @@ print(f"Registros em df_pos_filtrado: {len(df_pos_filtrado)}")
 #print(df_pos_filtrado.info())
 
 # # Descrição estatística dos dados pré-intervenção
-# print("\n" + "="*50)
-# print("DESCRIÇÃO ESTATÍSTICA - PRÉ-INTERVENÇÃO")
-# print("="*50)
-# print(df_pre_filtrado.describe())
+print("\n" + "="*50)
+print("DESCRIÇÃO ESTATÍSTICA - PRÉ-INTERVENÇÃO")
+print("="*50)
+print(df_pre_filtrado.describe())
 
 # # Descrição estatística dos dados pós-intervenção
-# print("\n" + "="*50)
-# print("DESCRIÇÃO ESTATÍSTICA - PÓS-INTERVENÇÃO")
-# print("="*50)
-# print(df_pos_filtrado.describe())
+print("\n" + "="*50)
+print("DESCRIÇÃO ESTATÍSTICA - PÓS-INTERVENÇÃO")
+print("="*50)
+print(df_pos_filtrado.describe())
 
 # Descrição estatística específica para as perguntas P1 a P40 e Score Final
-colunas_interesse = [col for col in df_pre_filtrado.columns if col.startswith('P') or 'Score' in col or 'score' in col]
+colunas_interesse = [col for col in df_pre_filtrado.columns if col.startswith('Q') or 'Score' in col or 'score' in col]
 
 if colunas_interesse:
     # Separar colunas P (booleanas) das colunas Score
-    colunas_p = [col for col in colunas_interesse if col.startswith('P')]
+    colunas_p = [col for col in colunas_interesse if col.startswith('Q')]
     colunas_score = [col for col in colunas_interesse if 'Score' in col or 'score' in col]
     
     # Converter colunas P para booleano (0 = False, 1 ou 2 = True)
