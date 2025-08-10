@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relatório Visual WordGen - Vocabulário (Fase 4)</title>
+<style>
+    :root {
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    }
+    body {
+        margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .header {
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; padding: 28px 18px; box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }
+    .header .title {
+        font-size: 26px; font-weight: 700; margin: 0;
+    }
+    .header .subtitle {
+        font-size: 14px; opacity: 0.95; margin-top: 6px;
+    }
+    .header .timestamp {
+        font-size: 12px; opacity: 0.85; margin-top: 4px;
+    }
+    .container {
+        max-width: 1200px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 22px; box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+    .cards {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px;
+    }
+    .card {
+        background: var(--card-grad); color: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    .card.green { background: var(--green-grad); }
+    .card.red { background: var(--red-grad); }
+    .card.yellow { background: var(--yellow-grad); }
+    .card .card-label { font-size: 13px; opacity: 0.95; }
+    .card .valor { font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .card .desc { font-size: 11px; opacity: 0.9; }
+
+    h2.section {
+        margin-top: 22px; font-size: 18px; border-left: 4px solid var(--purple1); padding-left: 10px; color: #1f2937;
+    }
+    .figs { display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 10px; }
+    .fig { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 8px; }
+    .fig img { width: 100%; height: auto; border-radius: 6px; }
+    .fig .caption { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+    .interp { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 14px; }
+    .grupo-item { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .grupo-titulo { font-weight: 600; }
+    .grupo-detalhes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; color: #374151; font-size: 13px; margin-top: 6px; }
+
+    .foot-note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }
+
+    .badge { display:inline-block; padding:2px 6px; border-radius:999px; font-size:11px; line-height:1.4; }
+    .badge.warn { background:#fff3cd; color:#7a6200; border:1px solid #ffe69c; }
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual WordGen</div>
+        <div class="subtitle">Vocabulário – Fase 4 (TDE). Baseado em total_pre_voc, total_pos_voc e group.</div>
+        <div class="timestamp">Gerado em: 2025-08-10 20:49:43</div>
+    </div>
+
+    <div class="container">
+        <h2 class="section">Indicadores</h2>
+        <div class="cards">
+            
+    <div class="card">
+        <div class="card-label">Registros</div>
+        <div class="valor">1798</div>
+        <div class='desc'>alunos após limpeza</div>
+    </div>
+    
+    <div class="card">
+        <div class="card-label">Total de grupos</div>
+        <div class="valor">24</div>
+        <div class='desc'>com dados válidos</div>
+    </div>
+    
+    <div class="card">
+        <div class="card-label">Média Pré</div>
+        <div class="valor">16.39</div>
+        
+    </div>
+    
+    <div class="card">
+        <div class="card-label">Média Pós</div>
+        <div class="valor">18.08</div>
+        
+    </div>
+    
+    <div class="card">
+        <div class="card-label">Delta médio</div>
+        <div class="valor">1.69</div>
+        <div class='desc'>pontos</div>
+    </div>
+    
+    <div class="card green">
+        <div class="card-label">% Melhoraram</div>
+        <div class="valor">47.3%</div>
+        
+    </div>
+    
+    <div class="card red">
+        <div class="card-label">% Pioraram</div>
+        <div class="valor">33.0%</div>
+        
+    </div>
+    
+    <div class="card yellow">
+        <div class="card-label">% Mantiveram</div>
+        <div class="valor">19.6%</div>
+        
+    </div>
+    
+    <div class="card">
+        <div class="card-label">Effect Size global</div>
+        <div class="valor">0.141</div>
+        
+    </div>
+    
+        </div>
+
+        <h2 class="section">Gráficos</h2>
+        <div class="figs">
+            <div class="fig">
+                <img src="figures/delta_medio_hist.png" alt="Histograma de deltas" />
+                <div class="caption">Distribuição dos deltas (pós - pré).</div>
+            </div>
+            <div class="fig">
+                <img src="figures/categorias_mudanca_bar.png" alt="Categorias Cohen" />
+                <div class="caption">Categorias de Cohen com base em SD do pré.</div>
+            </div>
+            <div class="fig">
+                <img src="figures/effect_size_forest.png" alt="Forest plot ES por grupo" />
+                <div class="caption">Effect Size por grupo (IC 95%). Linha tracejada: d = 0; Pontilhado: |d| = 0.4. Pontos vazados: n < 10 (estimativa instável).</div>
+            </div>
+        </div>
+
+        <h2 class="section">Interpretação contextualizada dos effect sizes por grupo</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">Referências: Cohen (1988) – 0.2/0.5/0.8; Hattie (2009) – d≥0.4 como “bom resultado”; Vocabulário (Marulis & Neuman, 2010) – d≥0.35 significativo.</p>
+            
+        <div class="grupo-item">
+            <div class="grupo-titulo">8 ANO E: ES = 0.598 (n=24) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Moderado</span>
+                <span><strong>IC 95%:</strong> [0.229, 0.966]</span>
+                <span>✓ Acima do benchmark (d≥0.4)</span>
+                <span>✓ Significativo em Vocabulário (d≥0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">8 ANO C: ES = 0.485 (n=131) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Moderado</span>
+                <span><strong>IC 95%:</strong> [0.315, 0.655]</span>
+                <span>✓ Acima do benchmark (d≥0.4)</span>
+                <span>✓ Significativo em Vocabulário (d≥0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">8 ANO B: ES = 0.443 (n=131) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Moderado</span>
+                <span><strong>IC 95%:</strong> [0.268, 0.618]</span>
+                <span>✓ Acima do benchmark (d≥0.4)</span>
+                <span>✓ Significativo em Vocabulário (d≥0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">8 ANO D: ES = 0.401 (n=72) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Moderado</span>
+                <span><strong>IC 95%:</strong> [0.146, 0.656]</span>
+                <span>✓ Acima do benchmark (d≥0.4)</span>
+                <span>✓ Significativo em Vocabulário (d≥0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO E: ES = 0.279 (n=32) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [-0.066, 0.624]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO B: ES = 0.248 (n=105) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [0.099, 0.397]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO E: ES = 0.223 (n=25) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [-0.003, 0.450]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">9 ANO B: ES = 0.189 (n=121) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [0.016, 0.362]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO C: ES = 0.174 (n=89) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [0.011, 0.338]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">9 ANO D: ES = 0.153 (n=41) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Pequeno</span>
+                <span><strong>IC 95%:</strong> [-0.180, 0.485]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO A: ES = 0.137 (n=110) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.028, 0.302]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6º ANO B: ES = 0.070 (n=25) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.098, 0.238]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO A: ES = 0.069 (n=118) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.064, 0.202]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO B: ES = 0.040 (n=120) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.106, 0.185]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO C: ES = 0.030 (n=120) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.135, 0.195]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO D: ES = 0.007 (n=78) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.190, 0.205]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO D: ES = -0.003 (n=57) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.194, 0.188]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6º ANO C: ES = -0.013 (n=25) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.317, 0.290]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6 ANO F: ES = -0.040 (n=25) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.362, 0.282]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">9 ANO C: ES = -0.066 (n=91) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.247, 0.115]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">9 ANO A: ES = -0.080 (n=115) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.215, 0.054]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">6° ANO C: ES = -0.083 (n=2) <span class='badge warn'>n pequeno (estimativa instável)</span></div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.247, 0.080]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">7 ANO F: ES = -0.086 (n=31) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.371, 0.199]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+
+        <div class="grupo-item">
+            <div class="grupo-titulo">8 ANO A: ES = -0.102 (n=110) </div>
+            <div class="grupo-detalhes">
+                <span><strong>Magnitude:</strong> Trivial</span>
+                <span><strong>IC 95%:</strong> [-0.260, 0.055]</span>
+                <span>⚠ Abaixo do benchmark (d<0.4)</span>
+                <span>⚠ Abaixo do threshold (d<0.35)</span>
+            </div>
+        </div>
+        
+        </div>
+
+        <div class="foot-note">
+            <p>Notas: ES global = Δ/SD(Pré). IC 95% via SE = SD(Δ)/√n / SD(Pré). Categorias Cohen baseadas em SD(Pré). Tudo calculado diretamente do CSV.</p>
+        </div>
+    </div>
+</body>
+</html>
