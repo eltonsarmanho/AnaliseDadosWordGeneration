@@ -282,8 +282,9 @@ class AnaliseVisual:
 def carregar_e_analisar():
     """Função principal para carregar dados e fazer análise visual"""
     # Carregar dados (adapte o caminho)
-    current_dir = pathlib.Path(__file__).parent.resolve()
+    current_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
     data_dir = str(current_dir) + '/Data'
+    print(f"Carregando dados de: {data_dir}")
     nome = "RESULTADOS_WordGen_TDE_Vocabulario_2024-1_Fase_3.xlsx"
     arquivo_excel = os.path.join(data_dir, nome)
     
