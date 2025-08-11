@@ -28,6 +28,16 @@ FIG_TOP_Q = os.path.join(FIG_DIR, "fase3_top_questoes.png")
 FIG_CATEG_BENCH = os.path.join(FIG_DIR, "fase3_categorias_bench.png")
 
 
+def fig_to_base64(fig) -> str:
+    """Converte uma figura matplotlib para string Base64."""
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    buffer.close()
+    return f"data:image/png;base64,{img_base64}"
+
+
 def _ensure_fig_dir():
     os.makedirs(FIG_DIR, exist_ok=True)
 
@@ -193,10 +203,10 @@ def categorizar_por_cohen(delta: pd.Series, sd_pre: float) -> pd.DataFrame:
     return pd.DataFrame({"z": z, "categoria": cats})
 
 
-# ---------- Gráficos ----------
+# ---------- Gráficos (Base64) ----------
 
-def salvar_prepos_barras(pre_tot: pd.Series, pos_tot: pd.Series, path: str):
-    _ensure_fig_dir()
+def gerar_prepos_barras(pre_tot: pd.Series, pos_tot: pd.Series) -> str:
+    """Gera gráfico de barras pré vs pós e retorna como Base64."""
     fig, ax = plt.subplots(figsize=(8, 5))
     medias = [pre_tot.mean(), pos_tot.mean()]
     desvios = [pre_tot.std(ddof=1), pos_tot.std(ddof=1)]
@@ -206,12 +216,14 @@ def salvar_prepos_barras(pre_tot: pd.Series, pos_tot: pd.Series, path: str):
     for b, m in zip(bars, medias):
         ax.text(b.get_x() + b.get_width()/2, b.get_height() + max(desvios)*0.05, f"{m:.2f}", ha="center", va="bottom")
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_scatter(pre_tot: pd.Series, pos_tot: pd.Series, path: str):
-    _ensure_fig_dir()
+def gerar_scatter(pre_tot: pd.Series, pos_tot: pd.Series) -> str:
+    """Gera gráfico de dispersão e retorna como Base64."""
     fig, ax = plt.subplots(figsize=(7, 7))
     sns.scatterplot(x=pre_tot, y=pos_tot, s=18, alpha=0.5, edgecolor="none", ax=ax, color="#6A5ACD")
     lim_min = min(pre_tot.min(), pos_tot.min())
@@ -222,12 +234,14 @@ def salvar_scatter(pre_tot: pd.Series, pos_tot: pd.Series, path: str):
     ax.set_title("Dispersão: Pré vs Pós por aluno")
     ax.legend()
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_delta_hist(delta: pd.Series, path: str):
-    _ensure_fig_dir()
+def gerar_delta_hist(delta: pd.Series) -> str:
+    """Gera histograma de deltas e retorna como Base64."""
     fig, ax = plt.subplots(figsize=(8, 5))
     sns.histplot(delta, bins=21, kde=True, color="#8A2BE2", ax=ax)
     ax.axvline(delta.mean(), color="red", linestyle="--", label=f"Δ médio = {delta.mean():.2f}")
@@ -236,12 +250,14 @@ def salvar_delta_hist(delta: pd.Series, path: str):
     ax.set_title("Distribuição das diferenças individuais (Δ)")
     ax.legend()
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_heatmap_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[str], path: str):
-    _ensure_fig_dir()
+def gerar_heatmap_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[str]) -> str:
+    """Gera heatmap das questões e retorna como Base64."""
     # Proporção de acertos por questão
     prop_pre = df_pre[cols_q].mean(axis=0)
     prop_pos = df_pos[cols_q].mean(axis=0)
@@ -253,12 +269,14 @@ def salvar_heatmap_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: 
     ax.set_xlabel("Questões")
     ax.set_ylabel("")
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_top_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[str], path: str, top_n: int = 10):
-    _ensure_fig_dir()
+def gerar_top_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[str], top_n: int = 10) -> str:
+    """Gera gráfico das top questões e retorna como Base64."""
     prop_pre = df_pre[cols_q].mean(axis=0)
     prop_pos = df_pos[cols_q].mean(axis=0)
     delta_q = (prop_pos - prop_pre).sort_values(ascending=False)
@@ -275,12 +293,14 @@ def salvar_top_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List
     ax.set_ylabel("Questão")
     ax.set_title("Top questões: maiores melhorias e quedas")
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_categorias_bench(cat_df: pd.DataFrame, path: str):
-    _ensure_fig_dir()
+def gerar_categorias_bench(cat_df: pd.DataFrame) -> str:
+    """Gera gráfico das categorias de benchmark e retorna como Base64."""
     ordem = [
         "Piorou (grande)", "Piorou (médio)", "Piorou (pequeno)",
         "Sem mudança",
@@ -300,19 +320,16 @@ def salvar_categorias_bench(cat_df: pd.DataFrame, path: str):
         ax.text(i, v + max(perc.max()*0.02, 0.5), f"{v:.1f}%", ha="center")
     # Linha de referência Hattie 0.4 e Vocabulário 0.35 como legenda explicativa no título
     plt.tight_layout()
-    fig.savefig(path, dpi=150)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
 # ---------- HTML ----------
 
-def _img_tag_local(src_path: str, alt: str) -> str:
-    # Use relative path from DATA_DIR when HTML is saved into DATA_DIR
-    rel = os.path.relpath(src_path, start=DATA_DIR)
-    return f'<img src="{rel}" alt="{alt}" />'
-
-
-def gerar_html(indic: Dict[str, float]) -> str:
+def gerar_html(indic: Dict[str, float], img_barras: str, img_scatter: str, 
+               img_hist: str, img_heatmap: str, img_top: str, img_categ: str) -> str:
     d = indic.get("cohen_d_global", np.nan)
     d_txt = "NA" if pd.isna(d) else f"{d:.3f}"
 
@@ -384,33 +401,33 @@ def gerar_html(indic: Dict[str, float]) -> str:
         <section>
           <h2>Comparação geral e dispersão</h2>
           <figure>
-            {_img_tag_local(FIG_PREPOS_BARRAS, 'Médias Pré vs Pós')}
+            <img src="{img_barras}" alt="Médias Pré vs Pós" />
             <figcaption>Barra com média e desvio padrão por momento (Pré/Pós).</figcaption>
           </figure>
           <figure>
-            {_img_tag_local(FIG_PREPOS_SCATTER, 'Dispersão Pré vs Pós')}
+            <img src="{img_scatter}" alt="Dispersão Pré vs Pós" />
             <figcaption>Cada ponto representa um aluno. Linha tracejada indica referência y = x.</figcaption>
           </figure>
         </section>
         <section>
           <h2>Distribuição das mudanças</h2>
           <figure>
-            {_img_tag_local(FIG_DELTA_HIST, 'Histograma de Δ')}
+            <img src="{img_hist}" alt="Histograma de Δ" />
             <figcaption>Δ = acertos no Pós − acertos no Pré.</figcaption>
           </figure>
           <figure>
-            {_img_tag_local(FIG_CATEG_BENCH, 'Categorias Cohen')}
+            <img src="{img_categ}" alt="Categorias Cohen" />
             <figcaption>Distribuição em categorias de mudança com base nos limiares de Cohen (SD do Pré).</figcaption>
           </figure>
         </section>
         <section>
           <h2>Diagnóstico por questão</h2>
           <figure>
-            {_img_tag_local(FIG_HEATMAP_Q, 'Heatmap por questão')}
+            <img src="{img_heatmap}" alt="Heatmap por questão" />
             <figcaption>Proporção de acertos por questão no Pré e no Pós.</figcaption>
           </figure>
           <figure>
-            {_img_tag_local(FIG_TOP_Q, 'Top questões (melhoras/quedas)')}
+            <img src="{img_top}" alt="Top questões (melhoras/quedas)" />
             <figcaption>Questões com maiores ganhos e quedas em proporção de acertos.</figcaption>
           </figure>
         </section>
@@ -439,21 +456,24 @@ def gerar_relatorio(path_pre: str = DEFAULT_PRE, path_pos: str = DEFAULT_POS, sa
 
     indic = indicadores(pre_tot, pos_tot, delta)
 
-    # Gráficos
-    salvar_prepos_barras(pre_tot, pos_tot, FIG_PREPOS_BARRAS)
-    salvar_scatter(pre_tot, pos_tot, FIG_PREPOS_SCATTER)
-    salvar_delta_hist(delta, FIG_DELTA_HIST)
-    salvar_heatmap_questoes(df_pre_a, df_pos_a, cols_q, FIG_HEATMAP_Q)
-    salvar_top_questoes(df_pre_a, df_pos_a, cols_q, FIG_TOP_Q)
+    # Gerar gráficos em Base64
+    print("Gerando gráficos em Base64...")
+    img_barras = gerar_prepos_barras(pre_tot, pos_tot)
+    img_scatter = gerar_scatter(pre_tot, pos_tot)
+    img_hist = gerar_delta_hist(delta)
+    img_heatmap = gerar_heatmap_questoes(df_pre_a, df_pos_a, cols_q)
+    img_top = gerar_top_questoes(df_pre_a, df_pos_a, cols_q)
 
     cat_df = categorizar_por_cohen(delta, indic["std_pre"])
-    salvar_categorias_bench(cat_df, FIG_CATEG_BENCH)
+    img_categ = gerar_categorias_bench(cat_df)
 
-    html = gerar_html(indic)
+    print("Renderizando HTML...")
+    html = gerar_html(indic, img_barras, img_scatter, img_hist, img_heatmap, img_top, img_categ)
     with open(saida_html, "w", encoding="utf-8") as f:
         f.write(html)
 
     print(f"Relatório salvo em: {saida_html}")
+    print("Todas as imagens foram incorporadas diretamente no HTML!")
     return saida_html
 
 

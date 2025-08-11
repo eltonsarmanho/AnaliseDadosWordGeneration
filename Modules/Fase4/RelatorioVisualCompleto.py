@@ -2,6 +2,8 @@ import os
 import pathlib
 from datetime import datetime
 from typing import Dict, List
+import base64
+import io
 
 import numpy as np
 import pandas as pd
@@ -42,6 +44,16 @@ def _to_numeric_series(s: pd.Series) -> pd.Series:
     s = s.str.replace(",", ".", regex=False)  # vírgula -> ponto
     s = s.str.replace(r"[^0-9\.-]", "", regex=True)
     return pd.to_numeric(s, errors="coerce")
+
+
+def fig_to_base64(fig) -> str:
+    """Converte uma figura matplotlib para string Base64."""
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', bbox_inches='tight', dpi=120)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    buffer.close()
+    return f"data:image/png;base64,{img_base64}"
 
 
 def categorizar_mudanca_cohen(delta: float, baseline_sd: float) -> str:
@@ -168,11 +180,11 @@ def resumo_por_grupo(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ======================
-# Gráficos (PNG)
+# Gráficos (Base64)
 # ======================
 
-def salvar_histograma_delta(df: pd.DataFrame, out_path: pathlib.Path):
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+def gerar_histograma_delta(df: pd.DataFrame) -> str:
+    """Gera histograma e retorna como Base64."""
     fig, ax = plt.subplots(figsize=(7, 4))
     vals = df["delta_voc"].dropna()
     ax.hist(vals, bins=30, color="#6baed6", edgecolor="white")
@@ -186,13 +198,14 @@ def salvar_histograma_delta(df: pd.DataFrame, out_path: pathlib.Path):
     ax.text(0.98, 0.92, f"Média: {mean_val:.2f}", transform=ax.transAxes, ha="right", va="center", fontsize=9,
             bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
     fig.tight_layout()
-    fig.savefig(out_path)
+    
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_barras_categorias(df: pd.DataFrame, baseline_sd: float, out_path: pathlib.Path):
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
+def gerar_barras_categorias(df: pd.DataFrame, baseline_sd: float) -> str:
+    """Gera gráfico de barras das categorias e retorna como Base64."""
     cat_order = [
         "Piora Grande (<-0.8 SD)",
         "Piora Média (-0.8 a -0.5 SD)",
@@ -228,13 +241,13 @@ def salvar_barras_categorias(df: pd.DataFrame, baseline_sd: float, out_path: pat
                 ha="center", va="bottom", fontsize=8)
 
     fig.tight_layout()
-    fig.savefig(out_path)
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
-def salvar_forest_plot(grp: pd.DataFrame, out_path: pathlib.Path):
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
+def gerar_forest_plot(grp: pd.DataFrame) -> str:
+    """Gera forest plot e retorna como Base64."""
     # Ordena por ES
     data = grp.copy()
     data = data.sort_values("effect_size")
@@ -286,8 +299,9 @@ def salvar_forest_plot(grp: pd.DataFrame, out_path: pathlib.Path):
     ax.legend(handles=legend_elems, loc='lower right', frameon=False, fontsize=8)
 
     fig.tight_layout()
-    fig.savefig(out_path)
+    base64_str = fig_to_base64(fig)
     plt.close(fig)
+    return base64_str
 
 
 # ======================
@@ -337,7 +351,8 @@ def _interpretacao_contexto_html(grp: pd.DataFrame) -> str:
     return "\n".join(rows)
 
 
-def gerar_html(df: pd.DataFrame, inds: Dict[str, float], grp: pd.DataFrame):
+def gerar_html(df: pd.DataFrame, inds: Dict[str, float], grp: pd.DataFrame, 
+               img_hist: str, img_cats: str, img_forest: str):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Cards
@@ -442,15 +457,15 @@ def gerar_html(df: pd.DataFrame, inds: Dict[str, float], grp: pd.DataFrame):
         <h2 class="section">Gráficos</h2>
         <div class="figs">
             <div class="fig">
-                <img src="figures/{FIG_HIST.name}" alt="Histograma de deltas" />
+                <img src="{img_hist}" alt="Histograma de deltas" />
                 <div class="caption">Distribuição dos deltas (pós - pré).</div>
             </div>
             <div class="fig">
-                <img src="figures/{FIG_CATS.name}" alt="Categorias Cohen" />
+                <img src="{img_cats}" alt="Categorias Cohen" />
                 <div class="caption">Categorias de Cohen com base em SD do pré.</div>
             </div>
             <div class="fig">
-                <img src="figures/{FIG_FOREST.name}" alt="Forest plot ES por grupo" />
+                <img src="{img_forest}" alt="Forest plot ES por grupo" />
                 <div class="caption">Effect Size por grupo (IC 95%). Linha tracejada: d = 0; Pontilhado: |d| = 0.4. Pontos vazados: n < 10 (estimativa instável).</div>
             </div>
         </div>
@@ -483,18 +498,19 @@ def main() -> pathlib.Path:
     inds = calcular_indicadores(df)
     grp = resumo_por_grupo(df)
 
-    print("Gerando figuras (PNG)...")
-    salvar_histograma_delta(df, FIG_HIST)
-    salvar_barras_categorias(df, inds["baseline_sd"], FIG_CATS)
-    salvar_forest_plot(grp, FIG_FOREST)
+    print("Gerando gráficos em Base64...")
+    img_hist = gerar_histograma_delta(df)
+    img_cats = gerar_barras_categorias(df, inds["baseline_sd"])
+    img_forest = gerar_forest_plot(grp)
 
     print("Renderizando HTML...")
-    html = gerar_html(df, inds, grp)
+    html = gerar_html(df, inds, grp, img_hist, img_cats, img_forest)
     HTML_OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(HTML_OUT, "w", encoding="utf-8") as f:
         f.write(html)
 
     print(f"Relatório gerado em: {HTML_OUT}")
+    print("Todas as imagens foram incorporadas diretamente no HTML!")
     return HTML_OUT
 
 
