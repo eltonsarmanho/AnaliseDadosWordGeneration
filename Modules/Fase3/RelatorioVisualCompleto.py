@@ -77,7 +77,7 @@ def limpar_validar_q(df: pd.DataFrame, cols_q: List[str]) -> pd.DataFrame:
     for c in cols_q:
         work[c] = pd.to_numeric(work[c], errors="coerce")
     # Domain check: only 0 or 1 allowed
-    mask_validos = work[cols_q].applymap(lambda x: x in (0, 1)).all(axis=1)
+    mask_validos = work[cols_q].map(lambda x: x in (0, 1)).all(axis=1)
     work = work[mask_validos]
     # Drop any residual NaNs in Qs
     work = work.dropna(subset=cols_q)
@@ -203,14 +203,29 @@ def categorizar_por_cohen(delta: pd.Series, sd_pre: float) -> pd.DataFrame:
     return pd.DataFrame({"z": z, "categoria": cats})
 
 
+# ---------- Utilidades ----------
+
+def interpretar_magnitude(es: float) -> str:
+    abs_es = abs(es)
+    if abs_es < 0.15:
+        return "Trivial"
+    elif abs_es < 0.35:
+        return "Pequeno"
+    elif abs_es < 0.65:
+        return "Moderado"
+    elif abs_es < 1.0:
+        return "Grande"
+    else:
+        return "Muito Grande"
+
 # ---------- Gráficos (Base64) ----------
 
 def gerar_prepos_barras(pre_tot: pd.Series, pos_tot: pd.Series) -> str:
     """Gera gráfico de barras pré vs pós e retorna como Base64."""
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(7, 4))
     medias = [pre_tot.mean(), pos_tot.mean()]
     desvios = [pre_tot.std(ddof=1), pos_tot.std(ddof=1)]
-    bars = ax.bar(["Pré", "Pós"], medias, yerr=desvios, capsize=6, color=["#7B68EE", "#4B0082"], alpha=0.9)
+    bars = ax.bar(["Pré", "Pós"], medias, yerr=desvios, capsize=6, color=["#6baed6", "#2171b5"], alpha=0.9)
     ax.set_ylabel("Acertos (média ± DP)")
     ax.set_title("Comparação Pré vs Pós (acertos totais)")
     for b, m in zip(bars, medias):
@@ -222,52 +237,20 @@ def gerar_prepos_barras(pre_tot: pd.Series, pos_tot: pd.Series) -> str:
     return base64_str
 
 
-def gerar_scatter(pre_tot: pd.Series, pos_tot: pd.Series) -> str:
-    """Gera gráfico de dispersão e retorna como Base64."""
-    fig, ax = plt.subplots(figsize=(7, 7))
-    sns.scatterplot(x=pre_tot, y=pos_tot, s=18, alpha=0.5, edgecolor="none", ax=ax, color="#6A5ACD")
-    lim_min = min(pre_tot.min(), pos_tot.min())
-    lim_max = max(pre_tot.max(), pos_tot.max())
-    ax.plot([lim_min, lim_max], [lim_min, lim_max], linestyle="--", color="#444", label="y=x")
-    ax.set_xlabel("Pré (acertos)")
-    ax.set_ylabel("Pós (acertos)")
-    ax.set_title("Dispersão: Pré vs Pós por aluno")
-    ax.legend()
-    plt.tight_layout()
-    
-    base64_str = fig_to_base64(fig)
-    plt.close(fig)
-    return base64_str
-
-
 def gerar_delta_hist(delta: pd.Series) -> str:
     """Gera histograma de deltas e retorna como Base64."""
-    fig, ax = plt.subplots(figsize=(8, 5))
-    sns.histplot(delta, bins=21, kde=True, color="#8A2BE2", ax=ax)
-    ax.axvline(delta.mean(), color="red", linestyle="--", label=f"Δ médio = {delta.mean():.2f}")
-    ax.set_xlabel("Δ (Pós - Pré)")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    vals = delta.dropna()
+    ax.hist(vals, bins=30, color="#6baed6", edgecolor="white")
+    mean_val = float(vals.mean()) if len(vals) else 0.0
+
+    ax.axvline(0, color="black", linestyle=":", linewidth=1)
+    ax.axvline(mean_val, color="#e41a1c", linestyle="--", linewidth=1.5)
+    ax.set_title("Distribuição dos Deltas (Pós - Pré)")
+    ax.set_xlabel("Delta de Vocabulário")
     ax.set_ylabel("Frequência")
-    ax.set_title("Distribuição das diferenças individuais (Δ)")
-    ax.legend()
-    plt.tight_layout()
-    
-    base64_str = fig_to_base64(fig)
-    plt.close(fig)
-    return base64_str
-
-
-def gerar_heatmap_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[str]) -> str:
-    """Gera heatmap das questões e retorna como Base64."""
-    # Proporção de acertos por questão
-    prop_pre = df_pre[cols_q].mean(axis=0)
-    prop_pos = df_pos[cols_q].mean(axis=0)
-    m = pd.DataFrame([prop_pre.values, prop_pos.values], index=["Pré", "Pós"], columns=cols_q)
-
-    fig, ax = plt.subplots(figsize=(min(16, 0.35*len(cols_q)+4), 4.5))
-    sns.heatmap(m, annot=False, cmap="Purples", vmin=0, vmax=1, cbar_kws={"label": "Proporção correta"}, ax=ax)
-    ax.set_title("Proporção de acertos por questão (Pré vs Pós)")
-    ax.set_xlabel("Questões")
-    ax.set_ylabel("")
+    ax.text(0.98, 0.92, f"Média: {mean_val:.2f}", transform=ax.transAxes, ha="right", va="center", fontsize=9,
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
     plt.tight_layout()
     
     base64_str = fig_to_base64(fig)
@@ -287,7 +270,20 @@ def gerar_top_questoes(df_pre: pd.DataFrame, df_pos: pd.DataFrame, cols_q: List[
     fig, ax = plt.subplots(figsize=(10, 7))
     dados = pd.concat([top_up, top_down])
     cores = ["#2E8B57"]*len(top_up) + ["#B22222"]*len(top_down)
-    sns.barplot(x=dados.values, y=dados.index, palette=cores, ax=ax)
+    
+    # Cria um DataFrame para usar com seaborn sem warning
+    plot_data = pd.DataFrame({
+        'delta': dados.values,
+        'questao': dados.index,
+        'cor': cores
+    })
+    
+    # Usa scatter + line para evitar warning do seaborn
+    for i, (questao, delta, cor) in enumerate(zip(plot_data['questao'], plot_data['delta'], plot_data['cor'])):
+        ax.barh(i, delta, color=cor, alpha=0.8)
+    
+    ax.set_yticks(range(len(plot_data)))
+    ax.set_yticklabels(plot_data['questao'])
     ax.axvline(0, color="#333", linewidth=1)
     ax.set_xlabel("Δ proporção correta (Pós - Pré)")
     ax.set_ylabel("Questão")
@@ -308,17 +304,32 @@ def gerar_categorias_bench(cat_df: pd.DataFrame) -> str:
     ]
     cont = cat_df["categoria"].value_counts().reindex(ordem).fillna(0)
     perc = 100 * cont / cont.sum()
+    
+    cores = {
+        "Piorou (grande)": "#d73027",
+        "Piorou (médio)": "#f46d43", 
+        "Piorou (pequeno)": "#fdae61",
+        "Sem mudança": "#fee08b",
+        "Melhorou (pequeno)": "#d9ef8b",
+        "Melhorou (médio)": "#a6d96a",
+        "Melhorou (grande)": "#66bd63",
+    }
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(x=perc.index, y=perc.values, palette="viridis", ax=ax)
+    
+    # Cria barras individuais para evitar warning do seaborn
+    for i, (cat, val) in enumerate(zip(ordem, perc.values)):
+        ax.bar(i, val, color=cores[cat], alpha=0.8)
+    
+    ax.set_xticks(range(len(ordem)))
+    ax.set_xticklabels(ordem, rotation=30, ha="right")
     ax.set_ylabel("% de alunos")
-    ax.set_xlabel("")
     ax.set_title("Distribuição de mudanças (padrão Cohen, SD do Pré)")
     ax.set_ylim(0, max(perc.max()*1.15, 10))
-    ax.tick_params(axis='x', rotation=35)
+    
+    # Adiciona valores nas barras
     for i, v in enumerate(perc.values):
         ax.text(i, v + max(perc.max()*0.02, 0.5), f"{v:.1f}%", ha="center")
-    # Linha de referência Hattie 0.4 e Vocabulário 0.35 como legenda explicativa no título
     plt.tight_layout()
     
     base64_str = fig_to_base64(fig)
@@ -328,121 +339,178 @@ def gerar_categorias_bench(cat_df: pd.DataFrame) -> str:
 
 # ---------- HTML ----------
 
-def gerar_html(indic: Dict[str, float], img_barras: str, img_scatter: str, 
-               img_hist: str, img_heatmap: str, img_top: str, img_categ: str) -> str:
+def _format_card(label: str, value: str, extra: str = "", theme: str = "default") -> str:
+    theme_class = {
+        "default": "card",
+        "green": "card green",
+        "red": "card red",
+        "yellow": "card yellow",
+    }.get(theme, "card")
+
+    desc_html = f"<div class='desc'>{extra}</div>" if extra else ""
+    return f"""
+    <div class="{theme_class}">
+        <div class="card-label">{label}</div>
+        <div class="valor">{value}</div>
+        {desc_html}
+    </div>
+    """
+
+
+def _interpretacao_contexto_html(indic: Dict[str, float]) -> str:
     d = indic.get("cohen_d_global", np.nan)
-    d_txt = "NA" if pd.isna(d) else f"{d:.3f}"
+    mag = interpretar_magnitude(d) if np.isfinite(d) else "Indefinido"
+    
+    bench_hattie = "✓ Acima do benchmark (d≥0.4)" if (np.isfinite(d) and abs(d) >= 0.4) else "⚠ Abaixo do benchmark (d<0.4)"
+    bench_vocab = "✓ Significativo em Vocabulário (d≥0.35)" if (np.isfinite(d) and abs(d) >= 0.35) else "⚠ Abaixo do threshold (d<0.35)"
 
-    # Badges for benchmarks
-    badge_hattie = "☑" if (not pd.isna(d) and d >= 0.4) else "☐"
-    badge_vocab = "☑" if (not pd.isna(d) and d >= 0.35) else "☐"
-
-    style = """
-    <style>
-      body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: #1a1a1a; }
-      header { background: linear-gradient(90deg, #6a11cb, #2575fc); color: white; padding: 28px 20px; }
-      header h1 { margin: 0 0 6px 0; font-weight: 700; }
-      header p { margin: 0; opacity: 0.95; }
-      .container { padding: 18px 22px 40px; }
-      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 16px 0 10px; }
-      .card { background: #ffffff; border: 1px solid #eee; border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-      .card h3 { margin: 0 0 6px 0; font-size: 14px; color: #555; font-weight: 600; }
-      .card .value { font-size: 22px; font-weight: 700; color: #4B0082; }
-      section { margin-top: 24px; }
-      section h2 { font-size: 18px; margin-bottom: 10px; color: #333; }
-      figure { margin: 16px 0; }
-      figure img { max-width: 100%; border-radius: 10px; border: 1px solid #eee; }
-      figcaption { font-size: 12px; color: #666; margin-top: 6px; }
-      .badges { display: flex; gap: 10px; margin-top: 6px; }
-      .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #ddd; background: #fafafa; }
-      footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-    """
-
-    cards = f"""
-    <div class="cards">
-      <div class="card"><h3>Amostra</h3><div class="value">{indic['n']}</div></div>
-      <div class="card"><h3>Média Pré ± DP</h3><div class="value">{indic['mean_pre']:.2f} ± {indic['std_pre']:.2f}</div></div>
-      <div class="card"><h3>Média Pós ± DP</h3><div class="value">{indic['mean_pos']:.2f} ± {indic['std_pos']:.2f}</div></div>
-      <div class="card"><h3>Δ médio (Pós - Pré)</h3><div class="value">{indic['mean_delta']:.2f}</div></div>
-      <div class="card"><h3>Cohen d (global)</h3><div class="value">{d_txt}</div></div>
-      <div class="card"><h3>Variação</h3><div class="value">{indic['%_improved']:.1f}% ↑ · {indic['%_unchanged']:.1f}% → · {indic['%_worsened']:.1f}% ↓</div></div>
+    return f"""
+    <div class="grupo-item">
+        <div class="grupo-titulo">Effect Size Global: d = {d:.3f} (n={indic['n']})</div>
+        <div class="grupo-detalhes">
+            <span><strong>Magnitude:</strong> {mag}</span>
+            <span>{bench_hattie}</span>
+            <span>{bench_vocab}</span>
+        </div>
     </div>
     """
 
-    benchmarks = f"""
-    <div class="card">
-      <h3>Benchmarks educacionais</h3>
-      <div class="badges">
-        <span class="badge">Hattie 0.40: {badge_hattie}</span>
-        <span class="badge">Vocabulário 0.35: {badge_vocab}</span>
-        <span class="badge">Cohen d global: {d_txt}</span>
-      </div>
-      <p style="margin-top:6px; font-size: 13px; color:#444">Interpretação: valores ≥ 0.40 sugerem impacto educacional típico de boas intervenções gerais (Hattie). Para vocabulário, efeitos ≥ 0.35 são frequentemente relatados em meta-análises (Marulis & Neuman, 2010). Este relatório usa SD do pré como base de padronização.</p>
-    </div>
-    """
+
+def gerar_html(indic: Dict[str, float], img_barras: str, img_hist: str, img_top: str, img_categ: str) -> str:
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Cards seguindo o padrão da Fase4
+    cards_html = "".join([
+        _format_card("Registros", f"{indic['n']}", "alunos após limpeza"),
+        _format_card("Média Pré", f"{indic['mean_pre']:.2f}"),
+        _format_card("Média Pós", f"{indic['mean_pos']:.2f}"),
+        _format_card("Delta médio", f"{indic['mean_delta']:.2f}", "pontos"),
+        _format_card("% Melhoraram", f"{indic['%_improved']:.1f}%", theme="green"),
+        _format_card("% Pioraram", f"{indic['%_worsened']:.1f}%", theme="red"),
+        _format_card("% Mantiveram", f"{indic['%_unchanged']:.1f}%", theme="yellow"),
+        _format_card("Effect Size global", f"{indic['cohen_d_global']:.3f}"),
+    ])
+
+    # Seção de interpretação seguindo o padrão da Fase4
+    interp_html = _interpretacao_contexto_html(indic)
 
     html = f"""
-    <!doctype html>
-    <html lang=\"pt-br\">
-    <head>
-      <meta charset=\"utf-8\" />
-      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-      <title>Relatório Visual WordGen – Fase 3</title>
-      {style}
-    </head>
-    <body>
-      <header>
-        <h1>Vocabulário WordGen – Fase 3 (Pré vs Pós)</h1>
-        <p>Relatório visual com indicadores, gráficos analíticos e benchmarks</p>
-      </header>
-      <div class="container">
-        {cards}
-        <section>
-          <h2>Comparação geral e dispersão</h2>
-          <figure>
-            <img src="{img_barras}" alt="Médias Pré vs Pós" />
-            <figcaption>Barra com média e desvio padrão por momento (Pré/Pós).</figcaption>
-          </figure>
-          <figure>
-            <img src="{img_scatter}" alt="Dispersão Pré vs Pós" />
-            <figcaption>Cada ponto representa um aluno. Linha tracejada indica referência y = x.</figcaption>
-          </figure>
-        </section>
-        <section>
-          <h2>Distribuição das mudanças</h2>
-          <figure>
-            <img src="{img_hist}" alt="Histograma de Δ" />
-            <figcaption>Δ = acertos no Pós − acertos no Pré.</figcaption>
-          </figure>
-          <figure>
-            <img src="{img_categ}" alt="Categorias Cohen" />
-            <figcaption>Distribuição em categorias de mudança com base nos limiares de Cohen (SD do Pré).</figcaption>
-          </figure>
-        </section>
-        <section>
-          <h2>Diagnóstico por questão</h2>
-          <figure>
-            <img src="{img_heatmap}" alt="Heatmap por questão" />
-            <figcaption>Proporção de acertos por questão no Pré e no Pós.</figcaption>
-          </figure>
-          <figure>
-            <img src="{img_top}" alt="Top questões (melhoras/quedas)" />
-            <figcaption>Questões com maiores ganhos e quedas em proporção de acertos.</figcaption>
-          </figure>
-        </section>
-        <section>
-          <h2>Análise com benchmarks educacionais</h2>
-          {benchmarks}
-        </section>
-        <footer>
-          <p>Notas: linhas com valores fora do domínio [0,1] ou com ausências em Qs foram removidas. IDs foram alinhados entre Pré e Pós para análise pareada.</p>
-          <p>Referências: Cohen (1988); Hattie (2009); Marulis & Neuman (2010).</p>
-        </footer>
-      </div>
-    </body>
-    </html>
-    """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relatório Visual WordGen - Vocabulário (Fase 3)</title>
+<style>
+    :root {{
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    }}
+    body {{
+        margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }}
+    .header {{
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; padding: 28px 18px; box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }}
+    .header .title {{
+        font-size: 26px; font-weight: 700; margin: 0;
+    }}
+    .header .subtitle {{
+        font-size: 14px; opacity: 0.95; margin-top: 6px;
+    }}
+    .header .timestamp {{
+        font-size: 12px; opacity: 0.85; margin-top: 4px;
+    }}
+    .container {{
+        max-width: 1200px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 22px; box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }}
+    .cards {{
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px;
+    }}
+    .card {{
+        background: var(--card-grad); color: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }}
+    .card.green {{ background: var(--green-grad); }}
+    .card.red {{ background: var(--red-grad); }}
+    .card.yellow {{ background: var(--yellow-grad); }}
+    .card .card-label {{ font-size: 13px; opacity: 0.95; }}
+    .card .valor {{ font-size: 22px; font-weight: 700; margin-top: 6px; }}
+    .card .desc {{ font-size: 11px; opacity: 0.9; }}
+
+    h2.section {{
+        margin-top: 22px; font-size: 18px; border-left: 4px solid var(--purple1); padding-left: 10px; color: #1f2937;
+    }}
+    .figs {{ display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 10px; }}
+    .fig {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 8px; }}
+    .fig img {{ width: 100%; height: auto; border-radius: 6px; }}
+    .fig .caption {{ font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }}
+
+    .interp {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 14px; }}
+    .grupo-item {{ background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }}
+    .grupo-titulo {{ font-weight: 600; }}
+    .grupo-detalhes {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; color: #374151; font-size: 13px; margin-top: 6px; }}
+
+    .foot-note {{ font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }}
+
+    .badge {{ display:inline-block; padding:2px 6px; border-radius:999px; font-size:11px; line-height:1.4; }}
+    .badge.warn {{ background:#fff3cd; color:#7a6200; border:1px solid #ffe69c; }}
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual WordGen</div>
+        <div class="subtitle">Vocabulário – Fase 3 (Pré vs Pós). Análise pareada por ID de aluno.</div>
+        <div class="timestamp">Gerado em: {now}</div>
+    </div>
+
+    <div class="container">
+        <h2 class="section">Indicadores</h2>
+        <div class="cards">
+            {cards_html}
+        </div>
+
+        <h2 class="section">Gráficos</h2>
+        <div class="figs">
+            <div class="fig">
+                <img src="{img_barras}" alt="Comparação Pré vs Pós" />
+                <div class="caption">Comparação das médias (Pré vs Pós) com desvio padrão.</div>
+            </div>
+            <div class="fig">
+                <img src="{img_hist}" alt="Histograma de deltas" />
+                <div class="caption">Distribuição dos deltas (pós - pré).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_categ}" alt="Categorias Cohen" />
+                <div class="caption">Categorias de Cohen com base em SD do pré.</div>
+            </div>
+            <div class="fig">
+                <img src="{img_top}" alt="Top questões" />
+                <div class="caption">Questões com maiores ganhos e quedas em proporção de acertos.</div>
+            </div>
+        </div>
+
+        <h2 class="section">Interpretação contextualizada do effect size</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">Referências: Cohen (1988) – 0.2/0.5/0.8; Hattie (2009) – d≥0.4 como "bom resultado"; Vocabulário (Marulis & Neuman, 2010) – d≥0.35 significativo.</p>
+            {interp_html}
+        </div>
+
+        <div class="foot-note">
+            <p>Notas: ES global = Δ/SD(Pré). Categorias Cohen baseadas em SD(Pré). Linhas com valores fora do domínio [0,1] ou com ausências em Qs foram removidas.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
     return html
 
 
@@ -459,16 +527,14 @@ def gerar_relatorio(path_pre: str = DEFAULT_PRE, path_pos: str = DEFAULT_POS, sa
     # Gerar gráficos em Base64
     print("Gerando gráficos em Base64...")
     img_barras = gerar_prepos_barras(pre_tot, pos_tot)
-    img_scatter = gerar_scatter(pre_tot, pos_tot)
     img_hist = gerar_delta_hist(delta)
-    img_heatmap = gerar_heatmap_questoes(df_pre_a, df_pos_a, cols_q)
     img_top = gerar_top_questoes(df_pre_a, df_pos_a, cols_q)
 
     cat_df = categorizar_por_cohen(delta, indic["std_pre"])
     img_categ = gerar_categorias_bench(cat_df)
 
     print("Renderizando HTML...")
-    html = gerar_html(indic, img_barras, img_scatter, img_hist, img_heatmap, img_top, img_categ)
+    html = gerar_html(indic, img_barras, img_hist, img_top, img_categ)
     with open(saida_html, "w", encoding="utf-8") as f:
         f.write(html)
 

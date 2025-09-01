@@ -55,3 +55,7 @@ Data/figures/
 
 # pyenv
 .python-version
+
+*.csv
+*.html
+*.txt
