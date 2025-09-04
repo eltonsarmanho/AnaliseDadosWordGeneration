@@ -48,6 +48,16 @@ plt.rcParams.update({
 # Funções de utilidade
 # ======================
 
+def obter_escolas_disponiveis():
+    """Obtém a lista de escolas disponíveis nos dados"""
+    try:
+        df_pre = pd.read_excel(ARQUIVO_PRE)
+        escolas = sorted(df_pre['Escola'].dropna().unique().tolist())
+        return ["Todas"] + escolas
+    except Exception as e:
+        print(f"Erro ao carregar escolas: {e}")
+        return ["Todas"]
+
 def interpretar_cohen_d(d):
     """Interpreta o Cohen's d conforme benchmarks educacionais"""
     abs_d = abs(d)
@@ -149,13 +159,19 @@ def fig_to_base64(fig):
 # Funções de análise
 # ======================
 
-def carregar_e_preparar_dados():
+def carregar_e_preparar_dados(escola_filtro=None):
     """Carrega e prepara os dados da Fase 2"""
     print("1. Carregando dados...")
     
     # Carregar dados
     df_pre = pd.read_excel(ARQUIVO_PRE)
     df_pos = pd.read_excel(ARQUIVO_POS)
+    
+    # Filtrar por escola se especificado
+    if escola_filtro and escola_filtro != "Todas":
+        print(f"   Filtrando por escola: {escola_filtro}")
+        df_pre = df_pre[df_pre['Escola'] == escola_filtro].copy()
+        df_pos = df_pos[df_pos['Escola'] == escola_filtro].copy()
     
     # Carregar mapeamento de palavras
     mapeamento_palavras = carregar_mapeamento_palavras()
@@ -267,7 +283,20 @@ def calcular_indicadores(scores_df, grupo_filtro=None):
         dados = scores_df
     
     if len(dados) == 0:
-        return {}
+        return {
+            'n': 0,
+            'mean_pre': 0,
+            'std_pre': 0,
+            'mean_pos': 0,
+            'std_pos': 0,
+            'mean_delta': 0,
+            'std_delta': 0,
+            'cohen_d': 0,
+            'p_value': 1.0,
+            'perc_improved': 0,
+            'perc_worsened': 0,
+            'perc_unchanged': 0
+        }
     
     pre_scores = dados['Score_Pre']
     pos_scores = dados['Score_Pos']
@@ -748,15 +777,498 @@ def format_card(label: str, value: str, extra: str = "", theme: str = "default")
 # Geração do HTML
 # ======================
 
+def gerar_graficos_escola(escola_filtro=None):
+    """Gera gráficos específicos para uma escola e retorna como base64"""
+    
+    # Carregar dados da escola
+    df_pre_final, df_pos_final, colunas_q, mapeamento_palavras = carregar_e_preparar_dados(escola_filtro)
+    scores_df = calcular_scores(df_pre_final, df_pos_final, colunas_q)
+    
+    if len(scores_df) == 0:
+        return {}
+    
+    # Calcular indicadores
+    indicadores_geral = calcular_indicadores(scores_df)
+    indicadores_grupo1 = calcular_indicadores(scores_df, "6º/7º anos")
+    indicadores_grupo2 = calcular_indicadores(scores_df, "8º/9º anos")
+    
+    # Analisar palavras
+    palavras_df_todos = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras)
+    palavras_df_grupo1 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "6º/7º anos")
+    palavras_df_grupo2 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "8º/9º anos")
+    
+    # Gerar gráficos em memória
+    graficos_b64 = {}
+    
+    # Gráfico 1: Comparação de grupos
+    fig1 = plot_grupos_barras(scores_df)
+    buffer1 = io.BytesIO()
+    fig1.savefig(buffer1, format='png', dpi=150, bbox_inches='tight')
+    buffer1.seek(0)
+    img_b64 = base64.b64encode(buffer1.getvalue()).decode('utf-8')
+    graficos_b64['grupos_barras'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig1)
+    buffer1.close()
+    
+    # Gráfico 2: Top palavras
+    fig2 = plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
+    buffer2 = io.BytesIO()
+    fig2.savefig(buffer2, format='png', dpi=150, bbox_inches='tight')
+    buffer2.seek(0)
+    img_b64 = base64.b64encode(buffer2.getvalue()).decode('utf-8')
+    graficos_b64['palavras_top'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig2)
+    buffer2.close()
+    
+    # Gráfico 3: Cohen's d com benchmarks
+    fig3 = plot_cohen_benchmark(indicadores_geral, indicadores_grupo1, indicadores_grupo2)
+    buffer3 = io.BytesIO()
+    fig3.savefig(buffer3, format='png', dpi=150, bbox_inches='tight')
+    buffer3.seek(0)
+    img_b64 = base64.b64encode(buffer3.getvalue()).decode('utf-8')
+    graficos_b64['cohen_benchmark'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig3)
+    buffer3.close()
+    
+    # Gráfico 4: Comparação intergrupos
+    fig4 = plot_comparacao_intergrupos(scores_df)
+    buffer4 = io.BytesIO()
+    fig4.savefig(buffer4, format='png', dpi=150, bbox_inches='tight')
+    buffer4.seek(0)
+    img_b64 = base64.b64encode(buffer4.getvalue()).decode('utf-8')
+    graficos_b64['comparacao_intergrupos'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig4)
+    buffer4.close()
+    
+    # Gráfico 5: Heatmap erros pós-teste
+    fig5 = plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2)
+    buffer5 = io.BytesIO()
+    fig5.savefig(buffer5, format='png', dpi=150, bbox_inches='tight')
+    buffer5.seek(0)
+    img_b64 = base64.b64encode(buffer5.getvalue()).decode('utf-8')
+    graficos_b64['heatmap_erros_pos'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig5)
+    buffer5.close()
+    
+    # Gráfico 6: Heatmap erros pré-teste
+    fig6 = plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2)
+    buffer6 = io.BytesIO()
+    fig6.savefig(buffer6, format='png', dpi=150, bbox_inches='tight')
+    buffer6.seek(0)
+    img_b64 = base64.b64encode(buffer6.getvalue()).decode('utf-8')
+    graficos_b64['heatmap_erros_pre'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig6)
+    buffer6.close()
+    
+    return graficos_b64
+
+def gerar_dados_todas_escolas():
+    """Gera dados para todas as escolas para o menu interativo"""
+    escolas = obter_escolas_disponiveis()
+    dados_escolas = {}
+    
+    print("📊 Calculando dados para todas as escolas...")
+    
+    for escola in escolas:
+        try:
+            print(f"   Processando: {escola}")
+            
+            # Carregar dados para esta escola
+            escola_filtro = escola if escola != "Todas" else None
+            df_pre_final, df_pos_final, colunas_q, mapeamento_palavras = carregar_e_preparar_dados(escola_filtro)
+            
+            if len(df_pre_final) == 0:
+                continue
+                
+            # Calcular scores
+            scores_df = calcular_scores(df_pre_final, df_pos_final, colunas_q)
+            
+            if len(scores_df) == 0:
+                continue
+            
+            # Calcular indicadores
+            indicadores_geral = calcular_indicadores(scores_df)
+            indicadores_grupo1 = calcular_indicadores(scores_df, "6º/7º anos")
+            indicadores_grupo2 = calcular_indicadores(scores_df, "8º/9º anos")
+            
+            # Gerar gráficos específicos para esta escola
+            print(f"     Gerando gráficos para: {escola}")
+            graficos = gerar_graficos_escola(escola_filtro)
+            
+            # Analisar palavras
+            palavras_df_todos = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras)
+            
+            dados_escolas[escola] = {
+                'indicadores_geral': indicadores_geral,
+                'indicadores_grupo1': indicadores_grupo1,
+                'indicadores_grupo2': indicadores_grupo2,
+                'graficos': graficos,
+                'top_palavras': palavras_df_todos.nlargest(10, 'Melhora')[['Palavra', 'Melhora']].to_dict('records') if len(palavras_df_todos) > 0 else []
+            }
+            
+        except Exception as e:
+            print(f"   ❌ Erro ao processar {escola}: {e}")
+            continue
+    
+    return dados_escolas
+
+def gerar_html_relatorio_interativo():
+    """Gera o relatório HTML interativo com menu de escolas"""
+    
+    # Gerar dados para todas as escolas (incluindo gráficos específicos)
+    dados_escolas = gerar_dados_todas_escolas()
+    
+    # Usar os gráficos da escola "Todas" como padrão
+    figuras_b64 = dados_escolas.get('Todas', {}).get('graficos', {})
+    
+    # Gerar HTML interativo
+    return gerar_html_com_menu(dados_escolas, figuras_b64)
+
+def gerar_html_com_menu(dados_escolas, figuras_b64):
+    """Gera HTML com menu interativo para seleção de escolas"""
+    
+    # Converter dados para JSON
+    import json
+    dados_json = json.dumps(dados_escolas, ensure_ascii=False, indent=2)
+    
+    html = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relatório Visual - WordGen Fase 2 - Vocabulário</title>
+<style>
+    :root {{
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    }}
+    body {{
+        margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }}
+    .header {{
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; padding: 28px 18px; box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }}
+    .header .title {{
+        font-size: 26px; font-weight: 700; margin: 0;
+    }}
+    .header .subtitle {{
+        font-size: 14px; opacity: 0.95; margin-top: 6px;
+    }}
+    .header .timestamp {{
+        font-size: 12px; opacity: 0.85; margin-top: 4px;
+    }}
+    
+    .menu-container {{
+        background: #fff; margin: 18px auto; max-width: 1200px; border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    }}
+    .menu-title {{
+        font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--purple1);
+    }}
+    .escola-select {{
+        width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; background: #fff; cursor: pointer;
+        transition: border-color 0.3s ease;
+    }}
+    .escola-select:focus {{
+        outline: none; border-color: var(--purple1);
+    }}
+    
+    .container {{
+        max-width: 1200px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 22px; box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }}
+    .cards {{
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px;
+    }}
+    .card {{
+        background: var(--card-grad); color: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }}
+    .card.green {{ background: var(--green-grad); }}
+    .card.red {{ background: var(--red-grad); }}
+    .card.yellow {{ background: var(--yellow-grad); }}
+    .card .card-label {{ font-size: 13px; opacity: 0.95; }}
+    .card .valor {{ font-size: 22px; font-weight: 700; margin-top: 6px; }}
+    .card .desc {{ font-size: 11px; opacity: 0.9; }}
+
+    h2.section {{
+        margin-top: 22px; font-size: 18px; border-left: 4px solid var(--purple1); padding-left: 10px; color: #1f2937;
+    }}
+    .figs {{ display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 10px; }}
+    .fig {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 8px; }}
+    .fig img {{ width: 100%; height: auto; border-radius: 6px; }}
+    .fig .caption {{ font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }}
+
+    .interp {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 14px; }}
+    .grupo-item {{ background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }}
+    .grupo-titulo {{ font-weight: 600; }}
+    .grupo-detalhes {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; color: #374151; font-size: 13px; margin-top: 6px; }}
+    .interpretacao-grupo {{ margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid var(--purple1); }}
+    .interpretacao-grupo p {{ margin: 3px 0; font-size: 12px; }}
+    .interpretacao-grupo strong {{ color: var(--purple1); }}
+
+    .figs-heatmap {{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 10px; }}
+    @media (max-width: 768px) {{ .figs-heatmap {{ grid-template-columns: 1fr; }} }}
+
+    .foot-note {{ font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }}
+    
+    .top-palavras {{ margin-top: 15px; }}
+    .palavra-item {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }}
+    .palavra-nome {{ font-weight: 500; }}
+    .palavra-melhora {{ color: var(--purple1); font-weight: 600; }}
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual WordGen - Fase 2</div>
+        <div class="subtitle">Vocabulário (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
+    </div>
+
+    <div class="menu-container">
+        <div class="menu-title">🏫 Selecionar Escola</div>
+        <select class="escola-select" id="escolaSelect" onchange="atualizarDados()">
+        </select>
+    </div>
+
+    <div class="container">
+        <h2 class="section">Indicadores</h2>
+        <div class="cards" id="cardsContainer">
+        </div>
+
+        <h2 class="section">Gráficos</h2>
+        <div class="figs">
+            <div class="fig" id="grafico-grupos">
+                <img src="{figuras_b64.get('grupos_barras', '')}" alt="Comparação de Grupos" />
+                <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário.</div>
+            </div>
+            <div class="fig" id="grafico-cohen">
+                <img src="{figuras_b64.get('cohen_benchmark', '')}" alt="Cohen's d com Benchmarks" />
+                <div class="caption">Effect sizes (Cohen's d) com referências de benchmarks educacionais.</div>
+            </div>
+            <div class="fig" id="grafico-palavras">
+                <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras" />
+                <div class="caption">Palavras com maior melhora na taxa de acerto.</div>
+            </div>
+            <div class="fig" id="grafico-intergrupos">
+                <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Intergrupos" />
+                <div class="caption">Comparação detalhada entre grupos etários.</div>
+            </div>
+        </div>
+
+        <h2 class="section">Percentual de Erros por Palavra e Grupo</h2>
+        <div class="figs-heatmap">
+            <div class="fig" id="grafico-heatmap-pre">
+                <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap de Erros Pré-teste" />
+                <div class="caption">Percentual de erros no pré-teste (Top 20 palavras).</div>
+            </div>
+            <div class="fig" id="grafico-heatmap-pos">
+                <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap de Erros Pós-teste" />
+                <div class="caption">Percentual de erros no pós-teste (Top 20 palavras).</div>
+            </div>
+        </div>
+
+        <h2 class="section">Interpretação contextualizada por grupo etário</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">Referências: Cohen (1988) – 0.2/0.5/0.8; Hattie (2009) – d≥0.4 como "bom resultado"; Vocabulário (Marulis & Neuman, 2010) – d≥0.35 significativo.</p>
+            <div id="interpretacaoContainer">
+            </div>
+        </div>
+
+        <div class="foot-note">
+            <p>Notas: ES = Effect Size (Cohen's d) = Δ/SD(Pré). Análise por grupos etários baseada na classificação de turmas. Dados filtrados para estudantes com participação completa (pré e pós-teste).</p>
+        </div>
+    </div>
+
+<script>
+const dadosEscolas = {dados_json};
+
+function inicializar() {{
+    const select = document.getElementById('escolaSelect');
+    
+    // Adicionar opções ao select
+    Object.keys(dadosEscolas).forEach(escola => {{
+        const option = document.createElement('option');
+        option.value = escola;
+        option.textContent = escola;
+        select.appendChild(option);
+    }});
+    
+    // Definir "Todas" como padrão
+    select.value = 'Todas';
+    atualizarDados();
+}}
+
+function atualizarDados() {{
+    const escolaSelecionada = document.getElementById('escolaSelect').value;
+    const dados = dadosEscolas[escolaSelecionada];
+    
+    if (!dados) return;
+    
+    atualizarCards(dados.indicadores_geral);
+    atualizarInterpretacao(dados);
+    atualizarGraficos(dados.graficos);
+}}
+
+function atualizarCards(indicadores) {{
+    const container = document.getElementById('cardsContainer');
+    const maxScore = 100;
+    const meanPrePercent = (indicadores.mean_pre / maxScore * 100).toFixed(1);
+    const meanPosPercent = (indicadores.mean_pos / maxScore * 100).toFixed(1);
+    
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-label">Palavras Testadas</div>
+            <div class="valor">50</div>
+            <div class="desc">questões de vocabulário</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Pontuação Máxima</div>
+            <div class="valor">100</div>
+            <div class="desc">pontos (2 por questão)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Registros</div>
+            <div class="valor">${{indicadores.n}}</div>
+            <div class="desc">alunos após limpeza</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pré</div>
+            <div class="valor">${{indicadores.mean_pre.toFixed(2)}}</div>
+            <div class="desc">(${{meanPrePercent}}% da máxima)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pós</div>
+            <div class="valor">${{indicadores.mean_pos.toFixed(2)}}</div>
+            <div class="desc">(${{meanPosPercent}}% da máxima)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Delta médio</div>
+            <div class="valor">${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(2)}}</div>
+            <div class="desc">pontos</div>
+        </div>
+        <div class="card green">
+            <div class="card-label">% Melhoraram</div>
+            <div class="valor">${{indicadores.perc_improved.toFixed(1)}}%</div>
+        </div>
+        <div class="card red">
+            <div class="card-label">% Pioraram</div>
+            <div class="valor">${{indicadores.perc_worsened.toFixed(1)}}%</div>
+        </div>
+        <div class="card yellow">
+            <div class="card-label">% Mantiveram</div>
+            <div class="valor">${{indicadores.perc_unchanged.toFixed(1)}}%</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Effect Size</div>
+            <div class="valor">${{indicadores.cohen_d.toFixed(3)}}</div>
+        </div>
+    `;
+}}
+
+function atualizarInterpretacao(dados) {{
+    const container = document.getElementById('interpretacaoContainer');
+    
+    function interpretarCohenD(d) {{
+        const absD = Math.abs(d);
+        let magnitude, hattieStatus, vocabStatus;
+        
+        if (absD >= 0.8) magnitude = "Grande";
+        else if (absD >= 0.5) magnitude = "Médio";
+        else if (absD >= 0.2) magnitude = "Pequeno";
+        else magnitude = "Negligível";
+        
+        hattieStatus = absD >= 0.4 ? "Acima do benchmark (d≥0.4)" : "Abaixo do benchmark (d≥0.4)";
+        vocabStatus = absD >= 0.35 ? "Significativo para vocabulário (d≥0.35)" : "Abaixo do threshold para vocabulário (d≥0.35)";
+        
+        return {{ magnitude, hattieStatus, vocabStatus }};
+    }}
+    
+    function criarGrupoItem(indicadores, nomeGrupo) {{
+        const d = indicadores.cohen_d;
+        const interp = interpretarCohenD(d);
+        
+        return `
+            <div class="grupo-item">
+                <div class="grupo-titulo">${{nomeGrupo}} (N=${{indicadores.n}})</div>
+                <div class="grupo-detalhes">
+                    <span>Média Pré: ${{indicadores.mean_pre.toFixed(2)}}</span>
+                    <span>Média Pós: ${{indicadores.mean_pos.toFixed(2)}}</span>
+                    <span>Delta: ${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(2)}}</span>
+                    <span>Cohen's d: ${{d.toFixed(3)}}</span>
+                    <span>% Melhoraram: ${{indicadores.perc_improved.toFixed(1)}}%</span>
+                </div>
+                <div class="interpretacao-grupo">
+                    <p><strong>Magnitude:</strong> ${{interp.magnitude}} (Cohen, 1988)</p>
+                    <p><strong>Benchmark Educacional:</strong> ${{interp.hattieStatus}} (Hattie, 2009)</p>
+                    <p><strong>Vocabulário:</strong> ${{interp.vocabStatus}} (Marulis & Neuman, 2010)</p>
+                </div>
+            </div>
+        `;
+    }}
+    
+    container.innerHTML = 
+        criarGrupoItem(dados.indicadores_grupo1, "6º/7º anos") + 
+        criarGrupoItem(dados.indicadores_grupo2, "8º/9º anos");
+}}
+
+function atualizarGraficos(graficos) {{
+    if (!graficos) return;
+    
+    // Atualizar cada gráfico se existir
+    const atualizarImg = (id, src) => {{
+        const img = document.querySelector(`#${{id}} img`);
+        if (img && src) {{
+            img.src = src;
+        }}
+    }};
+    
+    atualizarImg('grafico-grupos', graficos.grupos_barras);
+    atualizarImg('grafico-cohen', graficos.cohen_benchmark);
+    atualizarImg('grafico-palavras', graficos.palavras_top);
+    atualizarImg('grafico-intergrupos', graficos.comparacao_intergrupos);
+    atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
+    atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
+}}
+
+// Inicializar quando a página carregar
+document.addEventListener('DOMContentLoaded', inicializar);
+</script>
+</body>
+</html>
+"""
+    return html
+
 def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grupo2, 
-                        palavras_df_todos, figuras_b64):
+                        palavras_df_todos, figuras_b64, escola_filtro=None):
     """Gera o relatório HTML completo seguindo padrão da Fase 3"""
+    
+    # Definir título baseado na escola
+    if escola_filtro and escola_filtro != "Todas":
+        titulo_escola = f" - {escola_filtro}"
+        subtitulo_escola = f"Escola: {escola_filtro}. "
+    else:
+        titulo_escola = ""
+        subtitulo_escola = "Todas as escolas. "
+    
+    # Calcular pontuação máxima possível (50 questões × 2 pontos cada)
+    max_score = 50 * 2  # 100 pontos máximos
+    mean_pre_percent = (indicadores_geral.get('mean_pre', 0) / max_score) * 100
+    mean_pos_percent = (indicadores_geral.get('mean_pos', 0) / max_score) * 100
     
     # Cards seguindo o padrão da Fase 3
     cards_html = "".join([
+        format_card("Palavras Testadas", "50", "questões de vocabulário", theme="default"),
+        format_card("Pontuação Máxima", "100", "pontos (2 por questão)", theme="default"),
         format_card("Registros", f"{indicadores_geral.get('n', 0)}", "alunos após limpeza"),
-        format_card("Média Pré", f"{indicadores_geral.get('mean_pre', 0):.2f}"),
-        format_card("Média Pós", f"{indicadores_geral.get('mean_pos', 0):.2f}"),
+        format_card("Média Pré", f"{indicadores_geral.get('mean_pre', 0):.2f}", f"({mean_pre_percent:.1f}% da máxima)"),
+        format_card("Média Pós", f"{indicadores_geral.get('mean_pos', 0):.2f}", f"({mean_pos_percent:.1f}% da máxima)"),
         format_card("Delta médio", f"{indicadores_geral.get('mean_delta', 0):+.2f}", "pontos"),
         format_card("% Melhoraram", f"{indicadores_geral.get('perc_improved', 0):.1f}%", theme="green"),
         format_card("% Pioraram", f"{indicadores_geral.get('perc_worsened', 0):.1f}%", theme="red"),
@@ -867,8 +1379,8 @@ def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grup
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório Visual WordGen</div>
-        <div class="subtitle">Vocabulário – Fase 2 (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="title">Relatório Visual WordGen{titulo_escola}</div>
+        <div class="subtitle">{subtitulo_escola}Vocabulário – Fase 2 (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
         <div class="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
 
@@ -929,20 +1441,29 @@ def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grup
 # Função Principal
 # ======================
 
-def gerar_relatorio_completo():
+def gerar_relatorio_completo(escola_filtro=None):
     """Função principal que gera o relatório completo"""
+    escola_nome = escola_filtro if escola_filtro and escola_filtro != "Todas" else "Todas as Escolas"
     print("="*60)
-    print("RELATÓRIO VISUAL WORDGEN - FASE 2 - Vocabulário")
+    print(f"RELATÓRIO VISUAL WORDGEN - FASE 2 - {escola_nome}")
     print("="*60)
     
     # Criar diretório de figuras
     os.makedirs(FIG_DIR, exist_ok=True)
     
     # 1. Carregar e preparar dados
-    df_pre_final, df_pos_final, colunas_q, mapeamento_palavras = carregar_e_preparar_dados()
+    df_pre_final, df_pos_final, colunas_q, mapeamento_palavras = carregar_e_preparar_dados(escola_filtro)
     
     # 2. Calcular scores
     scores_df = calcular_scores(df_pre_final, df_pos_final, colunas_q)
+    
+    # Verificar se há dados suficientes
+    if len(scores_df) == 0:
+        print("❌ ERRO: Nenhum dado válido encontrado após limpeza.")
+        print("   Verifique se a escola especificada possui dados válidos.")
+        return None
+    
+    print(f"   Scores calculados: {len(scores_df)} estudantes")
     
     # 3. Calcular indicadores
     print("4. Calculando indicadores...")
@@ -1011,22 +1532,106 @@ def gerar_relatorio_completo():
     print("8. Gerando relatório HTML...")
     html_content = gerar_html_relatorio(
         indicadores_geral, indicadores_grupo1, indicadores_grupo2,
-        palavras_df_todos, figuras_b64
+        palavras_df_todos, figuras_b64, escola_filtro
     )
     
-    # 8. Salvar HTML
-    with open(OUTPUT_HTML, 'w', encoding='utf-8') as f:
+    # 8. Definir nome do arquivo baseado na escola
+    if escola_filtro and escola_filtro != "Todas":
+        # Limpar nome da escola para nome de arquivo
+        escola_limpa = escola_filtro.replace(" ", "_").replace("/", "_").replace(".", "")
+        output_file = DATA_DIR / f"relatorio_visual_wordgen_fase2_{escola_limpa}.html"
+    else:
+        output_file = OUTPUT_HTML
+    
+    # 9. Salvar HTML
+    with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
     print("="*60)
     print("✅ RELATÓRIO GERADO COM SUCESSO!")
-    print(f"📁 Arquivo HTML: {OUTPUT_HTML}")
+    print(f"📁 Arquivo HTML: {output_file}")
     print(f"📊 Figuras salvas em: {FIG_DIR}")
     print(f"👥 {indicadores_geral['n']} estudantes analisados")
     print(f"📈 Effect Size Geral: {indicadores_geral['cohen_d']:.4f}")
     print("="*60)
     
-    return str(OUTPUT_HTML)
+    return str(output_file)
+
+def gerar_relatorios_todas_escolas():
+    """Gera relatórios para todas as escolas individualmente"""
+    escolas = obter_escolas_disponiveis()
+    
+    print("="*60)
+    print("GERANDO RELATÓRIOS PARA TODAS AS ESCOLAS")
+    print("="*60)
+    
+    arquivos_gerados = []
+    
+    for escola in escolas:
+        try:
+            print(f"\n🏫 Processando: {escola}")
+            arquivo = gerar_relatorio_completo(escola)
+            arquivos_gerados.append(arquivo)
+        except Exception as e:
+            print(f"❌ Erro ao processar {escola}: {e}")
+    
+    print("\n" + "="*60)
+    print("✅ TODOS OS RELATÓRIOS GERADOS!")
+    print("="*60)
+    print("📁 Arquivos gerados:")
+    for arquivo in arquivos_gerados:
+        print(f"   • {arquivo}")
+    print("="*60)
+    
+    return arquivos_gerados
 
 if __name__ == "__main__":
-    gerar_relatorio_completo()
+    import sys
+    
+    # Interface de linha de comando
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--todas-escolas":
+            gerar_relatorios_todas_escolas()
+        elif sys.argv[1] == "--escola":
+            if len(sys.argv) > 2:
+                escola = sys.argv[2]
+                escolas_disponiveis = obter_escolas_disponiveis()
+                if escola in escolas_disponiveis:
+                    arquivo_gerado = gerar_relatorio_completo(escola)
+                    print(f"✅ Relatório salvo: {arquivo_gerado}")
+                    print(f"📊 Escola: {escola}")
+                else:
+                    print(f"❌ Escola '{escola}' não encontrada.")
+                    print("🏫 Escolas disponíveis:")
+                    for esc in escolas_disponiveis:
+                        print(f"   • {esc}")
+            else:
+                print("❌ Especifique o nome da escola após --escola")
+        elif sys.argv[1] == "--interativo":
+            print("🔄 Gerando relatório interativo...")
+            html_content = gerar_html_relatorio_interativo()
+            arquivo_saida = "/home/nees/Documents/VSCodigo/AnaliseDadosWordGeneration/Data/relatorio_visual_wordgen_fase2_interativo.html"
+            
+            with open(arquivo_saida, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            print(f"✅ Relatório interativo salvo: {arquivo_saida}")
+            print(f"🌐 Abra o arquivo em um navegador para usar o menu de seleção")
+        elif sys.argv[1] == "--listar-escolas":
+            escolas = obter_escolas_disponiveis()
+            print("🏫 Escolas disponíveis:")
+            for escola in escolas:
+                print(f"   • {escola}")
+        else:
+            print("❌ Opção inválida.")
+            print("📋 Uso:")
+            print("   python RelatorioVisualCompleto.py                   # Todas as escolas")
+            print("   python RelatorioVisualCompleto.py --todas-escolas   # Todas separadamente")
+            print("   python RelatorioVisualCompleto.py --escola 'NOME'   # Escola específica")
+            print("   python RelatorioVisualCompleto.py --interativo      # Menu interativo")
+            print("   python RelatorioVisualCompleto.py --listar-escolas  # Listar escolas")
+    else:
+        # Padrão: gerar relatório geral (todas as escolas)
+        arquivo_gerado = gerar_relatorio_completo()
+        print(f"✅ Relatório salvo: {arquivo_gerado}")
+        print(f"📊 Amostra: Todas as escolas")
