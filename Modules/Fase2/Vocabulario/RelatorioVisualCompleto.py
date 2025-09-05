@@ -31,7 +31,6 @@ OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase2.html"
 # Figuras
 FIG_GRUPOS_BARRAS = FIG_DIR / "fase2_grupos_barras.png"
 FIG_PALAVRAS_TOP = FIG_DIR / "fase2_palavras_top.png"
-FIG_COHEN_BENCHMARK = FIG_DIR / "fase2_cohen_benchmark.png"
 FIG_INTERGRUPOS = FIG_DIR / "fase2_comparacao_intergrupos.png"
 FIG_HEATMAP_ERROS_POS = FIG_DIR / "fase2_heatmap_erros_pos.png"
 FIG_HEATMAP_ERROS_PRE = FIG_DIR / "fase2_heatmap_erros_pre.png"
@@ -533,57 +532,6 @@ def plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
     plt.tight_layout()
     return fig
 
-def plot_cohen_benchmark(indicadores_geral, indicadores_grupo1, indicadores_grupo2):
-    """Effect sizes com benchmarks"""
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    # Dados
-    grupos = ['Geral', '6º/7º anos', '8º/9º anos']
-    cohens_d = [
-        indicadores_geral.get('cohen_d', 0),
-        indicadores_grupo1.get('cohen_d', 0),
-        indicadores_grupo2.get('cohen_d', 0)
-    ]
-    
-    # Cores baseadas nos valores
-    cores = []
-    for d in cohens_d:
-        abs_d = abs(d)
-        if abs_d >= 0.6:
-            cores.append('#28a745')  # Verde - Excelente
-        elif abs_d >= 0.4:
-            cores.append('#ffc107')  # Amarelo - Bom
-        elif abs_d >= 0.35:
-            cores.append('#fd7e14')  # Laranja - Adequado
-        elif abs_d >= 0.2:
-            cores.append('#6f42c1')  # Roxo - Marginal
-        else:
-            cores.append('#dc3545')  # Vermelho - Insuficiente
-    
-    # Gráfico de barras
-    bars = ax.bar(grupos, cohens_d, color=cores, alpha=0.8, edgecolor='black', linewidth=1)
-    
-    # Linhas de referência
-    ax.axhline(y=0.2, color='green', linestyle='--', alpha=0.7, label='Cohen: Pequeno (0.2)')
-    ax.axhline(y=0.5, color='orange', linestyle='--', alpha=0.7, label='Cohen: Médio (0.5)')
-    ax.axhline(y=0.8, color='red', linestyle='--', alpha=0.7, label='Cohen: Grande (0.8)')
-    ax.axhline(y=0.35, color='purple', linestyle=':', alpha=0.7, label='Marulis: Significativo (0.35)')
-    ax.axhline(y=0.4, color='blue', linestyle=':', alpha=0.7, label='Hattie: Bom (0.4)')
-    
-    # Valores nas barras
-    for bar, d in zip(bars, cohens_d):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                f'{d:.4f}', ha='center', va='bottom', fontweight='bold', fontsize=11)
-    
-    ax.set_ylabel("Cohen's d")
-    ax.set_title("Effect Sizes com Benchmarks Educacionais", fontsize=14, fontweight='bold')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    return fig
-
 def plot_comparacao_intergrupos(scores_df):
     """Comparação detalhada entre grupos - Layout simplificado 2x1"""
     fig, axes = plt.subplots(1, 2, figsize=(15, 6))
@@ -820,16 +768,6 @@ def gerar_graficos_escola(escola_filtro=None):
     plt.close(fig2)
     buffer2.close()
     
-    # Gráfico 3: Cohen's d com benchmarks
-    fig3 = plot_cohen_benchmark(indicadores_geral, indicadores_grupo1, indicadores_grupo2)
-    buffer3 = io.BytesIO()
-    fig3.savefig(buffer3, format='png', dpi=150, bbox_inches='tight')
-    buffer3.seek(0)
-    img_b64 = base64.b64encode(buffer3.getvalue()).decode('utf-8')
-    graficos_b64['cohen_benchmark'] = f"data:image/png;base64,{img_b64}"
-    plt.close(fig3)
-    buffer3.close()
-    
     # Gráfico 4: Comparação intergrupos
     fig4 = plot_comparacao_intergrupos(scores_df)
     buffer4 = io.BytesIO()
@@ -1048,10 +986,6 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
                 <img src="{figuras_b64.get('grupos_barras', '')}" alt="Comparação de Grupos" />
                 <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário.</div>
             </div>
-            <div class="fig" id="grafico-cohen">
-                <img src="{figuras_b64.get('cohen_benchmark', '')}" alt="Cohen's d com Benchmarks" />
-                <div class="caption">Effect sizes (Cohen's d) com referências de benchmarks educacionais.</div>
-            </div>
             <div class="fig" id="grafico-palavras">
                 <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras" />
                 <div class="caption">Palavras com maior melhora na taxa de acerto.</div>
@@ -1230,7 +1164,6 @@ function atualizarGraficos(graficos) {{
     }};
     
     atualizarImg('grafico-grupos', graficos.grupos_barras);
-    atualizarImg('grafico-cohen', graficos.cohen_benchmark);
     atualizarImg('grafico-palavras', graficos.palavras_top);
     atualizarImg('grafico-intergrupos', graficos.comparacao_intergrupos);
     atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
@@ -1397,10 +1330,6 @@ def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grup
                 <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário.</div>
             </div>
             <div class="fig">
-                <img src="{figuras_b64.get('cohen_benchmark', '')}" alt="Cohen's d com Benchmarks" />
-                <div class="caption">Effect sizes (Cohen's d) com referências de benchmarks educacionais.</div>
-            </div>
-            <div class="fig">
                 <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras" />
                 <div class="caption">Palavras com maior melhora na taxa de acerto.</div>
             </div>
@@ -1490,11 +1419,6 @@ def gerar_relatorio_completo(escola_filtro=None):
     fig2.savefig(FIG_PALAVRAS_TOP, dpi=150, bbox_inches='tight')
     plt.close(fig2)
     
-    # Figura 3: Cohen's d com benchmarks
-    fig3 = plot_cohen_benchmark(indicadores_geral, indicadores_grupo1, indicadores_grupo2)
-    fig3.savefig(FIG_COHEN_BENCHMARK, dpi=150, bbox_inches='tight')
-    plt.close(fig3)
-    
     # Figura 4: Comparação intergrupos
     fig4 = plot_comparacao_intergrupos(scores_df)
     fig4.savefig(FIG_INTERGRUPOS, dpi=150, bbox_inches='tight')
@@ -1517,7 +1441,6 @@ def gerar_relatorio_completo(escola_filtro=None):
     for nome, caminho in [
         ('grupos_barras', FIG_GRUPOS_BARRAS),
         ('palavras_top', FIG_PALAVRAS_TOP),
-        ('cohen_benchmark', FIG_COHEN_BENCHMARK),
         ('comparacao_intergrupos', FIG_INTERGRUPOS),
         ('heatmap_erros_pos', FIG_HEATMAP_ERROS_POS),
         ('heatmap_erros_pre', FIG_HEATMAP_ERROS_PRE)
