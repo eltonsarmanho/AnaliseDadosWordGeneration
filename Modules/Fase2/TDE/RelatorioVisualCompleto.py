@@ -611,51 +611,6 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
     plt.tight_layout()
     return fig_to_base64(fig)
 
-def gerar_grafico_distribuicao_grupos_segregado_tde(df: pd.DataFrame) -> str:
-    """Gera gráfico de distribuição de scores segregado por grupo (lado a lado)."""
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-    
-    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
-    cores = ['#3498db', '#e74c3c']
-    
-    for i, grupo in enumerate(grupos):
-        ax = axes[i]
-        data_grupo = df[df['GrupoTDE'] == grupo]
-        
-        if len(data_grupo) == 0:
-            ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
-                    transform=ax.transAxes, fontsize=14)
-            continue
-        
-        data_pre = data_grupo['Score_Pre']
-        data_pos = data_grupo['Score_Pos']
-        
-        nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
-        
-        # Histogramas de densidade
-        ax.hist(data_pre, alpha=0.5, label=f'Pré-teste', color=cores[i], bins=12, density=True)
-        ax.hist(data_pos, alpha=0.7, label=f'Pós-teste', color=cores[i], bins=12, density=True, hatch='//')
-        
-        ax.set_xlabel('Scores TDE', fontsize=12)
-        ax.set_ylabel('Densidade', fontsize=12)
-        ax.set_title(f'Distribuição {nome_curto}\n(N={len(data_grupo)})', fontsize=14, fontweight='bold')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Adicionar estatísticas
-        mean_pre = data_pre.mean()
-        mean_pos = data_pos.mean()
-        ax.axvline(mean_pre, color=cores[i], linestyle='--', alpha=0.6, linewidth=2)
-        ax.axvline(mean_pos, color=cores[i], linestyle='-', alpha=0.8, linewidth=2)
-        
-        # Texto com médias
-        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre:.1f}\nPós: {mean_pos:.1f}', 
-                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
-                verticalalignment='top', fontsize=10)
-    
-    plt.tight_layout()
-    return fig_to_base64(fig)
-
 def gerar_graficos_escola_tde(escola_filtro=None):
     """Gera gráficos específicos para uma escola TDE e retorna como base64"""
     
@@ -671,9 +626,6 @@ def gerar_graficos_escola_tde(escola_filtro=None):
     try:
         # Gráfico pré vs pós
         graficos['prepos'] = gerar_grafico_prepos_tde(df)
-        
-        # Gráfico de distribuição segregado por grupos
-        graficos['distribuicao_grupos'] = gerar_grafico_distribuicao_grupos_segregado_tde(df)
         
         # NOVOS GRÁFICOS SOLICITADOS:
         
@@ -914,12 +866,8 @@ def gerar_html_tde_interativo():
         border-radius: 10px; 
         padding: 8px; 
     }}
-    .fig-heatmap {{ 
-        background: #fafafa; 
-        border: 1px solid #eee; 
-        border-radius: 10px; 
-        padding: 8px; 
-    }}
+    .figs-heatmap {{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 10px; }}
+    @media (max-width: 768px) {{ .figs-heatmap {{ grid-template-columns: 1fr; }} }}
     .fig img {{ 
         width: 100%; 
         height: auto; 
@@ -1030,10 +978,6 @@ def gerar_html_tde_interativo():
                 <img src="{figuras_b64.get('prepos', '')}" alt="Comparação Pré vs Pós TDE" />
                 <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
             </div>
-            <div class="fig" id="grafico-distribuicao-grupos">
-                <img src="{figuras_b64.get('distribuicao_grupos', '')}" alt="Distribuição por Grupos TDE" />
-                <div class="caption">Distribuição de scores TDE por grupo (Grupo A: 6º/7º anos e Grupo B: 8º/9º anos).</div>
-            </div>
             <div class="fig" id="grafico-palavras-top">
                 <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras TDE" />
                 <div class="caption">Palavras com maior melhora na taxa de acerto TDE (Top 20 Geral + Comparação Top 15 por grupo).</div>
@@ -1044,15 +988,15 @@ def gerar_html_tde_interativo():
             </div>
         </div>
 
-        <h2 class="section">🔥 Percentual de Erros por Palavra e Grupos</h2>
+        <h2 class="section">Percentual de Erros por Palavra e Grupos</h2>
         <div class="figs-heatmap">
-            <div class="fig-heatmap" id="grafico-heatmap-pre">
+            <div class="fig" id="grafico-heatmap-pre">
                 <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap Erros Pré TDE" />
-                <div class="caption">Pré-teste - Top 20 palavras</div>
+                <div class="caption">Percentual de erros no pré-teste (Top 20 palavras).</div>
             </div>
-            <div class="fig-heatmap" id="grafico-heatmap-pos">
+            <div class="fig" id="grafico-heatmap-pos">
                 <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap Erros Pós TDE" />
-                <div class="caption">Pós-teste - Top 20 palavras</div>
+                <div class="caption">Percentual de erros no pós-teste (Top 20 palavras).</div>
             </div>
         </div>
 
@@ -1216,7 +1160,6 @@ function atualizarGraficos(graficos) {{
     }};
     
     atualizarImg('grafico-prepos', graficos.prepos);
-    atualizarImg('grafico-distribuicao-grupos', graficos.distribuicao_grupos);
     atualizarImg('grafico-palavras-top', graficos.palavras_top);
     atualizarImg('grafico-comparacao-intergrupos', graficos.comparacao_intergrupos);
     
@@ -1273,7 +1216,7 @@ def _interpretacao_contexto_tde_html(indic: Dict[str, float]) -> str:
     """
 
 def gerar_html_tde(indic: Dict[str, float], meta: Dict, 
-                   img_prepos: str, img_distribuicao_grupos: str, 
+                   img_prepos: str, 
                    img_palavras_top: str, img_comparacao_intergrupos: str,
                    img_heatmap_pos: str, img_heatmap_pre: str, escola_filtro: str = None) -> str:
     """Gera o HTML completo do relatório TDE."""
@@ -1415,12 +1358,8 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
         border-radius: 10px; 
         padding: 8px; 
     }
-    .fig-heatmap { 
-        background: #fafafa; 
-        border: 1px solid #eee; 
-        border-radius: 10px; 
-        padding: 8px; 
-    }
+    .figs-heatmap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 10px; }
+    @media (max-width: 768px) { .figs-heatmap { grid-template-columns: 1fr; } }
     .fig img { 
         width: 100%; 
         height: auto; 
@@ -1546,10 +1485,6 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
                 <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
             </div>
             <div class="fig">
-                <img src="{img_distribuicao_grupos}" alt="Distribuição por Grupos TDE" />
-                <div class="caption">Distribuição de scores TDE por grupo (Grupo A: 6º/7º anos e Grupo B: 8º/9º anos).</div>
-            </div>
-            <div class="fig">
                 <img src="{img_palavras_top}" alt="Top Palavras TDE" />
                 <div class="caption">Palavras com maior melhora na taxa de acerto TDE (Top 20 Geral + Comparação Top 15 por grupo).</div>
             </div>
@@ -1559,15 +1494,15 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
             </div>
         </div>
 
-        <h2 class="section">🔥 Percentual de Erros por Palavra e Grupos</h2>
+        <h2 class="section">Percentual de Erros por Palavra e Grupos</h2>
         <div class="figs-heatmap">
-            <div class="fig-heatmap">
+            <div class="fig">
                 <img src="{img_heatmap_pre}" alt="Heatmap Erros Pré TDE" />
-                <div class="caption">Pré-teste - Top 20 palavras</div>
+                <div class="caption">Percentual de erros no pré-teste (Top 20 palavras).</div>
             </div>
-            <div class="fig-heatmap">
+            <div class="fig">
                 <img src="{img_heatmap_pos}" alt="Heatmap Erros Pós TDE" />
-                <div class="caption">Pós-teste - Top 20 palavras</div>
+                <div class="caption">Percentual de erros no pós-teste (Top 20 palavras).</div>
             </div>
         </div>
 
@@ -1622,7 +1557,6 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     
     # Gerar gráficos originais
     img_prepos = gerar_grafico_prepos_tde(df)
-    img_distribuicao_grupos = gerar_grafico_distribuicao_grupos_segregado_tde(df)
     
     # Gerar novos gráficos solicitados
     img_palavras_top = gerar_grafico_palavras_top_tde(df)
@@ -1633,7 +1567,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     print("🎨 RENDERIZANDO HTML...")
     
     # Gerar HTML
-    html = gerar_html_tde(indic, meta, img_prepos, img_distribuicao_grupos, 
+    html = gerar_html_tde(indic, meta, img_prepos, 
                          img_palavras_top, img_comparacao_intergrupos,
                          img_heatmap_pos, img_heatmap_pre, escola_filtro)
     
