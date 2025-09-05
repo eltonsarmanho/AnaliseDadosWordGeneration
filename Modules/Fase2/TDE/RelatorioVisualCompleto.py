@@ -362,37 +362,120 @@ def analisar_palavras_tde(df: pd.DataFrame, grupo_filtro: str = None) -> pd.Data
 # ======================
 
 def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
-    """Gera gráfico comparativo pré vs pós-teste TDE."""
-    fig, ax = plt.subplots(figsize=(8, 5))
+    """Gera gráficos de comparação de scores e distribuição de mudanças por grupo etário TDE (4 gráficos em 2x2)."""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
-    # Dados para o gráfico
-    pre_mean = df['Score_Pre'].mean()
-    pos_mean = df['Score_Pos'].mean()
-    pre_std = df['Score_Pre'].std()
-    pos_std = df['Score_Pos'].std()
+    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
+    cores = ['#3498db', '#e74c3c']
     
-    # Criar barras
-    medias = [pre_mean, pos_mean]
-    desvios = [pre_std, pos_std]
-    labels = ["Pré-teste", "Pós-teste"]
-    colors = ["#3498db", "#e74c3c"]
+    # 1. Médias de scores por grupo
+    ax = axes[0, 0]
+    means_pre = []
+    means_pos = []
+    stds_pre = []
+    stds_pos = []
     
-    bars = ax.bar(labels, medias, yerr=desvios, capsize=8, 
-                  color=colors, alpha=0.8, edgecolor='white', linewidth=2)
+    for grupo in grupos:
+        data = df[df['GrupoTDE'] == grupo]
+        if len(data) > 0:
+            means_pre.append(data['Score_Pre'].mean())
+            means_pos.append(data['Score_Pos'].mean())
+            stds_pre.append(data['Score_Pre'].std())
+            stds_pos.append(data['Score_Pos'].std())
+        else:
+            means_pre.append(0)
+            means_pos.append(0)
+            stds_pre.append(0)
+            stds_pos.append(0)
     
-    # Configurar gráfico
-    ax.set_ylabel("Pontuação TDE (média ± DP)", fontsize=12)
-    ax.set_title("Comparação Pré vs Pós-teste TDE", fontsize=14, fontweight='bold')
-    ax.set_ylim(0, max(medias) + max(desvios) + 2)
+    x = np.arange(len(grupos))
+    width = 0.35
+    grupos_curtos = [g.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)') for g in grupos]
     
-    # Adicionar valores nas barras
-    for bar, media, desvio in zip(bars, medias, desvios):
+    ax.bar(x - width/2, means_pre, width, yerr=stds_pre, label='Pré-teste', alpha=0.8, color=cores[0])
+    ax.bar(x + width/2, means_pos, width, yerr=stds_pos, label='Pós-teste', alpha=0.8, color=cores[1])
+    
+    ax.set_xlabel('Grupos TDE', fontsize=12)
+    ax.set_ylabel('Score Médio', fontsize=12)
+    ax.set_title('Comparação de Médias por Grupo', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(grupos_curtos)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # 2. Boxplot de deltas (mudanças)
+    ax = axes[0, 1]
+    deltas_data = []
+    for grupo in grupos:
+        data = df[df['GrupoTDE'] == grupo]
+        if len(data) > 0:
+            deltas_data.append(data['Delta_Score'])
+        else:
+            deltas_data.append([0])  # Dados vazios
+    
+    bp = ax.boxplot(deltas_data, labels=grupos_curtos, patch_artist=True)
+    
+    for patch, cor in zip(bp['boxes'], cores):
+        patch.set_facecolor(cor)
+        patch.set_alpha(0.7)
+    
+    ax.set_ylabel('Mudança (Delta Score)', fontsize=12)
+    ax.set_title('Distribuição de Mudanças por Grupo', fontsize=14, fontweight='bold')
+    ax.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=2)
+    ax.grid(True, alpha=0.3)
+    
+    # 3. Tamanhos de amostra
+    ax = axes[1, 0]
+    sizes = [len(df[df['GrupoTDE'] == grupo]) for grupo in grupos]
+    bars = ax.bar(grupos_curtos, sizes, color=cores, alpha=0.8)
+    
+    for bar, size in zip(bars, sizes):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + desvio + 0.5,
-                f'{media:.1f}±{desvio:.1f}', ha='center', va='bottom', fontweight='bold')
+        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                f'{size}', ha='center', va='bottom', fontweight='bold', fontsize=12)
     
-    # Adicionar linha de referência zero
-    ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+    ax.set_ylabel('Número de Estudantes', fontsize=12)
+    ax.set_title('Tamanho das Amostras', fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    
+    # 4. Cohen's d por grupo
+    ax = axes[1, 1]
+    cohens_d = []
+    for grupo in grupos:
+        data = df[df['GrupoTDE'] == grupo]
+        if len(data) > 1:
+            pre_scores = data['Score_Pre']
+            pos_scores = data['Score_Pos']
+            deltas = data['Delta_Score']
+            
+            # Cohen's d = delta médio / desvio padrão do pré-teste
+            pooled_std = pre_scores.std()
+            d = deltas.mean() / pooled_std if pooled_std > 0 else 0
+            cohens_d.append(d)
+        else:
+            cohens_d.append(0)
+    
+    bars = ax.bar(grupos_curtos, cohens_d, color=cores, alpha=0.8)
+    
+    # Linhas de referência Cohen
+    ax.axhline(y=0.2, color='green', linestyle='--', alpha=0.7, label='Pequeno (0.2)')
+    ax.axhline(y=0.5, color='orange', linestyle='--', alpha=0.7, label='Médio (0.5)')
+    ax.axhline(y=0.8, color='red', linestyle='--', alpha=0.7, label='Grande (0.8)')
+    
+    # Linha de referência Hattie (específica para educação)
+    ax.axhline(y=0.4, color='purple', linestyle=':', alpha=0.7, label='Hattie: Bom (0.4)')
+    
+    for bar, d in zip(bars, cohens_d):
+        height = bar.get_height()
+        y_text = height + 0.02 if height > 0 else height - 0.05
+        ax.text(bar.get_x() + bar.get_width()/2., y_text,
+                f'{d:.3f}', ha='center', va='bottom' if height > 0 else 'top', 
+                fontweight='bold', fontsize=11)
+    
+    ax.set_ylabel("Cohen's d", fontsize=12)
+    ax.set_title("Effect Size por Grupo", fontsize=14, fontweight='bold')
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
     return fig_to_base64(fig)
@@ -976,7 +1059,7 @@ def gerar_html_tde_interativo():
         <div class="figs">
             <div class="fig" id="grafico-prepos">
                 <img src="{figuras_b64.get('prepos', '')}" alt="Comparação Pré vs Pós TDE" />
-                <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
+                <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário TDE (4 análises: médias por grupo, distribuição de mudanças, tamanhos amostrais e effect sizes).</div>
             </div>
             <div class="fig" id="grafico-palavras-top">
                 <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras TDE" />
@@ -1482,7 +1565,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
         <div class="figs">
             <div class="fig">
                 <img src="{img_prepos}" alt="Comparação Pré vs Pós TDE" />
-                <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
+                <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário TDE (4 análises: médias por grupo, distribuição de mudanças, tamanhos amostrais e effect sizes).</div>
             </div>
             <div class="fig">
                 <img src="{img_palavras_top}" alt="Top Palavras TDE" />
