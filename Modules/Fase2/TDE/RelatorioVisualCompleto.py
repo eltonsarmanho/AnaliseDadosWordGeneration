@@ -1200,14 +1200,14 @@ function atualizarCards(indicadores) {{
     
     container.innerHTML = `
         <div class="card">
-            <div class="card-label">40 Palavras Grupo A</div>
-            <div class="valor">20</div>
-            <div class="desc">palavras teste escrita</div>
+            <div class="card-label">Palavras Testadas</div>
+            <div class="valor">40</div>
+            <div class="desc">questões de escrita</div>
         </div>
         <div class="card">
-            <div class="card-label">40 Palavras Grupo B</div>
-            <div class="valor">20</div>
-            <div class="desc">palavras teste escrita</div>
+            <div class="card-label">Pontuação Máxima</div>
+            <div class="valor">80</div>
+            <div class="desc">pontos (2 por questão)</div>
         </div>
         <div class="card">
             <div class="card-label">Registros</div>
