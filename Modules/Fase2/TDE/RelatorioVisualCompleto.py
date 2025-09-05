@@ -611,109 +611,47 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
     plt.tight_layout()
     return fig_to_base64(fig)
 
-def gerar_grafico_delta_grupos_tde(df: pd.DataFrame) -> str:
-    """Gera gráfico de deltas por grupo TDE."""
-    fig, ax = plt.subplots(figsize=(10, 6))
+def gerar_grafico_distribuicao_grupos_segregado_tde(df: pd.DataFrame) -> str:
+    """Gera gráfico de distribuição de scores segregado por grupo (lado a lado)."""
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
     
-    # Preparar dados por grupo
-    grupos_data = []
-    for grupo in ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']:
-        df_grupo = df[df['GrupoTDE'] == grupo]
-        if len(df_grupo) > 0:
-            grupos_data.append({
-                'grupo': grupo.replace(' (6º/7º anos)', '\n(6º/7º anos)').replace(' (8º/9º anos)', '\n(8º/9º anos)'),
-                'deltas': df_grupo['Delta_Score'].values,
-                'mean': df_grupo['Delta_Score'].mean(),
-                'n': len(df_grupo)
-            })
+    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
+    cores = ['#3498db', '#e74c3c']
     
-    if not grupos_data:
-        # Gráfico vazio se não há dados
-        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
-                transform=ax.transAxes, fontsize=16)
-        return fig_to_base64(fig)
-    
-    # Criar boxplot
-    deltas_list = [g['deltas'] for g in grupos_data]
-    labels = [g['grupo'] for g in grupos_data]
-    
-    bp = ax.boxplot(deltas_list, tick_labels=labels, patch_artist=True, 
-                    boxprops=dict(facecolor='lightblue', alpha=0.7),
-                    medianprops=dict(color='red', linewidth=2))
-    
-    # Adicionar médias
-    for i, grupo_data in enumerate(grupos_data):
-        ax.scatter(i+1, grupo_data['mean'], color='red', s=100, zorder=5, marker='D')
-        ax.text(i+1, grupo_data['mean'] + 0.5, f"Média: {grupo_data['mean']:.1f}\nN: {grupo_data['n']}", 
-                ha='center', va='bottom', fontweight='bold', 
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
-    
-    # Linha de referência em zero
-    ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
-    
-    ax.set_ylabel("Delta Score (Pós - Pré)", fontsize=12)
-    ax.set_title("Distribuição dos Deltas TDE por Grupo", fontsize=14, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    return fig_to_base64(fig)
-
-def gerar_grafico_categorias_cohen_tde(df: pd.DataFrame, std_pre: float) -> str:
-    """Gera gráfico das categorias de Cohen para TDE."""
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # Categorizar cada delta
-    categorias = []
-    for delta in df['Delta_Score']:
-        cat = categorizar_mudanca_cohen_tde(delta, std_pre)
-        categorias.append(cat)
-    
-    df_cat = pd.DataFrame({'categoria': categorias})
-    
-    # Ordem das categorias
-    ordem_cats = [
-        "Piora Grande (<-0.8 SD)",
-        "Piora Média (-0.8 a -0.5 SD)", 
-        "Piora Pequena (-0.5 a -0.2 SD)",
-        "Sem Mudança Prática (±0.2 SD)",
-        "Melhora Pequena (0.2-0.5 SD)",
-        "Melhora Média (0.5-0.8 SD)",
-        "Melhora Grande (≥0.8 SD)"
-    ]
-    
-    # Contar por categoria
-    cont = df_cat['categoria'].value_counts().reindex(ordem_cats).fillna(0)
-    perc = 100 * cont / cont.sum()
-    
-    # Cores para as categorias
-    cores_cats = {
-        "Piora Grande (<-0.8 SD)": "#d73027",
-        "Piora Média (-0.8 a -0.5 SD)": "#f46d43",
-        "Piora Pequena (-0.5 a -0.2 SD)": "#fdae61", 
-        "Sem Mudança Prática (±0.2 SD)": "#fee08b",
-        "Melhora Pequena (0.2-0.5 SD)": "#d9ef8b",
-        "Melhora Média (0.5-0.8 SD)": "#a6d96a",
-        "Melhora Grande (≥0.8 SD)": "#66bd63"
-    }
-    
-    # Criar barras
-    cores = [cores_cats[cat] for cat in ordem_cats]
-    bars = ax.bar(range(len(ordem_cats)), perc.values, color=cores, alpha=0.8, edgecolor='white')
-    
-    # Configurar eixos
-    ax.set_xticks(range(len(ordem_cats)))
-    ax.set_xticklabels([cat.replace(' (', '\n(').replace(' SD)', ' SD)') for cat in ordem_cats], 
-                       rotation=45, ha='right')
-    ax.set_ylabel("% de Estudantes", fontsize=12)
-    ax.set_title("Categorias de Mudança TDE (Cohen, baseado em SD do Pré-teste)", 
-                 fontsize=14, fontweight='bold')
-    ax.set_ylim(0, max(perc.max() * 1.1, 5))
-    
-    # Adicionar percentuais nas barras
-    for bar, pct in zip(bars, perc.values):
-        if pct > 0:
-            ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.5,
-                    f'{pct:.1f}%', ha='center', va='bottom', fontweight='bold')
+    for i, grupo in enumerate(grupos):
+        ax = axes[i]
+        data_grupo = df[df['GrupoTDE'] == grupo]
+        
+        if len(data_grupo) == 0:
+            ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                    transform=ax.transAxes, fontsize=14)
+            continue
+        
+        data_pre = data_grupo['Score_Pre']
+        data_pos = data_grupo['Score_Pos']
+        
+        nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
+        
+        # Histogramas de densidade
+        ax.hist(data_pre, alpha=0.5, label=f'Pré-teste', color=cores[i], bins=12, density=True)
+        ax.hist(data_pos, alpha=0.7, label=f'Pós-teste', color=cores[i], bins=12, density=True, hatch='//')
+        
+        ax.set_xlabel('Scores TDE', fontsize=12)
+        ax.set_ylabel('Densidade', fontsize=12)
+        ax.set_title(f'Distribuição {nome_curto}\n(N={len(data_grupo)})', fontsize=14, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Adicionar estatísticas
+        mean_pre = data_pre.mean()
+        mean_pos = data_pos.mean()
+        ax.axvline(mean_pre, color=cores[i], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos, color=cores[i], linestyle='-', alpha=0.8, linewidth=2)
+        
+        # Texto com médias
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre:.1f}\nPós: {mean_pos:.1f}', 
+                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+                verticalalignment='top', fontsize=10)
     
     plt.tight_layout()
     return fig_to_base64(fig)
@@ -734,12 +672,8 @@ def gerar_graficos_escola_tde(escola_filtro=None):
         # Gráfico pré vs pós
         graficos['prepos'] = gerar_grafico_prepos_tde(df)
         
-        # Gráfico deltas por grupos
-        graficos['grupos'] = gerar_grafico_delta_grupos_tde(df)
-        
-        # Categorias Cohen
-        std_pre = df['Score_Pre'].std()
-        graficos['categorias'] = gerar_grafico_categorias_cohen_tde(df, std_pre)
+        # Gráfico de distribuição segregado por grupos
+        graficos['distribuicao_grupos'] = gerar_grafico_distribuicao_grupos_segregado_tde(df)
         
         # NOVOS GRÁFICOS SOLICITADOS:
         
@@ -968,7 +902,19 @@ def gerar_html_tde_interativo():
         gap: 18px; 
         margin-top: 10px; 
     }}
+    .figs-heatmap {{ 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 18px; 
+        margin-top: 10px; 
+    }}
     .fig {{ 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 8px; 
+    }}
+    .fig-heatmap {{ 
         background: #fafafa; 
         border: 1px solid #eee; 
         border-radius: 10px; 
@@ -1054,6 +1000,9 @@ def gerar_html_tde_interativo():
         .fig {{
             padding: 5px;
         }}
+        .figs-heatmap {{
+            grid-template-columns: 1fr;
+        }}
     }}
 </style>
 </head>
@@ -1081,9 +1030,9 @@ def gerar_html_tde_interativo():
                 <img src="{figuras_b64.get('prepos', '')}" alt="Comparação Pré vs Pós TDE" />
                 <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
             </div>
-            <div class="fig" id="grafico-grupos">
-                <img src="{figuras_b64.get('grupos', '')}" alt="Deltas por Grupo TDE" />
-                <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
+            <div class="fig" id="grafico-distribuicao-grupos">
+                <img src="{figuras_b64.get('distribuicao_grupos', '')}" alt="Distribuição por Grupos TDE" />
+                <div class="caption">Distribuição de scores TDE por grupo (Grupo A: 6º/7º anos e Grupo B: 8º/9º anos).</div>
             </div>
             <div class="fig" id="grafico-palavras-top">
                 <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras TDE" />
@@ -1093,17 +1042,17 @@ def gerar_html_tde_interativo():
                 <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Detalhada Grupos TDE" />
                 <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
             </div>
-            <div class="fig" id="grafico-heatmap-pos">
-                <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap Erros Pós TDE" />
-                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pós-teste - Top 20 palavras).</div>
-            </div>
-            <div class="fig" id="grafico-heatmap-pre">
+        </div>
+
+        <h2 class="section">🔥 Percentual de Erros por Palavra e Grupos</h2>
+        <div class="figs-heatmap">
+            <div class="fig-heatmap" id="grafico-heatmap-pre">
                 <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap Erros Pré TDE" />
-                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pré-teste - Top 20 palavras).</div>
+                <div class="caption">Pré-teste - Top 20 palavras</div>
             </div>
-            <div class="fig" id="grafico-categorias">
-                <img src="{figuras_b64.get('categorias', '')}" alt="Categorias Cohen TDE" />
-                <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
+            <div class="fig-heatmap" id="grafico-heatmap-pos">
+                <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap Erros Pós TDE" />
+                <div class="caption">Pós-teste - Top 20 palavras</div>
             </div>
         </div>
 
@@ -1267,12 +1216,13 @@ function atualizarGraficos(graficos) {{
     }};
     
     atualizarImg('grafico-prepos', graficos.prepos);
-    atualizarImg('grafico-grupos', graficos.grupos);
+    atualizarImg('grafico-distribuicao-grupos', graficos.distribuicao_grupos);
     atualizarImg('grafico-palavras-top', graficos.palavras_top);
     atualizarImg('grafico-comparacao-intergrupos', graficos.comparacao_intergrupos);
-    atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
+    
+    // Heatmaps na nova seção
     atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
-    atualizarImg('grafico-categorias', graficos.categorias);
+    atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
 }}
 
 // Inicializar quando a página carregar
@@ -1323,7 +1273,7 @@ def _interpretacao_contexto_tde_html(indic: Dict[str, float]) -> str:
     """
 
 def gerar_html_tde(indic: Dict[str, float], meta: Dict, 
-                   img_prepos: str, img_grupos: str, img_categorias: str, 
+                   img_prepos: str, img_distribuicao_grupos: str, 
                    img_palavras_top: str, img_comparacao_intergrupos: str,
                    img_heatmap_pos: str, img_heatmap_pre: str, escola_filtro: str = None) -> str:
     """Gera o HTML completo do relatório TDE."""
@@ -1453,7 +1403,19 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
         gap: 18px; 
         margin-top: 10px; 
     }
+    .figs-heatmap { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 18px; 
+        margin-top: 10px; 
+    }
     .fig { 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 8px; 
+    }
+    .fig-heatmap { 
         background: #fafafa; 
         border: 1px solid #eee; 
         border-radius: 10px; 
@@ -1534,6 +1496,9 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
         .fig {
             padding: 5px;
         }
+        .figs-heatmap {
+            grid-template-columns: 1fr;
+        }
     }
     """
     
@@ -1581,8 +1546,8 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
                 <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
             </div>
             <div class="fig">
-                <img src="{img_grupos}" alt="Deltas por Grupo TDE" />
-                <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
+                <img src="{img_distribuicao_grupos}" alt="Distribuição por Grupos TDE" />
+                <div class="caption">Distribuição de scores TDE por grupo (Grupo A: 6º/7º anos e Grupo B: 8º/9º anos).</div>
             </div>
             <div class="fig">
                 <img src="{img_palavras_top}" alt="Top Palavras TDE" />
@@ -1592,17 +1557,17 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
                 <img src="{img_comparacao_intergrupos}" alt="Comparação Detalhada Grupos TDE" />
                 <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
             </div>
-            <div class="fig">
-                <img src="{img_heatmap_pos}" alt="Heatmap Erros Pós TDE" />
-                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pós-teste - Top 20 palavras).</div>
-            </div>
-            <div class="fig">
+        </div>
+
+        <h2 class="section">🔥 Percentual de Erros por Palavra e Grupos</h2>
+        <div class="figs-heatmap">
+            <div class="fig-heatmap">
                 <img src="{img_heatmap_pre}" alt="Heatmap Erros Pré TDE" />
-                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pré-teste - Top 20 palavras).</div>
+                <div class="caption">Pré-teste - Top 20 palavras</div>
             </div>
-            <div class="fig">
-                <img src="{img_categorias}" alt="Categorias Cohen TDE" />
-                <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
+            <div class="fig-heatmap">
+                <img src="{img_heatmap_pos}" alt="Heatmap Erros Pós TDE" />
+                <div class="caption">Pós-teste - Top 20 palavras</div>
             </div>
         </div>
 
@@ -1657,8 +1622,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     
     # Gerar gráficos originais
     img_prepos = gerar_grafico_prepos_tde(df)
-    img_grupos = gerar_grafico_delta_grupos_tde(df)
-    img_categorias = gerar_grafico_categorias_cohen_tde(df, indic['std_pre'])
+    img_distribuicao_grupos = gerar_grafico_distribuicao_grupos_segregado_tde(df)
     
     # Gerar novos gráficos solicitados
     img_palavras_top = gerar_grafico_palavras_top_tde(df)
@@ -1669,7 +1633,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     print("🎨 RENDERIZANDO HTML...")
     
     # Gerar HTML
-    html = gerar_html_tde(indic, meta, img_prepos, img_grupos, img_categorias, 
+    html = gerar_html_tde(indic, meta, img_prepos, img_distribuicao_grupos, 
                          img_palavras_top, img_comparacao_intergrupos,
                          img_heatmap_pos, img_heatmap_pre, escola_filtro)
     
