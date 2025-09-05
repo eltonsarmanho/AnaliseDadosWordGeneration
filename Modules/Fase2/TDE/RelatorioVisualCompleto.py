@@ -618,8 +618,11 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # 3. Distribuição de Resultados TDE (inferior, ocupando 2 colunas)
-    ax = plt.subplot(2, 1, 2)  # Subplot que ocupa a linha inferior inteira
+    # 3. Distribuição de Resultados TDE (inferior, ocupando ambas as colunas)
+    # Remover os subplots inferiores e criar um único subplot na linha inferior
+    axes[1, 0].remove()
+    axes[1, 1].remove()
+    ax = fig.add_subplot(2, 1, 2)  # Criar subplot limpo que ocupa a linha inferior completa
     
     melhorou = []
     piorou = []
@@ -659,16 +662,17 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
             ax.text(i + width, ig + 2, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
     # Configurar eixos
-    ax.set_xlabel('Grupos TDE', fontsize=12)
+    ax.set_xlabel('Grupos', fontsize=12)
     ax.set_ylabel('Percentual (%)', fontsize=12)
     ax.set_title('Distribuição de Resultados TDE', fontsize=14, fontweight='bold', pad=20)
     
-    # Ajustar limites do eixo Y para evitar sobreposição
-    ax.set_ylim(0, max_value + 15)  # Espaço extra para os labels e legenda
+    # Configurar eixo Y fixo de 0% a 100%
+    ax.set_ylim(0, 100)
     
-    # Configurar xticks
+    # Configurar xticks - apenas nomes dos grupos (A e B)
+    grupos_simples = ['A (6°/7°)', 'B (8°/9°)']  # Nomes simples dos grupos
     ax.set_xticks(x)
-    ax.set_xticklabels(grupos_curtos, fontsize=11)
+    ax.set_xticklabels(grupos_simples, fontsize=12, fontweight='bold')
     
     # Posicionar legenda no canto superior direito, fora da área dos dados
     ax.legend(loc='upper right', bbox_to_anchor=(1.0, 0.98), fontsize=10, 
@@ -677,8 +681,8 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     # Grid mais sutil
     ax.grid(True, alpha=0.3, linestyle='--')
     
-    # Ajustar yticks para evitar sobreposição
-    yticks = np.arange(0, max_value + 15, 10)  # Intervalos de 10%
+    # Configurar yticks de 0% a 100% com intervalos de 10%
+    yticks = np.arange(0, 101, 10)  # 0%, 10%, 20%, ..., 100%
     ax.set_yticks(yticks)
     ax.set_yticklabels([f'{int(y)}%' for y in yticks], fontsize=10)
     
