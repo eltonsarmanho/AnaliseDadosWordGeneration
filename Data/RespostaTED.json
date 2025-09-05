@@ -1,0 +1,482 @@
+[
+	 {
+        "Pergunta 1": {
+            "Palavra Trabalhada": "boi",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 2": {
+            "Palavra Trabalhada": "dedo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 3": {
+            "Palavra Trabalhada": "luva",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 4": {
+            "Palavra Trabalhada": "sapo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 5": {
+            "Palavra Trabalhada": "gaveta",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 6": {
+            "Palavra Trabalhada": "placa",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 7": {
+            "Palavra Trabalhada": "abacaxi",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 8": {
+            "Palavra Trabalhada": "ervilha",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 9": {
+            "Palavra Trabalhada": "antiga",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 10": {
+            "Palavra Trabalhada": "zebu",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 11": {
+            "Palavra Trabalhada": "caminhar",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 12": {
+            "Palavra Trabalhada": "argila",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 13": {
+            "Palavra Trabalhada": "quebrado",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 14": {
+            "Palavra Trabalhada": "cabeça",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 15": {
+            "Palavra Trabalhada": "esquilo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 16": {
+            "Palavra Trabalhada": "jardim",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 17": {
+            "Palavra Trabalhada": "alfabeto",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 18": {
+            "Palavra Trabalhada": "chuteira",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 19": {
+            "Palavra Trabalhada": "alvo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 20": {
+            "Palavra Trabalhada": "cinema",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 21": {
+            "Palavra Trabalhada": "chinelo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 22": {
+            "Palavra Trabalhada": "completar",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 23": {
+            "Palavra Trabalhada": "pessoa",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 24": {
+            "Palavra Trabalhada": "luxo",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 25": {
+            "Palavra Trabalhada": "samba",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 26": {
+            "Palavra Trabalhada": "solução",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 27": {
+            "Palavra Trabalhada": "barriga",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 28": {
+            "Palavra Trabalhada": "secreto",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 29": {
+            "Palavra Trabalhada": "guia",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 30": {
+            "Palavra Trabalhada": "benzer",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 31": {
+            "Palavra Trabalhada": "enrolado",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 32": {
+            "Palavra Trabalhada": "amanhã",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 33": {
+            "Palavra Trabalhada": "existir",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 34": {
+            "Palavra Trabalhada": "aumento",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 35": {
+            "Palavra Trabalhada": "explicar",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 36": {
+            "Palavra Trabalhada": "cigana",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 37": {
+            "Palavra Trabalhada": "descer",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 38": {
+            "Palavra Trabalhada": "horta",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 39": {
+            "Palavra Trabalhada": "sossego",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 40": {
+            "Palavra Trabalhada": "jipe",
+            "Grupo": "A"
+        }
+    },
+    {
+        "Pergunta 1": {
+            "Palavra Trabalhada": "regeneração",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 2": {
+            "Palavra Trabalhada": "explorar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 3": {
+            "Palavra Trabalhada": "certeza",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 4": {
+            "Palavra Trabalhada": "composição",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 5": {
+            "Palavra Trabalhada": "alguém",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 6": {
+            "Palavra Trabalhada": "fixar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 7": {
+            "Palavra Trabalhada": "rigidez",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 8": {
+            "Palavra Trabalhada": "auxiliar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 9": {
+            "Palavra Trabalhada": "serviço",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 10": {
+            "Palavra Trabalhada": "acesa",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 11": {
+            "Palavra Trabalhada": "embaixatriz",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 12": {
+            "Palavra Trabalhada": "humanizar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 13": {
+            "Palavra Trabalhada": "oxigênio",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 14": {
+            "Palavra Trabalhada": "adolescente",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 15": {
+            "Palavra Trabalhada": "enxergar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 16": {
+            "Palavra Trabalhada": "confecção",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 17": {
+            "Palavra Trabalhada": "chinês",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 18": {
+            "Palavra Trabalhada": "recém",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 19": {
+            "Palavra Trabalhada": "flexionar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 20": {
+            "Palavra Trabalhada": "sensibilização",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 21": {
+            "Palavra Trabalhada": "juízo",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 22": {
+            "Palavra Trabalhada": "sucção",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 23": {
+            "Palavra Trabalhada": "majestoso",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 24": {
+            "Palavra Trabalhada": "análise",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 25": {
+            "Palavra Trabalhada": "planície",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 26": {
+            "Palavra Trabalhada": "inteligentíssimo",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 27": {
+            "Palavra Trabalhada": "essência",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 28": {
+            "Palavra Trabalhada": "têxtil",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 29": {
+            "Palavra Trabalhada": "persuasão",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 30": {
+            "Palavra Trabalhada": "excelência",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 31": {
+            "Palavra Trabalhada": "insensatez",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 32": {
+            "Palavra Trabalhada": "obsessão",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 33": {
+            "Palavra Trabalhada": "consciência",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 34": {
+            "Palavra Trabalhada": "abdômen",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 35": {
+            "Palavra Trabalhada": "oscilação",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 36": {
+            "Palavra Trabalhada": "excepcional",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 37": {
+            "Palavra Trabalhada": "ímã",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 38": {
+            "Palavra Trabalhada": "miscigenação",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 39": {
+            "Palavra Trabalhada": "ressuscitar",
+            "Grupo": "B"
+        }
+    },
+    {
+        "Pergunta 40": {
+            "Palavra Trabalhada": "exceção",
+            "Grupo": "B"
+        }
+    }
+]

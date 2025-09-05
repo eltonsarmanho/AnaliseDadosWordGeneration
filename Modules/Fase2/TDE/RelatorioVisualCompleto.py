@@ -1,0 +1,1457 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 2
+Interface visual interativa para análise de dados do Teste de Escrita (TDE)
+
+Baseado na metodologia dos relatórios de vocabulário com adaptações específicas
+para os dados e métricas do Teste de Escrita.
+
+Autor: Sistema de Análise WordGen
+Data: 2024
+"""
+
+import os
+import io
+import base64
+import pathlib
+import argparse
+from typing import List, Tuple, Dict
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Configurações matplotlib para compatibilidade
+plt.switch_backend("Agg")
+sns.set_theme(style="whitegrid")
+
+# ======================
+# Configurações de Paths
+# ======================
+BASE_DIR = pathlib.Path(__file__).parent.parent.parent.parent.resolve()  # Sair de TDE/Fase2/Modules/
+DATA_DIR = BASE_DIR / "Data"
+FIG_DIR = DATA_DIR / "figures"
+
+# Arquivos de dados TDE
+CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.xlsx"  # Usar Excel já que CSV não existe
+HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase2.html"
+MAPPING_FILE = DATA_DIR / "RespostaTED.json"
+
+# Configurações matplotlib
+plt.rcParams.update({
+    "figure.dpi": 120,
+    "savefig.dpi": 120,
+    "axes.grid": True,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+})
+
+# ======================
+# Benchmarks Educacionais TDE
+# ======================
+
+# Benchmarks específicos para Teste de Escrita baseados na literatura
+TDE_BENCHMARKS = {
+    "hattie_2009": {
+        "threshold": 0.4,
+        "description": "Hattie (2009) - Impacto visível na aprendizagem",
+        "context": "Meta-análise de intervenções educacionais"
+    },
+    "writing_cohen_1988": {
+        "threshold": 0.5,
+        "description": "Cohen (1988) - Effect size médio para escrita",
+        "context": "Benchmark clássico para estudos de escrita"
+    },
+    "literacy_interventions": {
+        "threshold": 0.35,
+        "description": "Intervenções de Letramento - Threshold mínimo",
+        "context": "Meta-análises de programas de alfabetização"
+    },
+    "writing_instruction": {
+        "threshold": 0.6,
+        "description": "Ensino de Escrita - Programas efetivos",
+        "context": "Graham & Perin (2007) - Writing instruction"
+    }
+}
+
+# ======================
+# Funções Utilitárias
+# ======================
+
+def fig_to_base64(fig) -> str:
+    """Converte uma figura matplotlib para string Base64."""
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', bbox_inches='tight', dpi=120)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    buffer.close()
+    plt.close(fig)
+    return f"data:image/png;base64,{img_base64}"
+
+def interpretar_magnitude(es: float) -> str:
+    """Interpreta a magnitude do effect size."""
+    abs_es = abs(es)
+    if abs_es < 0.15:
+        return "Trivial"
+    elif abs_es < 0.35:
+        return "Pequeno"
+    elif abs_es < 0.65:
+        return "Moderado"
+    elif abs_es < 1.0:
+        return "Grande"
+    else:
+        return "Muito Grande"
+
+def categorizar_mudanca_cohen_tde(delta: float, baseline_sd: float) -> str:
+    """Categoriza mudanças usando thresholds de Cohen adaptados para TDE."""
+    if not np.isfinite(baseline_sd) or baseline_sd <= 0:
+        return "Sem Mudança Prática (±0.2 SD)"
+
+    pequeno = 0.2 * baseline_sd
+    medio = 0.5 * baseline_sd  
+    grande = 0.8 * baseline_sd
+
+    if delta >= grande:
+        return "Melhora Grande (≥0.8 SD)"
+    elif delta >= medio:
+        return "Melhora Média (0.5-0.8 SD)"
+    elif delta >= pequeno:
+        return "Melhora Pequena (0.2-0.5 SD)"
+    elif delta > -pequeno:
+        return "Sem Mudança Prática (±0.2 SD)"
+    elif delta > -medio:
+        return "Piora Pequena (-0.5 a -0.2 SD)"
+    elif delta > -grande:
+        return "Piora Média (-0.8 a -0.5 SD)"
+    else:
+        return "Piora Grande (<-0.8 SD)"
+
+def _ensure_fig_dir():
+    """Garante que o diretório de figuras existe."""
+    os.makedirs(FIG_DIR, exist_ok=True)
+
+# ======================
+# Carregamento e Preparação dos Dados
+# ======================
+
+def obter_escolas_disponiveis_tde():
+    """Obtém a lista de escolas disponíveis nos dados TDE"""
+    try:
+        df = pd.read_excel(str(CSV_TABELA_TDE))
+    except:
+        # Fallback se não conseguir ler
+        return ["Todas"]
+    
+    escolas = sorted(df['Escola'].dropna().unique().tolist())
+    return ["Todas"] + escolas
+
+def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple[pd.DataFrame, Dict]:
+    """Carrega e prepara os dados TDE da tabela bruta."""
+    if csv_path is None:
+        csv_path = str(CSV_TABELA_TDE)
+    
+    print("📊 CARREGANDO DADOS TDE...")
+    
+    # Carregar dados
+    try:
+        if csv_path.endswith('.xlsx'):
+            df = pd.read_excel(csv_path)
+        else:
+            try:
+                df = pd.read_csv(csv_path, encoding='utf-8')
+            except:
+                df = pd.read_csv(csv_path, encoding='latin-1')
+    except Exception as e:
+        print(f"Erro ao carregar dados: {e}")
+        raise
+    
+    print(f"   Total de registros carregados: {len(df)}")
+    
+    # Aplicar filtro de escola se especificado
+    if escola_filtro and escola_filtro != "Todas":
+        df_original = df.copy()
+        df = df[df['Escola'] == escola_filtro]
+        print(f"   Filtro escola '{escola_filtro}': {len(df)} registros")
+    
+    # Verificar colunas essenciais
+    colunas_essenciais = ['Score_Pre', 'Score_Pos', 'Delta_Score', 'GrupoTDE', 'Escola']
+    missing_cols = [col for col in colunas_essenciais if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Colunas essenciais ausentes: {missing_cols}")
+    
+    # Limpeza básica
+    df = df.dropna(subset=['Score_Pre', 'Score_Pos', 'Delta_Score'])
+    
+    # Metadados
+    meta = {
+        "n_total": len(df),
+        "n_grupo_a": len(df[df['GrupoTDE'] == 'Grupo A (6º/7º anos)']),
+        "n_grupo_b": len(df[df['GrupoTDE'] == 'Grupo B (8º/9º anos)']),
+        "escolas": df['Escola'].unique().tolist(),
+        "escola_filtro": escola_filtro
+    }
+    
+    print(f"   Registros após limpeza: {len(df)}")
+    print(f"   Grupos: A={meta['n_grupo_a']}, B={meta['n_grupo_b']}")
+    
+    return df, meta
+
+def calcular_indicadores_tde(df: pd.DataFrame, grupo_filtro: str = None) -> Dict[str, float]:
+    """Calcula indicadores estatísticos específicos para TDE."""
+    
+    # Aplicar filtro de grupo se especificado
+    if grupo_filtro:
+        df = df[df['GrupoTDE'] == grupo_filtro]
+    
+    if len(df) == 0:
+        return {
+            "n": 0,
+            "mean_pre": 0.0,
+            "std_pre": 0.0,
+            "mean_pos": 0.0,
+            "std_pos": 0.0,
+            "mean_delta": 0.0,
+            "std_delta": 0.0,
+            "percent_improved": 0.0,
+            "percent_worsened": 0.0,
+            "percent_unchanged": 0.0,
+            "cohen_d_global": np.nan
+        }
+    
+    pre_scores = df['Score_Pre']
+    pos_scores = df['Score_Pos'] 
+    deltas = df['Delta_Score']
+    
+    n = len(df)
+    
+    # Estatísticas básicas
+    mean_pre = float(pre_scores.mean())
+    std_pre = float(pre_scores.std(ddof=1)) if n > 1 else 0.0
+    mean_pos = float(pos_scores.mean())
+    std_pos = float(pos_scores.std(ddof=1)) if n > 1 else 0.0
+    mean_delta = float(deltas.mean())
+    std_delta = float(deltas.std(ddof=1)) if n > 1 else 0.0
+    
+    # Percentuais de mudança
+    improved = (deltas > 0).mean() * 100.0
+    worsened = (deltas < 0).mean() * 100.0  
+    unchanged = (deltas == 0).mean() * 100.0
+    
+    # Effect size global (Delta médio / SD do pré-teste)
+    cohen_d = mean_delta / std_pre if std_pre > 1e-12 else np.nan
+    
+    return {
+        "n": n,
+        "mean_pre": mean_pre,
+        "std_pre": std_pre,
+        "mean_pos": mean_pos,
+        "std_pos": std_pos,
+        "mean_delta": mean_delta,
+        "std_delta": std_delta,
+        "percent_improved": improved,
+        "percent_worsened": worsened,
+        "percent_unchanged": unchanged,
+        "cohen_d_global": cohen_d
+    }
+
+# ======================
+# Geração de Gráficos
+# ======================
+
+def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
+    """Gera gráfico comparativo pré vs pós-teste TDE."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # Dados para o gráfico
+    pre_mean = df['Score_Pre'].mean()
+    pos_mean = df['Score_Pos'].mean()
+    pre_std = df['Score_Pre'].std()
+    pos_std = df['Score_Pos'].std()
+    
+    # Criar barras
+    medias = [pre_mean, pos_mean]
+    desvios = [pre_std, pos_std]
+    labels = ["Pré-teste", "Pós-teste"]
+    colors = ["#3498db", "#e74c3c"]
+    
+    bars = ax.bar(labels, medias, yerr=desvios, capsize=8, 
+                  color=colors, alpha=0.8, edgecolor='white', linewidth=2)
+    
+    # Configurar gráfico
+    ax.set_ylabel("Pontuação TDE (média ± DP)", fontsize=12)
+    ax.set_title("Comparação Pré vs Pós-teste TDE", fontsize=14, fontweight='bold')
+    ax.set_ylim(0, max(medias) + max(desvios) + 2)
+    
+    # Adicionar valores nas barras
+    for bar, media, desvio in zip(bars, medias, desvios):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + desvio + 0.5,
+                f'{media:.1f}±{desvio:.1f}', ha='center', va='bottom', fontweight='bold')
+    
+    # Adicionar linha de referência zero
+    ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_delta_grupos_tde(df: pd.DataFrame) -> str:
+    """Gera gráfico de deltas por grupo TDE."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Preparar dados por grupo
+    grupos_data = []
+    for grupo in ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']:
+        df_grupo = df[df['GrupoTDE'] == grupo]
+        if len(df_grupo) > 0:
+            grupos_data.append({
+                'grupo': grupo.replace(' (6º/7º anos)', '\n(6º/7º anos)').replace(' (8º/9º anos)', '\n(8º/9º anos)'),
+                'deltas': df_grupo['Delta_Score'].values,
+                'mean': df_grupo['Delta_Score'].mean(),
+                'n': len(df_grupo)
+            })
+    
+    if not grupos_data:
+        # Gráfico vazio se não há dados
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=16)
+        return fig_to_base64(fig)
+    
+    # Criar boxplot
+    deltas_list = [g['deltas'] for g in grupos_data]
+    labels = [g['grupo'] for g in grupos_data]
+    
+    bp = ax.boxplot(deltas_list, tick_labels=labels, patch_artist=True, 
+                    boxprops=dict(facecolor='lightblue', alpha=0.7),
+                    medianprops=dict(color='red', linewidth=2))
+    
+    # Adicionar médias
+    for i, grupo_data in enumerate(grupos_data):
+        ax.scatter(i+1, grupo_data['mean'], color='red', s=100, zorder=5, marker='D')
+        ax.text(i+1, grupo_data['mean'] + 0.5, f"Média: {grupo_data['mean']:.1f}\nN: {grupo_data['n']}", 
+                ha='center', va='bottom', fontweight='bold', 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    
+    # Linha de referência em zero
+    ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
+    
+    ax.set_ylabel("Delta Score (Pós - Pré)", fontsize=12)
+    ax.set_title("Distribuição dos Deltas TDE por Grupo", fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_categorias_cohen_tde(df: pd.DataFrame, std_pre: float) -> str:
+    """Gera gráfico das categorias de Cohen para TDE."""
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Categorizar cada delta
+    categorias = []
+    for delta in df['Delta_Score']:
+        cat = categorizar_mudanca_cohen_tde(delta, std_pre)
+        categorias.append(cat)
+    
+    df_cat = pd.DataFrame({'categoria': categorias})
+    
+    # Ordem das categorias
+    ordem_cats = [
+        "Piora Grande (<-0.8 SD)",
+        "Piora Média (-0.8 a -0.5 SD)", 
+        "Piora Pequena (-0.5 a -0.2 SD)",
+        "Sem Mudança Prática (±0.2 SD)",
+        "Melhora Pequena (0.2-0.5 SD)",
+        "Melhora Média (0.5-0.8 SD)",
+        "Melhora Grande (≥0.8 SD)"
+    ]
+    
+    # Contar por categoria
+    cont = df_cat['categoria'].value_counts().reindex(ordem_cats).fillna(0)
+    perc = 100 * cont / cont.sum()
+    
+    # Cores para as categorias
+    cores_cats = {
+        "Piora Grande (<-0.8 SD)": "#d73027",
+        "Piora Média (-0.8 a -0.5 SD)": "#f46d43",
+        "Piora Pequena (-0.5 a -0.2 SD)": "#fdae61", 
+        "Sem Mudança Prática (±0.2 SD)": "#fee08b",
+        "Melhora Pequena (0.2-0.5 SD)": "#d9ef8b",
+        "Melhora Média (0.5-0.8 SD)": "#a6d96a",
+        "Melhora Grande (≥0.8 SD)": "#66bd63"
+    }
+    
+    # Criar barras
+    cores = [cores_cats[cat] for cat in ordem_cats]
+    bars = ax.bar(range(len(ordem_cats)), perc.values, color=cores, alpha=0.8, edgecolor='white')
+    
+    # Configurar eixos
+    ax.set_xticks(range(len(ordem_cats)))
+    ax.set_xticklabels([cat.replace(' (', '\n(').replace(' SD)', ' SD)') for cat in ordem_cats], 
+                       rotation=45, ha='right')
+    ax.set_ylabel("% de Estudantes", fontsize=12)
+    ax.set_title("Categorias de Mudança TDE (Cohen, baseado em SD do Pré-teste)", 
+                 fontsize=14, fontweight='bold')
+    ax.set_ylim(0, max(perc.max() * 1.1, 5))
+    
+    # Adicionar percentuais nas barras
+    for bar, pct in zip(bars, perc.values):
+        if pct > 0:
+            ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.5,
+                    f'{pct:.1f}%', ha='center', va='bottom', fontweight='bold')
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_forest_plot_tde(df: pd.DataFrame) -> str:
+    """Gera forest plot dos effect sizes por grupo TDE (simplificado)."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Calcular effect sizes apenas para os 3 subgrupos solicitados
+    effect_sizes = []
+    
+    # Effect size global (Todos)
+    delta_global = df['Delta_Score'].mean()
+    std_pre_global = df['Score_Pre'].std()
+    es_global = delta_global / std_pre_global if std_pre_global > 0 else 0
+    effect_sizes.append({
+        'categoria': 'Todos',
+        'es': es_global,
+        'n': len(df),
+        'ci_lower': es_global - 1.96 * (1/np.sqrt(len(df))),  # CI aproximado
+        'ci_upper': es_global + 1.96 * (1/np.sqrt(len(df)))
+    })
+    
+    # Effect sizes por grupo TDE
+    for grupo in ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']:
+        df_grupo = df[df['GrupoTDE'] == grupo]
+        if len(df_grupo) > 1:
+            delta_grupo = df_grupo['Delta_Score'].mean()
+            std_pre_grupo = df_grupo['Score_Pre'].std()
+            es_grupo = delta_grupo / std_pre_grupo if std_pre_grupo > 0 else 0
+            nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
+            effect_sizes.append({
+                'categoria': nome_curto,
+                'es': es_grupo,
+                'n': len(df_grupo),
+                'ci_lower': es_grupo - 1.96 * (1/np.sqrt(len(df_grupo))),
+                'ci_upper': es_grupo + 1.96 * (1/np.sqrt(len(df_grupo)))
+            })
+    
+    # Plotar forest plot
+    y_positions = np.arange(len(effect_sizes))
+    cores = ['#2c3e50', '#3498db', '#e74c3c']
+    
+    for i, es_data in enumerate(effect_sizes):
+        cor = cores[i]
+        
+        # Point estimate
+        ax.scatter(es_data['es'], i, color=cor, s=120, zorder=5)
+        
+        # Confidence interval
+        ax.plot([es_data['ci_lower'], es_data['ci_upper']], [i, i], 
+                color=cor, linewidth=3, alpha=0.7)
+        
+        # Texto com N
+        ax.text(es_data['es'] + 0.05, i, f"N={es_data['n']}", 
+                va='center', fontsize=10, fontweight='bold')
+    
+    # Configurar eixos
+    ax.set_yticks(y_positions)
+    ax.set_yticklabels([es['categoria'] for es in effect_sizes])
+    ax.set_xlabel("Effect Size (Cohen's d)", fontsize=12)
+    ax.set_title("Forest Plot - Effect Sizes TDE", fontsize=14, fontweight='bold')
+    
+    # Linha de referência
+    ax.axvline(x=0, color='black', linestyle='-', alpha=0.3)
+    
+    # Benchmarks principais
+    ax.axvline(x=0.4, color='red', linestyle='--', alpha=0.5, linewidth=2)
+    ax.axvline(x=-0.4, color='red', linestyle='--', alpha=0.5, linewidth=2)
+    ax.axvline(x=0.5, color='orange', linestyle=':', alpha=0.7, linewidth=2)
+    ax.axvline(x=-0.5, color='orange', linestyle=':', alpha=0.7, linewidth=2)
+    
+    # Legenda dos benchmarks
+    ax.text(0.98, 0.02, "Linhas: Hattie d≥0.4 (vermelho), Cohen d≥0.5 (laranja)", 
+            transform=ax.transAxes, ha='right', va='bottom', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9), fontsize=9)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_graficos_escola_tde(escola_filtro=None):
+    """Gera gráficos específicos para uma escola TDE e retorna como base64"""
+    
+    # Carregar dados da escola
+    df, meta = carregar_dados_tde(escola_filtro=escola_filtro)
+    
+    if len(df) == 0:
+        return {}
+    
+    # Gerar gráficos em memória
+    graficos = {}
+    
+    try:
+        # Gráfico pré vs pós
+        graficos['prepos'] = gerar_grafico_prepos_tde(df)
+        
+        # Gráfico deltas por grupos
+        graficos['grupos'] = gerar_grafico_delta_grupos_tde(df)
+        
+        # Categorias Cohen
+        std_pre = df['Score_Pre'].std()
+        graficos['categorias'] = gerar_grafico_categorias_cohen_tde(df, std_pre)
+        
+        # Forest plot simplificado
+        graficos['forest'] = gerar_grafico_forest_plot_tde(df)
+        
+    except Exception as e:
+        print(f"Erro ao gerar gráficos para {escola_filtro}: {e}")
+    
+    return graficos
+
+def gerar_dados_todas_escolas_tde():
+    """Gera dados para todas as escolas TDE para o menu interativo"""
+    escolas = obter_escolas_disponiveis_tde()
+    dados_escolas = {}
+    
+    print("📊 Calculando dados TDE para todas as escolas...")
+    
+    for escola in escolas:
+        try:
+            print(f"   Processando: {escola}")
+            
+            # Carregar dados para esta escola
+            escola_filtro = escola if escola != "Todas" else None
+            df, meta = carregar_dados_tde(escola_filtro=escola_filtro)
+            
+            if len(df) == 0:
+                continue
+            
+            # Calcular indicadores
+            indicadores_geral = calcular_indicadores_tde(df)
+            indicadores_grupo_a = calcular_indicadores_tde(df, "Grupo A (6º/7º anos)")
+            indicadores_grupo_b = calcular_indicadores_tde(df, "Grupo B (8º/9º anos)")
+            
+            # Gerar gráficos específicos para esta escola
+            print(f"     Gerando gráficos TDE para: {escola}")
+            graficos = gerar_graficos_escola_tde(escola_filtro)
+            
+            dados_escolas[escola] = {
+                'indicadores_geral': indicadores_geral,
+                'indicadores_grupo_a': indicadores_grupo_a,
+                'indicadores_grupo_b': indicadores_grupo_b,
+                'graficos': graficos
+            }
+            
+        except Exception as e:
+            print(f"   ❌ Erro ao processar {escola}: {e}")
+            continue
+    
+    return dados_escolas
+
+# ======================
+# Geração do HTML Interativo
+# ======================
+
+def _format_card_tde(label: str, value: str, extra: str = "", theme: str = "default") -> str:
+    """Formata um card de indicador seguindo o padrão visual do vocabulário."""
+    theme_class = {
+        "default": "card",
+        "green": "card green", 
+        "red": "card red",
+        "yellow": "card yellow",
+        "blue": "card blue"
+    }.get(theme, "card")
+    
+    desc_html = f"<div class='desc'>{extra}</div>" if extra else ""
+    return f"""
+    <div class="{theme_class}">
+        <div class="card-label">{label}</div>
+        <div class="valor">{value}</div>
+        {desc_html}
+    </div>
+    """
+
+def gerar_html_tde_interativo():
+    """Gera o relatório HTML TDE interativo com menu de escolas"""
+    
+    # Gerar dados para todas as escolas (incluindo gráficos específicos)
+    dados_escolas = gerar_dados_todas_escolas_tde()
+    
+    # Usar os gráficos da escola "Todas" como padrão
+    figuras_b64 = dados_escolas.get('Todas', {}).get('graficos', {})
+    
+    # Converter dados para JSON
+    import json
+    dados_json = json.dumps(dados_escolas, ensure_ascii=False, indent=2)
+    
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<title>Relatório Visual TDE WordGen - Fase 2</title>
+<style>
+    :root {{
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+        --blue-grad: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }}
+    body {{
+        margin: 0; 
+        background: var(--bg); 
+        color: var(--text); 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-text-size-adjust: 100%;
+    }}
+    .header {{
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; 
+        padding: 28px 18px; 
+        box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }}
+    .header .title {{
+        font-size: 26px; 
+        font-weight: 700; 
+        margin: 0;
+    }}
+    .header .subtitle {{
+        font-size: 14px; 
+        opacity: 0.95; 
+        margin-top: 6px;
+    }}
+    .header .timestamp {{
+        font-size: 12px; 
+        opacity: 0.85; 
+        margin-top: 4px;
+    }}
+    
+    .menu-container {{
+        background: #fff; 
+        margin: 18px auto; 
+        max-width: 1200px; 
+        border-radius: 12px; 
+        padding: 18px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    }}
+    .menu-title {{
+        font-size: 18px; 
+        font-weight: 600; 
+        margin-bottom: 12px; 
+        color: var(--purple1);
+    }}
+    .escola-select {{
+        width: 100%; 
+        padding: 12px; 
+        border: 2px solid #e2e8f0; 
+        border-radius: 8px; 
+        font-size: 16px; 
+        background: #fff; 
+        cursor: pointer;
+        transition: border-color 0.3s ease;
+    }}
+    .escola-select:focus {{
+        outline: none; 
+        border-color: var(--purple1);
+    }}
+    
+    .container {{
+        max-width: 1200px; 
+        margin: 18px auto; 
+        background: #fff; 
+        border-radius: 12px; 
+        padding: 22px; 
+        box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }}
+    .cards {{
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); 
+        gap: 12px; 
+        margin-top: 16px;
+    }}
+    .card {{
+        background: var(--card-grad); 
+        color: #fff; 
+        border-radius: 10px; 
+        padding: 14px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }}
+    .card.green {{ background: var(--green-grad); }}
+    .card.red {{ background: var(--red-grad); }}
+    .card.yellow {{ background: var(--yellow-grad); }}
+    .card.blue {{ background: var(--blue-grad); }}
+    .card .card-label {{ 
+        font-size: 13px; 
+        opacity: 0.95; 
+    }}
+    .card .valor {{ 
+        font-size: 22px; 
+        font-weight: 700; 
+        margin-top: 6px; 
+    }}
+    .card .desc {{ 
+        font-size: 11px; 
+        opacity: 0.9; 
+    }}
+
+    h2.section {{
+        margin-top: 22px; 
+        font-size: 18px; 
+        border-left: 4px solid var(--purple1); 
+        padding-left: 10px; 
+        color: #1f2937;
+    }}
+    .figs {{ 
+        display: grid; 
+        grid-template-columns: 1fr; 
+        gap: 18px; 
+        margin-top: 10px; 
+    }}
+    .fig {{ 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 8px; 
+    }}
+    .fig img {{ 
+        width: 100%; 
+        height: auto; 
+        border-radius: 6px; 
+        max-width: 100%;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }}
+    .fig .caption {{ 
+        font-size: 12px; 
+        color: var(--muted); 
+        margin-top: 6px; 
+        text-align: center; 
+    }}
+
+    .interp {{ 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 14px; 
+    }}
+    .grupo-item {{ 
+        background: #fff; 
+        border: 1px solid #eee; 
+        border-radius: 8px; 
+        padding: 10px 12px; 
+        margin: 10px 0; 
+    }}
+    .grupo-titulo {{ 
+        font-weight: 600; 
+    }}
+    .grupo-detalhes {{ 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+        gap: 6px; 
+        color: #374151; 
+        font-size: 13px; 
+        margin-top: 6px; 
+    }}
+    .interpretacao-grupo {{ 
+        margin-top: 10px; 
+        padding: 8px; 
+        background: #f8f9fa; 
+        border-radius: 6px; 
+        border-left: 3px solid var(--purple1); 
+    }}
+    .interpretacao-grupo p {{ 
+        margin: 3px 0; 
+        font-size: 12px; 
+    }}
+    .interpretacao-grupo strong {{ 
+        color: var(--purple1); 
+    }}
+
+    .foot-note {{ 
+        font-size: 12px; 
+        color: var(--muted); 
+        text-align: center; 
+        margin-top: 16px; 
+    }}
+
+    @media (max-width: 768px) {{
+        .container {{
+            margin: 10px;
+            padding: 15px;
+        }}
+        .cards {{
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+        }}
+        .header .title {{
+            font-size: 22px;
+        }}
+        .fig {{
+            padding: 5px;
+        }}
+    }}
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual TDE WordGen - Fase 2</div>
+        <div class="subtitle">Teste de Escrita (Grupos TDE: A - 6º/7º vs B - 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
+    </div>
+
+    <div class="menu-container">
+        <div class="menu-title">🏫 Selecionar Escola</div>
+        <select class="escola-select" id="escolaSelect" onchange="atualizarDados()">
+        </select>
+    </div>
+
+    <div class="container">
+        <h2 class="section">📊 Indicadores Principais</h2>
+        <div class="cards" id="cardsContainer">
+        </div>
+
+        <h2 class="section">📈 Análises Visuais</h2>
+        <div class="figs">
+            <div class="fig" id="grafico-prepos">
+                <img src="{figuras_b64.get('prepos', '')}" alt="Comparação Pré vs Pós TDE" />
+                <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
+            </div>
+            <div class="fig" id="grafico-grupos">
+                <img src="{figuras_b64.get('grupos', '')}" alt="Deltas por Grupo TDE" />
+                <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
+            </div>
+            <div class="fig" id="grafico-categorias">
+                <img src="{figuras_b64.get('categorias', '')}" alt="Categorias Cohen TDE" />
+                <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
+            </div>
+            <div class="fig" id="grafico-forest">
+                <img src="{figuras_b64.get('forest', '')}" alt="Forest Plot TDE" />
+                <div class="caption">Forest plot dos effect sizes TDE (Todos, Grupo A e Grupo B).</div>
+            </div>
+        </div>
+
+        <h2 class="section">🎯 Interpretação Contextualizada</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">
+                <strong>Referências Educacionais para TDE:</strong><br>
+                • Hattie (2009): d≥0.4 indica impacto educacional visível<br>
+                • Cohen (1988): d=0.5 para efeito médio em escrita<br>
+                • Graham & Perin (2007): d≥0.6 para programas efetivos de ensino de escrita<br>
+                • Intervenções de Letramento: d≥0.35 como threshold mínimo
+            </p>
+            <div id="interpretacaoContainer">
+            </div>
+        </div>
+
+        <div class="foot-note">
+            <p><strong>Metodologia TDE:</strong> Effect Size = Δ/SD(Pré). Grupos baseados na série escolar. 
+            Categorias Cohen usando SD do pré-teste. Dados com valores faltantes foram removidos.</p>
+        </div>
+    </div>
+
+<script>
+const dadosEscolas = {dados_json};
+
+function inicializar() {{
+    const select = document.getElementById('escolaSelect');
+    
+    // Adicionar opções ao select
+    Object.keys(dadosEscolas).forEach(escola => {{
+        const option = document.createElement('option');
+        option.value = escola;
+        option.textContent = escola;
+        select.appendChild(option);
+    }});
+    
+    // Definir "Todas" como padrão
+    select.value = 'Todas';
+    atualizarDados();
+}}
+
+function atualizarDados() {{
+    const escolaSelecionada = document.getElementById('escolaSelect').value;
+    const dados = dadosEscolas[escolaSelecionada];
+    
+    if (!dados) return;
+    
+    atualizarCards(dados.indicadores_geral);
+    atualizarInterpretacao(dados);
+    atualizarGraficos(dados.graficos);
+}}
+
+function atualizarCards(indicadores) {{
+    const container = document.getElementById('cardsContainer');
+    
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-label">40 Palavras Grupo A</div>
+            <div class="valor">20</div>
+            <div class="desc">palavras teste escrita</div>
+        </div>
+        <div class="card">
+            <div class="card-label">40 Palavras Grupo B</div>
+            <div class="valor">20</div>
+            <div class="desc">palavras teste escrita</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Registros</div>
+            <div class="valor">${{indicadores.n}}</div>
+            <div class="desc">alunos após limpeza</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pré</div>
+            <div class="valor">${{indicadores.mean_pre.toFixed(1)}}</div>
+            <div class="desc">pontos TDE</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pós</div>
+            <div class="valor">${{indicadores.mean_pos.toFixed(1)}}</div>
+            <div class="desc">pontos TDE</div>
+        </div>
+        <div class="card ${{indicadores.mean_delta >= 0 ? 'green' : 'red'}}">
+            <div class="card-label">Delta médio</div>
+            <div class="valor">${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(1)}}</div>
+            <div class="desc">pontos TDE</div>
+        </div>
+        <div class="card green">
+            <div class="card-label">% Melhoraram</div>
+            <div class="valor">${{indicadores.percent_improved.toFixed(1)}}%</div>
+        </div>
+        <div class="card red">
+            <div class="card-label">% Pioraram</div>
+            <div class="valor">${{indicadores.percent_worsened.toFixed(1)}}%</div>
+        </div>
+        <div class="card yellow">
+            <div class="card-label">% Mantiveram</div>
+            <div class="valor">${{indicadores.percent_unchanged.toFixed(1)}}%</div>
+        </div>
+        <div class="card blue">
+            <div class="card-label">Effect Size</div>
+            <div class="valor">${{indicadores.cohen_d_global.toFixed(3)}}</div>
+        </div>
+    `;
+}}
+
+function interpretarCohenD(d) {{
+    const absD = Math.abs(d);
+    let magnitude, hattieStatus, educStatus;
+    
+    if (absD >= 0.8) magnitude = "Grande";
+    else if (absD >= 0.5) magnitude = "Médio";
+    else if (absD >= 0.2) magnitude = "Pequeno";
+    else magnitude = "Negligível";
+    
+    hattieStatus = absD >= 0.4 ? "Acima do benchmark (d≥0.4)" : "Abaixo do benchmark (d≥0.4)";
+    educStatus = absD >= 0.35 ? "Significativo para TDE (d≥0.35)" : "Abaixo do threshold para TDE (d≥0.35)";
+    
+    return {{ magnitude, hattieStatus, educStatus }};
+}}
+
+function criarGrupoItem(indicadores, nomeGrupo) {{
+    const d = indicadores.cohen_d_global;
+    const interp = interpretarCohenD(d);
+    
+    return `
+        <div class="grupo-item">
+            <div class="grupo-titulo">${{nomeGrupo}} (N=${{indicadores.n}})</div>
+            <div class="grupo-detalhes">
+                <span>Média Pré: ${{indicadores.mean_pre.toFixed(1)}}</span>
+                <span>Média Pós: ${{indicadores.mean_pos.toFixed(1)}}</span>
+                <span>Delta: ${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(1)}}</span>
+                <span>Cohen's d: ${{d.toFixed(3)}}</span>
+                <span>% Melhoraram: ${{indicadores.percent_improved.toFixed(1)}}%</span>
+            </div>
+            <div class="interpretacao-grupo">
+                <p><strong>Magnitude:</strong> ${{interp.magnitude}} (Cohen, 1988)</p>
+                <p><strong>Benchmark Educacional:</strong> ${{interp.hattieStatus}} (Hattie, 2009)</p>
+                <p><strong>TDE:</strong> ${{interp.educStatus}} (Adaptado de meta-análises)</p>
+            </div>
+        </div>
+    `;
+}}
+
+function atualizarInterpretacao(dados) {{
+    const container = document.getElementById('interpretacaoContainer');
+    
+    container.innerHTML = 
+        criarGrupoItem(dados.indicadores_grupo_a, "Grupo A (6º/7º anos)") + 
+        criarGrupoItem(dados.indicadores_grupo_b, "Grupo B (8º/9º anos)");
+}}
+
+function atualizarGraficos(graficos) {{
+    if (!graficos) return;
+    
+    // Atualizar cada gráfico se existir
+    const atualizarImg = (id, src) => {{
+        const img = document.querySelector(`#${{id}} img`);
+        if (img && src) {{
+            img.src = src;
+        }}
+    }};
+    
+    atualizarImg('grafico-prepos', graficos.prepos);
+    atualizarImg('grafico-grupos', graficos.grupos);
+    atualizarImg('grafico-categorias', graficos.categorias);
+    atualizarImg('grafico-forest', graficos.forest);
+}}
+
+// Inicializar quando a página carregar
+document.addEventListener('DOMContentLoaded', inicializar);
+</script>
+</body>
+</html>
+"""
+    return html
+
+def _interpretacao_contexto_tde_html(indic: Dict[str, float]) -> str:
+    """Gera seção de interpretação contextualizada para TDE."""
+    d_global = indic.get("cohen_d_global", np.nan)
+    
+    mag_global = interpretar_magnitude(d_global) if np.isfinite(d_global) else "Indefinido"
+    
+    # Avaliação contra benchmarks
+    benchmarks_html = ""
+    for bench_name, bench_data in TDE_BENCHMARKS.items():
+        threshold = bench_data['threshold']
+        description = bench_data['description']
+        
+        if np.isfinite(d_global):
+            status = "✓ Atende" if abs(d_global) >= threshold else "⚠ Não atende"
+            cor = "color: #27ae60;" if abs(d_global) >= threshold else "color: #e74c3c;"
+        else:
+            status = "? Indefinido"
+            cor = "color: #f39c12;"
+        
+        benchmarks_html += f"""
+        <div style="margin: 5px 0;">
+            <span style="{cor}"><strong>{status}</strong></span>
+            <span>{description} (d≥{threshold})</span>
+        </div>
+        """
+    
+    return f"""
+    <div class="grupo-item">
+        <div class="grupo-titulo">Effect Size Global TDE: d = {d_global:.3f} (N={indic['n']})</div>
+        <div class="grupo-detalhes">
+            <span><strong>Magnitude:</strong> {mag_global}</span>
+            <div style="margin-top: 10px;">
+                <strong>Avaliação contra Benchmarks Educacionais:</strong>
+                {benchmarks_html}
+            </div>
+        </div>
+    </div>
+    """
+
+def gerar_html_tde(indic: Dict[str, float], meta: Dict, 
+                   img_prepos: str, img_grupos: str, img_categorias: str, 
+                   img_forest: str, escola_filtro: str = None) -> str:
+    """Gera o HTML completo do relatório TDE."""
+    
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Título baseado no filtro
+    titulo_filtro = f" - {escola_filtro}" if escola_filtro and escola_filtro != "Todas" else ""
+    
+    # Cards de indicadores com o padrão de 40 palavras
+    cards_html = "".join([
+        _format_card_tde("40 Palavras Grupo A", "20", "palavras teste escrita"),
+        _format_card_tde("40 Palavras Grupo B", "20", "palavras teste escrita"),
+        _format_card_tde("Estudantes", f"{indic['n']}", "após limpeza de dados"),
+        _format_card_tde("Score Médio Pré", f"{indic['mean_pre']:.1f}", f"±{indic['std_pre']:.1f}"),
+        _format_card_tde("Score Médio Pós", f"{indic['mean_pos']:.1f}", f"±{indic['std_pos']:.1f}"),
+        _format_card_tde("Delta Médio", f"{indic['mean_delta']:.1f}", "pontos TDE", 
+                         theme="green" if indic['mean_delta'] > 0 else "red"),
+        _format_card_tde("% Melhoraram", f"{indic['percent_improved']:.1f}%", 
+                         "delta > 0", theme="green"),
+        _format_card_tde("% Pioraram", f"{indic['percent_worsened']:.1f}%", 
+                         "delta < 0", theme="red"),
+        _format_card_tde("% Mantiveram", f"{indic['percent_unchanged']:.1f}%", 
+                         "delta = 0", theme="yellow"),
+        _format_card_tde("Effect Size", f"{indic['cohen_d_global']:.3f}", 
+                         interpretar_magnitude(indic['cohen_d_global']) if np.isfinite(indic['cohen_d_global']) else "N/A", 
+                         theme="blue"),
+    ])
+    
+    # Interpretação contextualizada
+    interp_html = _interpretacao_contexto_tde_html(indic)
+    
+    # Informações dos grupos
+    grupo_info = f"Grupo A: {meta['n_grupo_a']} • Grupo B: {meta['n_grupo_b']}"
+    
+    # CSS com compatibilidade iOS
+    css_styles = """
+    :root {
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+        --blue-grad: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    body {
+        margin: 0; 
+        background: var(--bg); 
+        color: var(--text); 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-text-size-adjust: 100%;
+    }
+    .header {
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; 
+        padding: 28px 18px; 
+        box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }
+    .header .title {
+        font-size: 26px; 
+        font-weight: 700; 
+        margin: 0;
+    }
+    .header .subtitle {
+        font-size: 14px; 
+        opacity: 0.95; 
+        margin-top: 6px;
+    }
+    .header .timestamp {
+        font-size: 12px; 
+        opacity: 0.85; 
+        margin-top: 4px;
+    }
+    .container {
+        max-width: 1200px; 
+        margin: 18px auto; 
+        background: #fff; 
+        border-radius: 12px; 
+        padding: 22px; 
+        box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+    .cards {
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); 
+        gap: 12px; 
+        margin-top: 16px;
+    }
+    .card {
+        background: var(--card-grad); 
+        color: #fff; 
+        border-radius: 10px; 
+        padding: 14px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    .card.green { background: var(--green-grad); }
+    .card.red { background: var(--red-grad); }
+    .card.yellow { background: var(--yellow-grad); }
+    .card.blue { background: var(--blue-grad); }
+    .card .card-label { 
+        font-size: 13px; 
+        opacity: 0.95; 
+    }
+    .card .valor { 
+        font-size: 22px; 
+        font-weight: 700; 
+        margin-top: 6px; 
+    }
+    .card .desc { 
+        font-size: 11px; 
+        opacity: 0.9; 
+    }
+
+    h2.section {
+        margin-top: 22px; 
+        font-size: 18px; 
+        border-left: 4px solid var(--purple1); 
+        padding-left: 10px; 
+        color: #1f2937;
+    }
+    .figs { 
+        display: grid; 
+        grid-template-columns: 1fr; 
+        gap: 18px; 
+        margin-top: 10px; 
+    }
+    .fig { 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 8px; 
+    }
+    .fig img { 
+        width: 100%; 
+        height: auto; 
+        border-radius: 6px; 
+        max-width: 100%;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+    .fig .caption { 
+        font-size: 12px; 
+        color: var(--muted); 
+        margin-top: 6px; 
+        text-align: center; 
+    }
+
+    .interp { 
+        background: #fafafa; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        padding: 14px; 
+    }
+    .grupo-item { 
+        background: #fff; 
+        border: 1px solid #eee; 
+        border-radius: 8px; 
+        padding: 10px 12px; 
+        margin: 10px 0; 
+    }
+    .grupo-titulo { 
+        font-weight: 600; 
+    }
+    .grupo-detalhes { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+        gap: 6px; 
+        color: #374151; 
+        font-size: 13px; 
+        margin-top: 6px; 
+    }
+
+    .filtro-info {
+        background: #e3f2fd;
+        border: 1px solid #2196f3;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px 0;
+        font-size: 14px;
+    }
+
+    .foot-note { 
+        font-size: 12px; 
+        color: var(--muted); 
+        text-align: center; 
+        margin-top: 16px; 
+    }
+
+    @media (max-width: 768px) {
+        .container {
+            margin: 10px;
+            padding: 15px;
+        }
+        .cards {
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+        }
+        .header .title {
+            font-size: 22px;
+        }
+        .fig {
+            padding: 5px;
+        }
+    }
+    """
+    
+    # Informação sobre filtro
+    filtro_info_html = ""
+    if escola_filtro and escola_filtro != "Todas":
+        filtro_info_html = f"""
+        <div class="filtro-info">
+            <strong>📍 Filtro Ativo:</strong> Dados filtrados para a escola "{escola_filtro}"
+        </div>
+        """
+    
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<title>Relatório Visual TDE WordGen - Fase 2{titulo_filtro}</title>
+<style>
+{css_styles}
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual TDE WordGen{titulo_filtro}</div>
+        <div class="subtitle">Teste de Escrita – Fase 2 (Pré vs Pós-teste). {grupo_info}</div>
+        <div class="timestamp">Gerado em: {now}</div>
+    </div>
+
+    <div class="container">
+        {filtro_info_html}
+        
+        <h2 class="section">📊 Indicadores Principais</h2>
+        <div class="cards">
+            {cards_html}
+        </div>
+
+        <h2 class="section">📈 Análises Visuais</h2>
+        <div class="figs">
+            <div class="fig">
+                <img src="{img_prepos}" alt="Comparação Pré vs Pós TDE" />
+                <div class="caption">Comparação das pontuações médias TDE (Pré vs Pós-teste) com desvio padrão.</div>
+            </div>
+            <div class="fig">
+                <img src="{img_grupos}" alt="Deltas por Grupo TDE" />
+                <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_categorias}" alt="Categorias Cohen TDE" />
+                <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_forest}" alt="Forest Plot TDE" />
+                <div class="caption">Forest plot dos effect sizes TDE (Todos, Grupo A e Grupo B).</div>
+            </div>
+        </div>
+
+        <h2 class="section">🎯 Interpretação Contextualizada</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">
+                <strong>Referências Educacionais para TDE:</strong><br>
+                • Hattie (2009): d≥0.4 indica impacto educacional visível<br>
+                • Cohen (1988): d=0.5 para efeito médio em escrita<br>
+                • Graham & Perin (2007): d≥0.6 para programas efetivos de ensino de escrita<br>
+                • Intervenções de Letramento: d≥0.35 como threshold mínimo
+            </p>
+            {interp_html}
+        </div>
+
+        <div class="foot-note">
+            <p><strong>Metodologia TDE:</strong> Effect Size = Δ/SD(Pré). Grupos baseados na série escolar. 
+            Categorias Cohen usando SD do pré-teste. Dados com valores faltantes foram removidos. 
+            N total processado: {indic['n']} estudantes.</p>
+        </div>
+    </div>
+</body>
+</html>"""
+    
+    return html
+
+# ======================
+# Função Principal
+# ======================
+
+def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> str:
+    """Gera o relatório visual completo para TDE."""
+    
+    if output_path is None:
+        if escola_filtro and escola_filtro != "Todas":
+            escola_clean = escola_filtro.replace(" ", "_").replace("/", "_")
+            output_path = str(DATA_DIR / f"relatorio_visual_TDE_fase2_{escola_clean}.html")
+        else:
+            output_path = str(HTML_OUT)
+    
+    print("="*80)
+    print("🎯 RELATÓRIO VISUAL TDE - WORDGEN FASE 2")
+    print("="*80)
+    
+    # Carregar e preparar dados
+    df, meta = carregar_dados_tde(escola_filtro=escola_filtro)
+    
+    # Calcular indicadores
+    indic = calcular_indicadores_tde(df)
+    
+    print("📊 GERANDO GRÁFICOS...")
+    
+    # Gerar gráficos
+    img_prepos = gerar_grafico_prepos_tde(df)
+    img_grupos = gerar_grafico_delta_grupos_tde(df)
+    img_categorias = gerar_grafico_categorias_cohen_tde(df, indic['std_pre'])
+    img_forest = gerar_grafico_forest_plot_tde(df)
+    
+    print("🎨 RENDERIZANDO HTML...")
+    
+    # Gerar HTML
+    html = gerar_html_tde(indic, meta, img_prepos, img_grupos, img_categorias, 
+                         img_forest, escola_filtro)
+    
+    # Salvar arquivo
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    
+    print("="*80)
+    print("✅ RELATÓRIO TDE GERADO COM SUCESSO!")
+    print("="*80)
+    print(f"📁 Arquivo: {output_path}")
+    print(f"📊 Estudantes processados: {indic['n']}")
+    print(f"📈 Effect Size Global: {indic['cohen_d_global']:.3f}")
+    print(f"📍 Filtro escola: {escola_filtro or 'Todas'}")
+    print("="*80)
+    
+    return output_path
+
+# ======================
+# Interface CLI
+# ======================
+
+def main():
+    """Interface de linha de comando."""
+    parser = argparse.ArgumentParser(
+        description='Gera relatório visual interativo para dados TDE WordGen Fase 2'
+    )
+    parser.add_argument('--escola', type=str, default=None,
+                       help='Filtrar por escola específica')
+    parser.add_argument('--output', type=str, default=None,
+                       help='Caminho do arquivo HTML de saída')
+    parser.add_argument('--listar-escolas', action='store_true',
+                       help='Lista todas as escolas disponíveis')
+    parser.add_argument('--interativo', action='store_true',
+                       help='Gera relatório interativo com menu de escolas')
+    
+    args = parser.parse_args()
+    
+    if args.listar_escolas:
+        print("🏫 ESCOLAS DISPONÍVEIS:")
+        escolas = obter_escolas_disponiveis_tde()
+        for i, escola in enumerate(escolas, 1):
+            if escola != "Todas":
+                df, _ = carregar_dados_tde(escola_filtro=escola)
+                n_estudantes = len(df)
+                print(f"   {i}. {escola} (N={n_estudantes})")
+        return
+    
+    if args.interativo:
+        print("🔄 Gerando relatório TDE interativo...")
+        html_content = gerar_html_tde_interativo()
+        arquivo_saida = str(DATA_DIR / "relatorio_visual_TDE_fase2_interativo.html")
+        
+        with open(arquivo_saida, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        print(f"✅ Relatório interativo TDE salvo: {arquivo_saida}")
+        print(f"🌐 Abra o arquivo em um navegador para usar o menu de seleção")
+        return
+    
+    # Gerar relatório padrão
+    arquivo_saida = gerar_relatorio_tde(escola_filtro=args.escola, output_path=args.output)
+    
+    print(f"\n🌐 Para visualizar o relatório, abra o arquivo:")
+    print(f"   {arquivo_saida}")
+
+if __name__ == "__main__":
+    main()
