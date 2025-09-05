@@ -96,12 +96,12 @@ def classificar_grupo_tde(turma):
         return "Indefinido"
 
 def tem_questoes_validas_tde(row, colunas_p):
-    """Verifica se o estudante tem pelo menos 80% das questões TDE respondidas"""
+    """Verifica se o estudante tem pelo menos 60% das questões TDE respondidas"""
     valores_validos = 0
     for col in colunas_p:
         if col in row.index and not pd.isna(row[col]):
             valores_validos += 1
-    return valores_validos >= 32  # Pelo menos 80% das 40 questões
+    return valores_validos >= 24  # Pelo menos 60% das 40 questões
 
 def gerar_tabela_bruta_tde():
     """Gera tabela com dados brutos TDE após pré-processamento"""
