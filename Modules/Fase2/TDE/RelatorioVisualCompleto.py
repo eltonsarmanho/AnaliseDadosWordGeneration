@@ -1250,6 +1250,7 @@ function atualizarCards(indicadores) {{
 
 function interpretarCohenD(d) {{
     const absD = Math.abs(d);
+    const isPositive = d >= 0;
     let magnitude, hattieStatus, educStatus;
     
     if (absD >= 0.8) magnitude = "Grande";
@@ -1257,10 +1258,29 @@ function interpretarCohenD(d) {{
     else if (absD >= 0.2) magnitude = "Pequeno";
     else magnitude = "Negligível";
     
-    hattieStatus = absD >= 0.4 ? "Acima do benchmark (d≥0.4)" : "Abaixo do benchmark (d≥0.4)";
-    educStatus = absD >= 0.35 ? "Significativo para TDE (d≥0.35)" : "Abaixo do threshold para TDE (d≥0.35)";
+    // Benchmark Hattie com direção
+    if (absD >= 0.4) {{
+        hattieStatus = isPositive ? 
+            "✅ Acima do benchmark (d≥0.4) - Melhoria significativa" : 
+            "🚨 Acima do benchmark (|d|≥0.4) - ALERTA: Deterioração significativa";
+    }} else {{
+        hattieStatus = isPositive ? 
+            "⚠️ Abaixo do benchmark (d<0.4) - Melhoria limitada" : 
+            "ℹ️ Abaixo do benchmark (|d|<0.4) - Deterioração limitada";
+    }}
     
-    return {{ magnitude, hattieStatus, educStatus }};
+    // TDE com direção
+    if (absD >= 0.35) {{
+        educStatus = isPositive ? 
+            "✅ Significativo para TDE (d≥0.35) - Ganho relevante" : 
+            "🚨 Significativo para TDE (|d|≥0.35) - ALERTA: Perda relevante";
+    }} else {{
+        educStatus = isPositive ? 
+            "⚠️ Abaixo do threshold (d<0.35) - Ganho limitado" : 
+            "ℹ️ Abaixo do threshold (|d|<0.35) - Perda limitada";
+    }}
+    
+    return {{ magnitude, hattieStatus, educStatus, isPositive }};
 }}
 
 function criarGrupoItem(indicadores, nomeGrupo) {{

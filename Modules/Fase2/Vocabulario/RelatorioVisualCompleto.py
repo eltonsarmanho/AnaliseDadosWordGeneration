@@ -58,8 +58,9 @@ def obter_escolas_disponiveis():
         return ["Todas"]
 
 def interpretar_cohen_d(d):
-    """Interpreta o Cohen's d conforme benchmarks educacionais"""
+    """Interpreta o Cohen's d conforme benchmarks educacionais com direção do efeito"""
     abs_d = abs(d)
+    is_positive = d >= 0
     
     # Magnitude (Cohen, 1988)
     if abs_d >= 0.8:
@@ -71,22 +72,36 @@ def interpretar_cohen_d(d):
     else:
         magnitude = "Negligível"
     
-    # Benchmark educacional (Hattie, 2009)
+    # Benchmark educacional (Hattie, 2009) - considerando direção
     if abs_d >= 0.4:
-        hattie_status = "Acima do benchmark (d≥0.4)"
+        if is_positive:
+            hattie_status = "✅ Acima do benchmark (d≥0.4) - Melhoria significativa"
+        else:
+            hattie_status = "🚨 Acima do benchmark (|d|≥0.4) - ALERTA: Deterioração significativa"
     else:
-        hattie_status = "Abaixo do benchmark (d≥0.4)"
+        if is_positive:
+            hattie_status = "⚠️ Abaixo do benchmark (d<0.4) - Melhoria limitada"
+        else:
+            hattie_status = "ℹ️ Abaixo do benchmark (|d|<0.4) - Deterioração limitada"
     
-    # Significativo para vocabulário (Marulis & Neuman, 2010)
+    # Significativo para vocabulário (Marulis & Neuman, 2010) - considerando direção
     if abs_d >= 0.35:
-        vocab_status = "Significativo para vocabulário (d≥0.35)"
+        if is_positive:
+            vocab_status = "✅ Significativo para vocabulário (d≥0.35) - Ganho relevante"
+        else:
+            vocab_status = "🚨 Significativo para vocabulário (|d|≥0.35) - ALERTA: Perda relevante"
     else:
-        vocab_status = "Abaixo do threshold para vocabulário (d≥0.35)"
+        if is_positive:
+            vocab_status = "⚠️ Abaixo do threshold (d<0.35) - Ganho limitado"
+        else:
+            vocab_status = "ℹ️ Abaixo do threshold (|d|<0.35) - Perda limitada"
     
     return {
         'magnitude': magnitude,
         'hattie_status': hattie_status,
-        'vocab_status': vocab_status
+        'vocab_status': vocab_status,
+        'is_positive': is_positive,
+        'interpretation_alert': "CRÍTICO" if (abs_d >= 0.5 and not is_positive) else "NORMAL"
     }
 
 def converter_valor_questao(valor):
@@ -1132,22 +1147,40 @@ function atualizarCards(indicadores) {{
 function atualizarInterpretacao(dados) {{
     const container = document.getElementById('interpretacaoContainer');
     
-    function interpretarCohenD(d) {{
-        const absD = Math.abs(d);
-        let magnitude, hattieStatus, vocabStatus;
-        
-        if (absD >= 0.8) magnitude = "Grande";
-        else if (absD >= 0.5) magnitude = "Médio";
-        else if (absD >= 0.2) magnitude = "Pequeno";
-        else magnitude = "Negligível";
-        
-        hattieStatus = absD >= 0.4 ? "Acima do benchmark (d≥0.4)" : "Abaixo do benchmark (d≥0.4)";
-        vocabStatus = absD >= 0.35 ? "Significativo para vocabulário (d≥0.35)" : "Abaixo do threshold para vocabulário (d≥0.35)";
-        
-        return {{ magnitude, hattieStatus, vocabStatus }};
+function interpretarCohenD(d) {{
+    const absD = Math.abs(d);
+    const isPositive = d >= 0;
+    let magnitude, hattieStatus, vocabStatus;
+    
+    if (absD >= 0.8) magnitude = "Grande";
+    else if (absD >= 0.5) magnitude = "Médio";
+    else if (absD >= 0.2) magnitude = "Pequeno";
+    else magnitude = "Negligível";
+    
+    // Benchmark Hattie com direção
+    if (absD >= 0.4) {{
+        hattieStatus = isPositive ? 
+            "✅ Acima do benchmark (d≥0.4) - Melhoria significativa" : 
+            "🚨 Acima do benchmark (|d|≥0.4) - ALERTA: Deterioração significativa";
+    }} else {{
+        hattieStatus = isPositive ? 
+            "⚠️ Abaixo do benchmark (d<0.4) - Melhoria limitada" : 
+            "ℹ️ Abaixo do benchmark (|d|<0.4) - Deterioração limitada";
     }}
     
-    function criarGrupoItem(indicadores, nomeGrupo) {{
+    // Vocabulário com direção
+    if (absD >= 0.35) {{
+        vocabStatus = isPositive ? 
+            "✅ Significativo para vocabulário (d≥0.35) - Ganho relevante" : 
+            "🚨 Significativo para vocabulário (|d|≥0.35) - ALERTA: Perda relevante";
+    }} else {{
+        vocabStatus = isPositive ? 
+            "⚠️ Abaixo do threshold (d<0.35) - Ganho limitado" : 
+            "ℹ️ Abaixo do threshold (|d|<0.35) - Perda limitada";
+    }}
+    
+    return {{ magnitude, hattieStatus, vocabStatus, isPositive }};
+}}    function criarGrupoItem(indicadores, nomeGrupo) {{
         const d = indicadores.cohen_d;
         const interp = interpretarCohenD(d);
         
