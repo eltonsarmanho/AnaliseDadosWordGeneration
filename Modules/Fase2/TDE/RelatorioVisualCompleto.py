@@ -646,22 +646,41 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     bars2 = ax.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
     bars3 = ax.bar(x + width, igual, width, label='Manteve', color='#6c757d', alpha=0.7)
     
+    # Calcular valor máximo para ajustar limites do gráfico
+    max_value = max(max(melhorou), max(piorou), max(igual)) if any(melhorou + piorou + igual) else 100
+    
     # Adicionar valores nas barras
     for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
         if mel > 0:
-            ax.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            ax.text(i - width, mel + 2, f'{mel:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
         if pio > 0:
-            ax.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            ax.text(i, pio + 2, f'{pio:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
         if ig > 0:
-            ax.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            ax.text(i + width, ig + 2, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
+    # Configurar eixos
     ax.set_xlabel('Grupos TDE', fontsize=12)
     ax.set_ylabel('Percentual (%)', fontsize=12)
-    ax.set_title('Distribuição de Resultados TDE', fontsize=14, fontweight='bold')
+    ax.set_title('Distribuição de Resultados TDE', fontsize=14, fontweight='bold', pad=20)
+    
+    # Ajustar limites do eixo Y para evitar sobreposição
+    ax.set_ylim(0, max_value + 15)  # Espaço extra para os labels e legenda
+    
+    # Configurar xticks
     ax.set_xticks(x)
-    ax.set_xticklabels(grupos_curtos)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    ax.set_xticklabels(grupos_curtos, fontsize=11)
+    
+    # Posicionar legenda no canto superior direito, fora da área dos dados
+    ax.legend(loc='upper right', bbox_to_anchor=(1.0, 0.98), fontsize=10, 
+              frameon=True, fancybox=True, shadow=True)
+    
+    # Grid mais sutil
+    ax.grid(True, alpha=0.3, linestyle='--')
+    
+    # Ajustar yticks para evitar sobreposição
+    yticks = np.arange(0, max_value + 15, 10)  # Intervalos de 10%
+    ax.set_yticks(yticks)
+    ax.set_yticklabels([f'{int(y)}%' for y in yticks], fontsize=10)
     
     plt.tight_layout()
     return fig_to_base64(fig)
