@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 
 # Configurar caminhos
-current_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
+current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 data_dir = str(current_dir) + '/Data'
 
 def carregar_mapeamento_palavras():

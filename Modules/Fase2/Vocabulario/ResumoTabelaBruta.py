@@ -4,7 +4,7 @@ import pathlib
 from datetime import datetime
 
 # Configurar caminhos
-current_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
+current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 data_dir = str(current_dir) + '/Data'
 
 def gerar_resumo_tabela_bruta():

@@ -9,7 +9,7 @@ import io
 import json
 
 # Adiciona o diretório atual ao sys.path para permitir importações relativas
-current_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
+current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 print(f"Diretório atual: {current_dir}")
 data_dir = str(current_dir) + '/Data'
 

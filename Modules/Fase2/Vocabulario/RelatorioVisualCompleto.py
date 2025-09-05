@@ -18,7 +18,7 @@ sns.set_theme(style="whitegrid")
 # ======================
 # Configurações de Paths
 # ======================
-BASE_DIR = pathlib.Path(__file__).parent.parent.parent.resolve()
+BASE_DIR = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 

@@ -18,7 +18,7 @@ import os
 import pathlib
 
 # Adicionar o diretório do módulo ao path
-current_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
+current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 sys.path.append(str(current_dir))
 
 from Modules.Fase2.PipelineTabelaBruta import main as gerar_tabela

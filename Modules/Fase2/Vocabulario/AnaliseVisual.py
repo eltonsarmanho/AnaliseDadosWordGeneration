@@ -15,7 +15,7 @@ plt.rcParams['font.size'] = 12
 
 class AnaliseVisualFase2:
     def __init__(self):
-        self.base_dir = pathlib.Path(__file__).parent.parent.parent.resolve()
+        self.base_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
         self.data_dir = self.base_dir / "Data"
         self.fig_dir = self.data_dir / "figures"
         
