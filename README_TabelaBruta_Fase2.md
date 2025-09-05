@@ -9,6 +9,7 @@ Este pipeline gera uma tabela consolidada com dados **brutos após pré-processa
 ### 📁 Principais
 - `tabela_bruta_fase2_vocabulario_wordgen.csv` (1MB) - Tabela em formato CSV
 - `tabela_bruta_fase2_vocabulario_wordgen.xlsx` (627KB) - Tabela em formato Excel
+- `dicionario_dados_tabela_bruta_fase2.txt` (16KB) - Dicionário de dados completo
 
 ### 📊 Conteúdo da Tabela
 
@@ -43,7 +44,7 @@ Para cada uma das 50 questões de vocabulário:
 
 ### 🚀 Executar Pipeline Completo
 ```bash
-# Gerar tabela + resumo + preview
+# Gerar tabela + resumo + preview + dicionário
 python Modules/Fase2/PipelineTabelaBrutaCLI.py --all
 ```
 
@@ -58,6 +59,9 @@ python Modules/Fase2/PipelineTabelaBrutaCLI.py --resumo
 # Ver preview dos dados
 python Modules/Fase2/PipelineTabelaBrutaCLI.py --preview
 
+# Gerar dicionário de dados
+python Modules/Fase2/PipelineTabelaBrutaCLI.py --dicionario
+
 # Ver opções disponíveis
 python Modules/Fase2/PipelineTabelaBrutaCLI.py --help
 ```
@@ -69,9 +73,65 @@ python Modules/Fase2/PipelineTabelaBruta.py
 
 # Resumo executivo (sem CLI)
 python Modules/Fase2/ResumoTabelaBruta.py
+
+# Dicionário de dados (sem CLI)
+python Modules/Fase2/GeradorDicionarioDados.py
 ```
 
-## Estatísticas dos Dados
+## Dicionário de Dados
+
+### 📖 Documentação Completa
+O arquivo `dicionario_dados_tabela_bruta_fase2.txt` contém documentação detalhada de:
+
+#### 📋 Estrutura Completa
+- **Informações gerais:** Descrição do dataset, período, população
+- **Distribuições:** Por escola, grupo etário, estatísticas descritivas
+- **Colunas de identificação:** 11 colunas com dados do estudante e scores
+- **Questões de vocabulário:** 150 colunas (50 questões × 3 tipos: Pre/Pos/Delta)
+- **Lista completa das palavras:** Todas as 50 palavras com respostas corretas
+- **Critérios de inclusão:** Regras de pré-processamento aplicadas
+- **Transformações:** Como os dados foram limpos e padronizados
+- **Estatísticas descritivas:** Médias, desvios, distribuições
+- **Guia de uso:** Como analisar os dados, limitações, cuidados
+
+#### 🔍 Exemplo de Documentação por Coluna
+```
+1. ID_Unico
+   Tipo: Texto
+   Descrição: Identificador único do estudante
+   Detalhes: Formato: 'Nome_Turma' para evitar duplicatas
+
+6. Score_Pre
+   Tipo: Numérica
+   Descrição: Pontuação total no pré-teste
+   Detalhes: Faixa: 0-100 pontos (soma de Q1-Q50)
+```
+
+#### 📚 Documentação das Questões
+```
+Q01 - enorme
+     Colunas: Q01_Pre_enorme, Q01_Pos_enorme, Q01_Delta_enorme
+     Resposta correta: grande
+
+Q02 - diretriz
+     Colunas: Q02_Pre_diretriz, Q02_Pos_diretriz, Q02_Delta_diretriz
+     Resposta correta: regra
+```
+
+### 💡 Codificação das Respostas
+- **0** = Erro (resposta incorreta)
+- **1** = Acerto parcial (resposta parcialmente correta)
+- **2** = Acerto total (resposta completamente correta)
+- **(vazio)** = Não respondido ou valor inválido (D/M no original)
+
+### 📊 Estatísticas Incluídas
+- **468 linhas** de documentação
+- **161 colunas** documentadas
+- **50 questões** mapeadas com palavras
+- **Estatísticas descritivas** completas
+- **Guias de uso** e limitações
+
+---
 
 ### 👥 Distribuição por Grupo Etário
 - **6º/7º anos:** 730 estudantes (53.6%)
@@ -175,6 +235,7 @@ print(f"Grupo 8º/9º: {grupo2['Score_Pre'].mean():.2f} → {grupo2['Score_Pos']
 Data/
 ├── tabela_bruta_fase2_vocabulario_wordgen.csv    # Tabela principal
 ├── tabela_bruta_fase2_vocabulario_wordgen.xlsx   # Versão Excel
+├── dicionario_dados_tabela_bruta_fase2.txt       # Dicionário de dados
 └── Fase2/
     ├── Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.xlsx
     └── Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (...).xlsx
