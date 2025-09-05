@@ -554,33 +554,73 @@ def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
     return fig_to_base64(fig)
 
 def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
-    """Gera comparação detalhada entre grupos etários TDE (Gráfico de densidade e Barra)."""
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    """Gera comparação detalhada entre grupos etários TDE (2 gráficos de densidade separados + distribuição de resultados embaixo)."""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
     grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
     cores = ['#3498db', '#e74c3c']
     
-    # 1. Distribuição de scores pré e pós combinados (densidade)
-    ax = axes[0]
+    # 1. Distribuição de densidade - GRUPO A (superior esquerdo)
+    ax = axes[0, 0]
+    data_pre_a = df[df['GrupoTDE'] == grupos[0]]['Score_Pre']
+    data_pos_a = df[df['GrupoTDE'] == grupos[0]]['Score_Pos']
     
-    # Dados para cada grupo
-    for i, grupo in enumerate(grupos):
-        data_pre = df[df['GrupoTDE'] == grupo]['Score_Pre']
-        data_pos = df[df['GrupoTDE'] == grupo]['Score_Pos']
+    if len(data_pre_a) > 0:
+        ax.hist(data_pre_a, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
+        ax.hist(data_pos_a, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
         
-        nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
+        # Adicionar médias como linhas verticais
+        mean_pre_a = data_pre_a.mean()
+        mean_pos_a = data_pos_a.mean()
+        ax.axvline(mean_pre_a, color=cores[0], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_a, color=cores[0], linestyle='-', alpha=0.8, linewidth=2)
         
-        ax.hist(data_pre, alpha=0.4, label=f'{nome_curto} (Pré)', color=cores[i], bins=15, density=True)
-        ax.hist(data_pos, alpha=0.6, label=f'{nome_curto} (Pós)', color=cores[i], bins=15, density=True, hatch='//')
+        # Texto com médias
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_a:.1f}\nPós: {mean_pos_a:.1f}', 
+                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+                verticalalignment='top', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=14)
     
     ax.set_xlabel('Scores TDE', fontsize=12)
     ax.set_ylabel('Densidade', fontsize=12)
-    ax.set_title('Distribuição de Scores TDE Pré e Pós-teste', fontsize=14, fontweight='bold')
+    ax.set_title('Grupo A (6º/7º anos)\nDistribuição de Densidade', fontsize=14, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # 2. Percentuais de melhoria (barras)
-    ax = axes[1]
+    # 2. Distribuição de densidade - GRUPO B (superior direito)
+    ax = axes[0, 1]
+    data_pre_b = df[df['GrupoTDE'] == grupos[1]]['Score_Pre']
+    data_pos_b = df[df['GrupoTDE'] == grupos[1]]['Score_Pos']
+    
+    if len(data_pre_b) > 0:
+        ax.hist(data_pre_b, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
+        ax.hist(data_pos_b, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
+        
+        # Adicionar médias como linhas verticais
+        mean_pre_b = data_pre_b.mean()
+        mean_pos_b = data_pos_b.mean()
+        ax.axvline(mean_pre_b, color=cores[1], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_b, color=cores[1], linestyle='-', alpha=0.8, linewidth=2)
+        
+        # Texto com médias
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_b:.1f}\nPós: {mean_pos_b:.1f}', 
+                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+                verticalalignment='top', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=14)
+    
+    ax.set_xlabel('Scores TDE', fontsize=12)
+    ax.set_ylabel('Densidade', fontsize=12)
+    ax.set_title('Grupo B (8º/9º anos)\nDistribuição de Densidade', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # 3. Distribuição de Resultados TDE (inferior, ocupando 2 colunas)
+    ax = plt.subplot(2, 1, 2)  # Subplot que ocupa a linha inferior inteira
+    
     melhorou = []
     piorou = []
     igual = []
@@ -609,11 +649,11 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     # Adicionar valores nas barras
     for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
         if mel > 0:
-            ax.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            ax.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
         if pio > 0:
-            ax.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            ax.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
         if ig > 0:
-            ax.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            ax.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
     ax.set_xlabel('Grupos TDE', fontsize=12)
     ax.set_ylabel('Percentual (%)', fontsize=12)
@@ -1067,7 +1107,7 @@ def gerar_html_tde_interativo():
             </div>
             <div class="fig" id="grafico-comparacao-intergrupos">
                 <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Detalhada Grupos TDE" />
-                <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
+                <div class="caption">Comparação detalhada entre grupos etários TDE (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
             </div>
         </div>
 
@@ -1573,7 +1613,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
             </div>
             <div class="fig">
                 <img src="{img_comparacao_intergrupos}" alt="Comparação Detalhada Grupos TDE" />
-                <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
+                <div class="caption">Comparação detalhada entre grupos etários TDE (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
             </div>
         </div>
 
