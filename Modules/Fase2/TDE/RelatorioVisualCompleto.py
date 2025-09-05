@@ -718,82 +718,6 @@ def gerar_grafico_categorias_cohen_tde(df: pd.DataFrame, std_pre: float) -> str:
     plt.tight_layout()
     return fig_to_base64(fig)
 
-def gerar_grafico_forest_plot_tde(df: pd.DataFrame) -> str:
-    """Gera forest plot dos effect sizes por grupo TDE (simplificado)."""
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Calcular effect sizes apenas para os 3 subgrupos solicitados
-    effect_sizes = []
-    
-    # Effect size global (Todos)
-    delta_global = df['Delta_Score'].mean()
-    std_pre_global = df['Score_Pre'].std()
-    es_global = delta_global / std_pre_global if std_pre_global > 0 else 0
-    effect_sizes.append({
-        'categoria': 'Todos',
-        'es': es_global,
-        'n': len(df),
-        'ci_lower': es_global - 1.96 * (1/np.sqrt(len(df))),  # CI aproximado
-        'ci_upper': es_global + 1.96 * (1/np.sqrt(len(df)))
-    })
-    
-    # Effect sizes por grupo TDE
-    for grupo in ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']:
-        df_grupo = df[df['GrupoTDE'] == grupo]
-        if len(df_grupo) > 1:
-            delta_grupo = df_grupo['Delta_Score'].mean()
-            std_pre_grupo = df_grupo['Score_Pre'].std()
-            es_grupo = delta_grupo / std_pre_grupo if std_pre_grupo > 0 else 0
-            nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
-            effect_sizes.append({
-                'categoria': nome_curto,
-                'es': es_grupo,
-                'n': len(df_grupo),
-                'ci_lower': es_grupo - 1.96 * (1/np.sqrt(len(df_grupo))),
-                'ci_upper': es_grupo + 1.96 * (1/np.sqrt(len(df_grupo)))
-            })
-    
-    # Plotar forest plot
-    y_positions = np.arange(len(effect_sizes))
-    cores = ['#2c3e50', '#3498db', '#e74c3c']
-    
-    for i, es_data in enumerate(effect_sizes):
-        cor = cores[i]
-        
-        # Point estimate
-        ax.scatter(es_data['es'], i, color=cor, s=120, zorder=5)
-        
-        # Confidence interval
-        ax.plot([es_data['ci_lower'], es_data['ci_upper']], [i, i], 
-                color=cor, linewidth=3, alpha=0.7)
-        
-        # Texto com N
-        ax.text(es_data['es'] + 0.05, i, f"N={es_data['n']}", 
-                va='center', fontsize=10, fontweight='bold')
-    
-    # Configurar eixos
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels([es['categoria'] for es in effect_sizes])
-    ax.set_xlabel("Effect Size (Cohen's d)", fontsize=12)
-    ax.set_title("Forest Plot - Effect Sizes TDE", fontsize=14, fontweight='bold')
-    
-    # Linha de referência
-    ax.axvline(x=0, color='black', linestyle='-', alpha=0.3)
-    
-    # Benchmarks principais
-    ax.axvline(x=0.4, color='red', linestyle='--', alpha=0.5, linewidth=2)
-    ax.axvline(x=-0.4, color='red', linestyle='--', alpha=0.5, linewidth=2)
-    ax.axvline(x=0.5, color='orange', linestyle=':', alpha=0.7, linewidth=2)
-    ax.axvline(x=-0.5, color='orange', linestyle=':', alpha=0.7, linewidth=2)
-    
-    # Legenda dos benchmarks
-    ax.text(0.98, 0.02, "Linhas: Hattie d≥0.4 (vermelho), Cohen d≥0.5 (laranja)", 
-            transform=ax.transAxes, ha='right', va='bottom', 
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9), fontsize=9)
-    
-    plt.tight_layout()
-    return fig_to_base64(fig)
-
 def gerar_graficos_escola_tde(escola_filtro=None):
     """Gera gráficos específicos para uma escola TDE e retorna como base64"""
     
@@ -816,9 +740,6 @@ def gerar_graficos_escola_tde(escola_filtro=None):
         # Categorias Cohen
         std_pre = df['Score_Pre'].std()
         graficos['categorias'] = gerar_grafico_categorias_cohen_tde(df, std_pre)
-        
-        # Forest plot simplificado
-        graficos['forest'] = gerar_grafico_forest_plot_tde(df)
         
         # NOVOS GRÁFICOS SOLICITADOS:
         
@@ -1184,10 +1105,6 @@ def gerar_html_tde_interativo():
                 <img src="{figuras_b64.get('categorias', '')}" alt="Categorias Cohen TDE" />
                 <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
             </div>
-            <div class="fig" id="grafico-forest">
-                <img src="{figuras_b64.get('forest', '')}" alt="Forest Plot TDE" />
-                <div class="caption">Forest plot dos effect sizes TDE (Todos, Grupo A e Grupo B).</div>
-            </div>
         </div>
 
         <h2 class="section">🎯 Interpretação Contextualizada</h2>
@@ -1356,7 +1273,6 @@ function atualizarGraficos(graficos) {{
     atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
     atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
     atualizarImg('grafico-categorias', graficos.categorias);
-    atualizarImg('grafico-forest', graficos.forest);
 }}
 
 // Inicializar quando a página carregar
@@ -1408,7 +1324,7 @@ def _interpretacao_contexto_tde_html(indic: Dict[str, float]) -> str:
 
 def gerar_html_tde(indic: Dict[str, float], meta: Dict, 
                    img_prepos: str, img_grupos: str, img_categorias: str, 
-                   img_forest: str, img_palavras_top: str, img_comparacao_intergrupos: str,
+                   img_palavras_top: str, img_comparacao_intergrupos: str,
                    img_heatmap_pos: str, img_heatmap_pre: str, escola_filtro: str = None) -> str:
     """Gera o HTML completo do relatório TDE."""
     
@@ -1688,10 +1604,6 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
                 <img src="{img_categorias}" alt="Categorias Cohen TDE" />
                 <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
             </div>
-            <div class="fig">
-                <img src="{img_forest}" alt="Forest Plot TDE" />
-                <div class="caption">Forest plot dos effect sizes TDE (Todos, Grupo A e Grupo B).</div>
-            </div>
         </div>
 
         <h2 class="section">🎯 Interpretação Contextualizada</h2>
@@ -1747,7 +1659,6 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     img_prepos = gerar_grafico_prepos_tde(df)
     img_grupos = gerar_grafico_delta_grupos_tde(df)
     img_categorias = gerar_grafico_categorias_cohen_tde(df, indic['std_pre'])
-    img_forest = gerar_grafico_forest_plot_tde(df)
     
     # Gerar novos gráficos solicitados
     img_palavras_top = gerar_grafico_palavras_top_tde(df)
@@ -1759,7 +1670,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     
     # Gerar HTML
     html = gerar_html_tde(indic, meta, img_prepos, img_grupos, img_categorias, 
-                         img_forest, img_palavras_top, img_comparacao_intergrupos,
+                         img_palavras_top, img_comparacao_intergrupos,
                          img_heatmap_pos, img_heatmap_pre, escola_filtro)
     
     # Salvar arquivo
