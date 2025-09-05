@@ -533,31 +533,49 @@ def plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
     return fig
 
 def plot_comparacao_intergrupos(scores_df):
-    """Comparação detalhada entre grupos - Layout simplificado 2x1"""
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    """Comparação detalhada entre grupos - Layout 2x2 com densidades separadas e distribuição de resultados abaixo"""
+    fig = plt.figure(figsize=(15, 10))
     
     grupos = ['6º/7º anos', '8º/9º anos']
     cores = ['#3498db', '#e74c3c']
     
-    # 1. Distribuição de scores pré e pós combinados
-    ax = axes[0]
+    # 1. Distribuição de densidade - GRUPO A (superior esquerdo)
+    ax1 = plt.subplot(2, 2, 1)
     
-    # Dados para cada grupo
-    for i, grupo in enumerate(grupos):
-        data_pre = scores_df[scores_df['GrupoEtario'] == grupo]['Score_Pre']
-        data_pos = scores_df[scores_df['GrupoEtario'] == grupo]['Score_Pos']
-        
-        ax.hist(data_pre, alpha=0.4, label=f'{grupo} (Pré)', color=cores[i], bins=15, density=True)
-        ax.hist(data_pos, alpha=0.6, label=f'{grupo} (Pós)', color=cores[i], bins=15, density=True, hatch='//')
+    # Dados do Grupo A (6º/7º anos)
+    data_pre_a = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pre']
+    data_pos_a = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pos']
     
-    ax.set_xlabel('Scores')
-    ax.set_ylabel('Densidade')
-    ax.set_title('Distribuição de Scores Pré e Pós-teste')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    if len(data_pre_a) > 0:
+        ax1.hist(data_pre_a, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
+        ax1.hist(data_pos_a, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
     
-    # 2. Percentuais de melhoria
-    ax = axes[1]
+    ax1.set_xlabel('Scores', fontsize=11)
+    ax1.set_ylabel('Densidade', fontsize=11)
+    ax1.set_title('Grupo A (6º/7º anos)\nDistribuição de Densidade', fontsize=12, fontweight='bold')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # 2. Distribuição de densidade - GRUPO B (superior direito)
+    ax2 = plt.subplot(2, 2, 2)
+    
+    # Dados do Grupo B (8º/9º anos)
+    data_pre_b = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pre']
+    data_pos_b = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pos']
+    
+    if len(data_pre_b) > 0:
+        ax2.hist(data_pre_b, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
+        ax2.hist(data_pos_b, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
+    
+    ax2.set_xlabel('Scores', fontsize=11)
+    ax2.set_ylabel('Densidade', fontsize=11)
+    ax2.set_title('Grupo B (8º/9º anos)\nDistribuição de Densidade', fontsize=12, fontweight='bold')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # 3. Distribuição de Resultados (inferior - ocupando as duas posições)
+    ax3 = plt.subplot(2, 1, 2)
+    
     melhorou = []
     piorou = []
     igual = []
@@ -566,30 +584,35 @@ def plot_comparacao_intergrupos(scores_df):
         data = scores_df[scores_df['GrupoEtario'] == grupo]
         total = len(data)
         
-        melhorou.append((data['Delta'] > 0).sum() / total * 100)
-        piorou.append((data['Delta'] < 0).sum() / total * 100)
-        igual.append((data['Delta'] == 0).sum() / total * 100)
+        if total > 0:
+            melhorou.append((data['Delta'] > 0).sum() / total * 100)
+            piorou.append((data['Delta'] < 0).sum() / total * 100)
+            igual.append((data['Delta'] == 0).sum() / total * 100)
+        else:
+            melhorou.append(0)
+            piorou.append(0)
+            igual.append(0)
     
     x = np.arange(len(grupos))
     width = 0.25
     
-    ax.bar(x - width, melhorou, width, label='Melhorou', color='#28a745', alpha=0.7)
-    ax.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
-    ax.bar(x + width, igual, width, label='Igual', color='#6c757d', alpha=0.7)
+    ax3.bar(x - width, melhorou, width, label='Melhorou', color='#28a745', alpha=0.7)
+    ax3.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
+    ax3.bar(x + width, igual, width, label='Igual', color='#6c757d', alpha=0.7)
     
     # Adicionar valores nas barras
     for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
-        ax.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=9)
-        ax.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=9)
-        ax.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=9)
+        ax3.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=10)
+        ax3.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=10)
+        ax3.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10)
     
-    ax.set_xlabel('Grupos')
-    ax.set_ylabel('Percentual (%)')
-    ax.set_title('Distribuição de Resultados')
-    ax.set_xticks(x)
-    ax.set_xticklabels(grupos)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    ax3.set_xlabel('Grupos', fontsize=12)
+    ax3.set_ylabel('Percentual (%)', fontsize=12)
+    ax3.set_title('Distribuição de Resultados', fontsize=14, fontweight='bold')
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(grupos)
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
     
     plt.tight_layout()
     return fig
@@ -976,11 +999,11 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
     </div>
 
     <div class="container">
-        <h2 class="section">Indicadores</h2>
+        <h2 class="section">📊 Indicadores Principais</h2>
         <div class="cards" id="cardsContainer">
         </div>
 
-        <h2 class="section">Gráficos</h2>
+        <h2 class="section">📈 Análises Visuais</h2>
         <div class="figs">
             <div class="fig" id="grafico-grupos">
                 <img src="{figuras_b64.get('grupos_barras', '')}" alt="Comparação de Grupos" />
@@ -992,7 +1015,7 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
             </div>
             <div class="fig" id="grafico-intergrupos">
                 <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Intergrupos" />
-                <div class="caption">Comparação detalhada entre grupos etários.</div>
+                <div class="caption">Comparação detalhada entre grupos etários (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
             </div>
         </div>
 
@@ -1335,7 +1358,7 @@ def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grup
             </div>
             <div class="fig">
                 <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Intergrupos" />
-                <div class="caption">Comparação detalhada entre grupos etários.</div>
+                <div class="caption">Comparação detalhada entre grupos etários (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
             </div>
         </div>
 

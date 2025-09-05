@@ -1146,7 +1146,7 @@ def gerar_html_tde_interativo():
             </div>
         </div>
 
-        <h2 class="section">🎯 Interpretação Contextualizada</h2>
+        <h2 class="section">Interpretação contextualizada por grupo etário</h2>
         <div class="interp">
             <p style="margin-top:0;color:#374151;">
                 <strong>Referências Educacionais para TDE:</strong><br>
