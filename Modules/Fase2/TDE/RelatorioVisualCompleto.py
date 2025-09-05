@@ -258,6 +258,106 @@ def calcular_indicadores_tde(df: pd.DataFrame, grupo_filtro: str = None) -> Dict
     }
 
 # ======================
+# Funções de Análise de Palavras
+# ======================
+
+def extrair_palavras_tde(df: pd.DataFrame) -> pd.DataFrame:
+    """Extrai dados das palavras TDE para análise."""
+    palavras_data = []
+    
+    # Padrão das colunas: P{num}_{pre/pos}_{palavra}
+    colunas = df.columns.tolist()
+    
+    # Extrair informações das palavras
+    for col in colunas:
+        if col.startswith('P') and '_Pre_' in col:
+            # Extrair número da questão e palavra
+            parts = col.split('_')
+            if len(parts) >= 3:
+                questao_num = parts[0]  # P01, P02, etc.
+                palavra = '_'.join(parts[2:])  # pode ter underscores na palavra
+                
+                # Colunas correspondentes
+                col_pre = f"{questao_num}_Pre_{palavra}"
+                col_pos = f"{questao_num}_Pos_{palavra}"
+                col_delta = f"{questao_num}_Delta_{palavra}"
+                
+                # Verificar se todas as colunas existem
+                if col_pre in colunas and col_pos in colunas and col_delta in colunas:
+                    palavras_data.append({
+                        'Questao': questao_num,
+                        'Palavra': palavra,
+                        'Col_Pre': col_pre,
+                        'Col_Pos': col_pos,
+                        'Col_Delta': col_delta
+                    })
+    
+    return pd.DataFrame(palavras_data)
+
+def analisar_palavras_tde(df: pd.DataFrame, grupo_filtro: str = None) -> pd.DataFrame:
+    """Analisa performance das palavras TDE por grupo."""
+    
+    # Filtrar por grupo se especificado
+    if grupo_filtro:
+        df = df[df['GrupoTDE'] == grupo_filtro]
+    
+    if len(df) == 0:
+        return pd.DataFrame()
+    
+    # Extrair informações das palavras
+    palavras_info = extrair_palavras_tde(df)
+    
+    if len(palavras_info) == 0:
+        return pd.DataFrame()
+    
+    resultados = []
+    
+    for _, palavra_info in palavras_info.iterrows():
+        questao = palavra_info['Questao']
+        palavra = palavra_info['Palavra']
+        col_pre = palavra_info['Col_Pre']
+        col_pos = palavra_info['Col_Pos']
+        col_delta = palavra_info['Col_Delta']
+        
+        # Dados válidos (não nulos)
+        mask_valido = df[col_pre].notna() & df[col_pos].notna()
+        dados_validos = df[mask_valido]
+        
+        if len(dados_validos) == 0:
+            continue
+        
+        # Calcular estatísticas
+        acertos_pre = dados_validos[col_pre].sum()
+        acertos_pos = dados_validos[col_pos].sum()
+        total_tentativas = len(dados_validos)
+        
+        taxa_acerto_pre = acertos_pre / total_tentativas if total_tentativas > 0 else 0
+        taxa_acerto_pos = acertos_pos / total_tentativas if total_tentativas > 0 else 0
+        
+        melhora = taxa_acerto_pos - taxa_acerto_pre
+        melhora_percentual = melhora * 100
+        
+        # Percentual de erros
+        perc_erro_pre = (1 - taxa_acerto_pre) * 100
+        perc_erro_pos = (1 - taxa_acerto_pos) * 100
+        
+        resultados.append({
+            'Questao': questao,
+            'Palavra': palavra,
+            'Total_Tentativas': total_tentativas,
+            'Acertos_Pre': acertos_pre,
+            'Acertos_Pos': acertos_pos,
+            'Taxa_Acerto_Pre': taxa_acerto_pre,
+            'Taxa_Acerto_Pos': taxa_acerto_pos,
+            'Melhora': melhora,
+            'Melhora_Percentual': melhora_percentual,
+            'Perc_Erro_Pre': perc_erro_pre,
+            'Perc_Erro_Pos': perc_erro_pos
+        })
+    
+    return pd.DataFrame(resultados)
+
+# ======================
 # Geração de Gráficos
 # ======================
 
@@ -293,6 +393,220 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     
     # Adicionar linha de referência zero
     ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
+    """Gera gráfico das palavras com maior melhora TDE (Top 20 Palavras - Melhora Geral) e Comparação de Melhora - Top 15."""
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    
+    # Analisar palavras por grupo
+    palavras_geral = analisar_palavras_tde(df)
+    palavras_grupo_a = analisar_palavras_tde(df, "Grupo A (6º/7º anos)")
+    palavras_grupo_b = analisar_palavras_tde(df, "Grupo B (8º/9º anos)")
+    
+    if len(palavras_geral) == 0:
+        # Gráfico vazio se não há dados
+        for ax in axes:
+            ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                    transform=ax.transAxes, fontsize=16)
+        return fig_to_base64(fig)
+    
+    # 1. Top 20 palavras - melhora geral
+    ax = axes[0]
+    top_20 = palavras_geral.nlargest(20, 'Melhora')
+    y_pos = np.arange(len(top_20))
+    
+    bars = ax.barh(y_pos, top_20['Melhora_Percentual'], color='#3498db', alpha=0.7)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels([p[:15] + '...' if len(p) > 15 else p for p in top_20['Palavra']])
+    ax.set_xlabel('Melhora na Taxa de Acerto (%)', fontsize=12)
+    ax.set_title('Top 20 Palavras TDE - Melhora Geral', fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    
+    # Adicionar valores nas barras
+    for bar, valor in zip(bars, top_20['Melhora_Percentual']):
+        width = bar.get_width()
+        ax.text(width + 0.5, bar.get_y() + bar.get_height()/2, 
+                f'{valor:.1f}%', ha='left', va='center', fontweight='bold', fontsize=9)
+    
+    # 2. Comparação entre grupos - Top 15
+    ax = axes[1]
+    top_15_questoes = palavras_geral.nlargest(15, 'Melhora')['Questao']
+    
+    melhoras_ga = []
+    melhoras_gb = []
+    palavras_nomes = []
+    
+    for questao in top_15_questoes:
+        palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
+        palavras_nomes.append(palavra[:10] + '...' if len(palavra) > 10 else palavra)
+        
+        # Buscar melhora para cada grupo
+        melhora_ga = palavras_grupo_a[palavras_grupo_a['Questao'] == questao]['Melhora_Percentual']
+        melhora_gb = palavras_grupo_b[palavras_grupo_b['Questao'] == questao]['Melhora_Percentual']
+        
+        melhoras_ga.append(melhora_ga.iloc[0] if len(melhora_ga) > 0 else 0)
+        melhoras_gb.append(melhora_gb.iloc[0] if len(melhora_gb) > 0 else 0)
+    
+    x = np.arange(len(palavras_nomes))
+    width = 0.35
+    
+    ax.bar(x - width/2, melhoras_ga, width, label='Grupo A (6º/7º)', color='#3498db', alpha=0.7)
+    ax.bar(x + width/2, melhoras_gb, width, label='Grupo B (8º/9º)', color='#e74c3c', alpha=0.7)
+    
+    ax.set_xlabel('Palavras', fontsize=12)
+    ax.set_ylabel('Melhora (%)', fontsize=12)
+    ax.set_title('Comparação de Melhora TDE - Top 15', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(palavras_nomes, rotation=45, ha='right')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # Linha de referência em zero
+    ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
+    """Gera comparação detalhada entre grupos etários TDE (Gráfico de densidade e Barra)."""
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    
+    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
+    cores = ['#3498db', '#e74c3c']
+    
+    # 1. Distribuição de scores pré e pós combinados (densidade)
+    ax = axes[0]
+    
+    # Dados para cada grupo
+    for i, grupo in enumerate(grupos):
+        data_pre = df[df['GrupoTDE'] == grupo]['Score_Pre']
+        data_pos = df[df['GrupoTDE'] == grupo]['Score_Pos']
+        
+        nome_curto = grupo.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)')
+        
+        ax.hist(data_pre, alpha=0.4, label=f'{nome_curto} (Pré)', color=cores[i], bins=15, density=True)
+        ax.hist(data_pos, alpha=0.6, label=f'{nome_curto} (Pós)', color=cores[i], bins=15, density=True, hatch='//')
+    
+    ax.set_xlabel('Scores TDE', fontsize=12)
+    ax.set_ylabel('Densidade', fontsize=12)
+    ax.set_title('Distribuição de Scores TDE Pré e Pós-teste', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # 2. Percentuais de melhoria (barras)
+    ax = axes[1]
+    melhorou = []
+    piorou = []
+    igual = []
+    
+    for grupo in grupos:
+        data = df[df['GrupoTDE'] == grupo]
+        total = len(data)
+        
+        if total > 0:
+            melhorou.append((data['Delta_Score'] > 0).sum() / total * 100)
+            piorou.append((data['Delta_Score'] < 0).sum() / total * 100)
+            igual.append((data['Delta_Score'] == 0).sum() / total * 100)
+        else:
+            melhorou.append(0)
+            piorou.append(0)
+            igual.append(0)
+    
+    x = np.arange(len(grupos))
+    width = 0.25
+    grupos_curtos = [g.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)') for g in grupos]
+    
+    bars1 = ax.bar(x - width, melhorou, width, label='Melhorou', color='#28a745', alpha=0.7)
+    bars2 = ax.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
+    bars3 = ax.bar(x + width, igual, width, label='Manteve', color='#6c757d', alpha=0.7)
+    
+    # Adicionar valores nas barras
+    for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
+        if mel > 0:
+            ax.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        if pio > 0:
+            ax.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        if ig > 0:
+            ax.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+    
+    ax.set_xlabel('Grupos TDE', fontsize=12)
+    ax.set_ylabel('Percentual (%)', fontsize=12)
+    ax.set_title('Distribuição de Resultados TDE', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(grupos_curtos)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
+
+def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -> str:
+    """Gera heatmap do percentual de erros por palavra e grupo TDE."""
+    
+    # Analisar palavras por grupo
+    palavras_geral = analisar_palavras_tde(df)
+    palavras_grupo_a = analisar_palavras_tde(df, "Grupo A (6º/7º anos)")
+    palavras_grupo_b = analisar_palavras_tde(df, "Grupo B (8º/9º anos)")
+    
+    if len(palavras_geral) == 0:
+        fig, ax = plt.subplots(figsize=(8, 12))
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=16)
+        return fig_to_base64(fig)
+    
+    # Selecionar top 20 palavras com maior melhora geral
+    top_20_questoes = palavras_geral.nlargest(20, 'Melhora')['Questao']
+    
+    # Preparar dados para heatmap
+    heatmap_data = []
+    palavras_labels = []
+    
+    coluna_erro = 'Perc_Erro_Pos' if tipo_teste == "pos" else 'Perc_Erro_Pre'
+    
+    for questao in top_20_questoes:
+        palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
+        palavras_labels.append(palavra[:12] + '...' if len(palavra) > 12 else palavra)
+        
+        # Erros para cada grupo
+        erro_ga = palavras_grupo_a[palavras_grupo_a['Questao'] == questao][coluna_erro]
+        erro_gb = palavras_grupo_b[palavras_grupo_b['Questao'] == questao][coluna_erro]
+        
+        erro_ga_val = erro_ga.iloc[0] if len(erro_ga) > 0 else 0
+        erro_gb_val = erro_gb.iloc[0] if len(erro_gb) > 0 else 0
+        
+        heatmap_data.append([erro_ga_val, erro_gb_val])
+    
+    heatmap_array = np.array(heatmap_data)
+    
+    fig, ax = plt.subplots(figsize=(8, 12))
+    
+    im = ax.imshow(heatmap_array, cmap='Reds', aspect='auto')
+    
+    # Configurar eixos
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['Grupo A (6º/7º)', 'Grupo B (8º/9º)'])
+    ax.set_yticks(range(len(palavras_labels)))
+    ax.set_yticklabels(palavras_labels)
+    
+    teste_nome = "Pós-teste" if tipo_teste == "pos" else "Pré-teste"
+    ax.set_title(f'Percentual de Erros TDE por Palavra e Grupo\n({teste_nome} - Top 20 palavras)', 
+                 fontweight='bold', fontsize=14)
+    
+    # Adicionar valores
+    for i in range(len(palavras_labels)):
+        for j in range(2):
+            valor = heatmap_array[i, j]
+            text = ax.text(j, i, f'{valor:.1f}%',
+                         ha="center", va="center", 
+                         color="white" if valor > 50 else "black",
+                         fontweight='bold', fontsize=10)
+    
+    # Colorbar
+    cbar = plt.colorbar(im, ax=ax, label='Percentual de Erros (%)')
+    cbar.ax.tick_params(labelsize=10)
     
     plt.tight_layout()
     return fig_to_base64(fig)
@@ -505,6 +819,20 @@ def gerar_graficos_escola_tde(escola_filtro=None):
         
         # Forest plot simplificado
         graficos['forest'] = gerar_grafico_forest_plot_tde(df)
+        
+        # NOVOS GRÁFICOS SOLICITADOS:
+        
+        # Palavras com maior melhora (Top 20 + Comparação Top 15)
+        graficos['palavras_top'] = gerar_grafico_palavras_top_tde(df)
+        
+        # Comparação detalhada entre grupos (densidade + barras)
+        graficos['comparacao_intergrupos'] = gerar_grafico_comparacao_intergrupos_tde(df)
+        
+        # Heatmap erros pós-teste
+        graficos['heatmap_erros_pos'] = gerar_grafico_heatmap_erros_tde(df, "pos")
+        
+        # Heatmap erros pré-teste
+        graficos['heatmap_erros_pre'] = gerar_grafico_heatmap_erros_tde(df, "pre")
         
     except Exception as e:
         print(f"Erro ao gerar gráficos para {escola_filtro}: {e}")
@@ -836,6 +1164,22 @@ def gerar_html_tde_interativo():
                 <img src="{figuras_b64.get('grupos', '')}" alt="Deltas por Grupo TDE" />
                 <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
             </div>
+            <div class="fig" id="grafico-palavras-top">
+                <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras TDE" />
+                <div class="caption">Palavras com maior melhora na taxa de acerto TDE (Top 20 Geral + Comparação Top 15 por grupo).</div>
+            </div>
+            <div class="fig" id="grafico-comparacao-intergrupos">
+                <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Detalhada Grupos TDE" />
+                <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
+            </div>
+            <div class="fig" id="grafico-heatmap-pos">
+                <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap Erros Pós TDE" />
+                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pós-teste - Top 20 palavras).</div>
+            </div>
+            <div class="fig" id="grafico-heatmap-pre">
+                <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap Erros Pré TDE" />
+                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pré-teste - Top 20 palavras).</div>
+            </div>
             <div class="fig" id="grafico-categorias">
                 <img src="{figuras_b64.get('categorias', '')}" alt="Categorias Cohen TDE" />
                 <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
@@ -1007,6 +1351,10 @@ function atualizarGraficos(graficos) {{
     
     atualizarImg('grafico-prepos', graficos.prepos);
     atualizarImg('grafico-grupos', graficos.grupos);
+    atualizarImg('grafico-palavras-top', graficos.palavras_top);
+    atualizarImg('grafico-comparacao-intergrupos', graficos.comparacao_intergrupos);
+    atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
+    atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
     atualizarImg('grafico-categorias', graficos.categorias);
     atualizarImg('grafico-forest', graficos.forest);
 }}
@@ -1060,7 +1408,8 @@ def _interpretacao_contexto_tde_html(indic: Dict[str, float]) -> str:
 
 def gerar_html_tde(indic: Dict[str, float], meta: Dict, 
                    img_prepos: str, img_grupos: str, img_categorias: str, 
-                   img_forest: str, escola_filtro: str = None) -> str:
+                   img_forest: str, img_palavras_top: str, img_comparacao_intergrupos: str,
+                   img_heatmap_pos: str, img_heatmap_pre: str, escola_filtro: str = None) -> str:
     """Gera o HTML completo do relatório TDE."""
     
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1320,6 +1669,22 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
                 <div class="caption">Distribuição dos deltas TDE por grupo (6º/7º vs 8º/9º anos).</div>
             </div>
             <div class="fig">
+                <img src="{img_palavras_top}" alt="Top Palavras TDE" />
+                <div class="caption">Palavras com maior melhora na taxa de acerto TDE (Top 20 Geral + Comparação Top 15 por grupo).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_comparacao_intergrupos}" alt="Comparação Detalhada Grupos TDE" />
+                <div class="caption">Comparação detalhada entre grupos etários TDE (Distribuição de densidade + Percentuais de melhoria).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_heatmap_pos}" alt="Heatmap Erros Pós TDE" />
+                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pós-teste - Top 20 palavras).</div>
+            </div>
+            <div class="fig">
+                <img src="{img_heatmap_pre}" alt="Heatmap Erros Pré TDE" />
+                <div class="caption">Heatmap do percentual de erros TDE por palavra e grupo (Pré-teste - Top 20 palavras).</div>
+            </div>
+            <div class="fig">
                 <img src="{img_categorias}" alt="Categorias Cohen TDE" />
                 <div class="caption">Categorias de mudança TDE segundo Cohen (baseado em SD do pré-teste).</div>
             </div>
@@ -1378,17 +1743,24 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     
     print("📊 GERANDO GRÁFICOS...")
     
-    # Gerar gráficos
+    # Gerar gráficos originais
     img_prepos = gerar_grafico_prepos_tde(df)
     img_grupos = gerar_grafico_delta_grupos_tde(df)
     img_categorias = gerar_grafico_categorias_cohen_tde(df, indic['std_pre'])
     img_forest = gerar_grafico_forest_plot_tde(df)
     
+    # Gerar novos gráficos solicitados
+    img_palavras_top = gerar_grafico_palavras_top_tde(df)
+    img_comparacao_intergrupos = gerar_grafico_comparacao_intergrupos_tde(df)
+    img_heatmap_pos = gerar_grafico_heatmap_erros_tde(df, "pos")
+    img_heatmap_pre = gerar_grafico_heatmap_erros_tde(df, "pre")
+    
     print("🎨 RENDERIZANDO HTML...")
     
     # Gerar HTML
     html = gerar_html_tde(indic, meta, img_prepos, img_grupos, img_categorias, 
-                         img_forest, escola_filtro)
+                         img_forest, img_palavras_top, img_comparacao_intergrupos,
+                         img_heatmap_pos, img_heatmap_pre, escola_filtro)
     
     # Salvar arquivo
     with open(output_path, "w", encoding="utf-8") as f:
