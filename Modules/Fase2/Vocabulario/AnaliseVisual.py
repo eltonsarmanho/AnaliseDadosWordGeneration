@@ -19,9 +19,9 @@ class AnaliseVisualFase2:
         self.data_dir = self.base_dir / "Data"
         self.fig_dir = self.data_dir / "figures"
         
-        # Caminhos dos arquivos
-        self.arquivo_pre = self.data_dir / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.xlsx"
-        self.arquivo_pos = self.data_dir / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).xlsx"
+        # Caminhos dos arquivos - Usando CSV
+        self.arquivo_pre = self.data_dir / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.csv"
+        self.arquivo_pos = self.data_dir / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv"
         self.arquivo_respostas = self.data_dir / "RespostaVocabulario.json"
         
         # Garantir que existe diretório de figuras
@@ -90,8 +90,8 @@ class AnaliseVisualFase2:
         print("Carregando dados da Fase 2...")
         
         # Carregar dados
-        self.df_pre = pd.read_excel(self.arquivo_pre)
-        self.df_pos = pd.read_excel(self.arquivo_pos)
+        self.df_pre = pd.read_csv(self.arquivo_pre)
+        self.df_pos = pd.read_csv(self.arquivo_pos)
         
         # Carregar mapeamento de palavras
         self.mapeamento_palavras = self.carregar_mapeamento_palavras()

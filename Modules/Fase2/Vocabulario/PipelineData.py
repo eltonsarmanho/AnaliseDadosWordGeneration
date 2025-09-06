@@ -13,9 +13,9 @@ current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 print(f"Diretório atual: {current_dir}")
 data_dir = str(current_dir) + '/Data'
 
-# Caminhos dos arquivos
-arquivo_pre = os.path.join(data_dir, 'Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.xlsx')
-arquivo_pos = os.path.join(data_dir, 'Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).xlsx')
+# Caminhos dos arquivos - CSV como padrão
+arquivo_pre = os.path.join(data_dir, 'Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.csv')
+arquivo_pos = os.path.join(data_dir, 'Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv')
 arquivo_respostas = os.path.join(data_dir, 'RespostaVocabulario.json')
 
 print(f"Arquivo PRÉ localizado: {arquivo_pre}")
@@ -239,8 +239,10 @@ def classificar_grupo_etario(turma):
 
 # Carregar dados
 capture_print("CARREGANDO DADOS...")
-df_pre = pd.read_excel(arquivo_pre)
-df_pos = pd.read_excel(arquivo_pos)
+df_pre = pd.read_csv(arquivo_pre)
+df_pos = pd.read_csv(arquivo_pos)
+
+capture_print(f"Dados carregados - PRÉ: {df_pre.shape}, PÓS: {df_pos.shape}")
 
 # Carregar mapeamento de palavras
 mapeamento_palavras = carregar_mapeamento_palavras()

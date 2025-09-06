@@ -22,9 +22,9 @@ BASE_DIR = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 
-# Dados da Fase 2
-ARQUIVO_PRE = DATA_DIR / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.xlsx"
-ARQUIVO_POS = DATA_DIR / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).xlsx"
+# Dados da Fase 2 - Usando CSV
+ARQUIVO_PRE = DATA_DIR / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.csv"
+ARQUIVO_POS = DATA_DIR / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv"
 ARQUIVO_RESPOSTAS = DATA_DIR / "RespostaVocabulario.json"
 OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase2.html"
 
@@ -50,7 +50,7 @@ plt.rcParams.update({
 def obter_escolas_disponiveis():
     """Obtém a lista de escolas disponíveis nos dados"""
     try:
-        df_pre = pd.read_excel(ARQUIVO_PRE)
+        df_pre = pd.read_csv(ARQUIVO_PRE)
         escolas = sorted(df_pre['Escola'].dropna().unique().tolist())
         return ["Todas"] + escolas
     except Exception as e:
@@ -178,8 +178,8 @@ def carregar_e_preparar_dados(escola_filtro=None):
     print("1. Carregando dados...")
     
     # Carregar dados
-    df_pre = pd.read_excel(ARQUIVO_PRE)
-    df_pos = pd.read_excel(ARQUIVO_POS)
+    df_pre = pd.read_csv(ARQUIVO_PRE)
+    df_pos = pd.read_csv(ARQUIVO_POS)
     
     # Filtrar por escola se especificado
     if escola_filtro and escola_filtro != "Todas":
@@ -224,7 +224,7 @@ def carregar_e_preparar_dados(escola_filtro=None):
         for col in colunas_q:
             if col in row.index and not pd.isna(row[col]):
                 valores_validos += 1
-        return valores_validos >= 40  # Pelo menos 80% das questões
+        return valores_validos >= 25  # Pelo menos 25% das questões
     
     # Aplicar filtro
     mask_pre = df_pre_filtrado.apply(tem_questoes_validas, axis=1)

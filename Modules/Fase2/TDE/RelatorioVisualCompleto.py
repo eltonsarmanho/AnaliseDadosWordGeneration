@@ -36,7 +36,7 @@ DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 
 # Arquivos de dados TDE
-CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.xlsx"  # Usar Excel já que CSV não existe
+CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.csv"  # Usar CSV como padrão
 HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase2.html"
 MAPPING_FILE = DATA_DIR / "RespostaTED.json"
 
@@ -140,7 +140,7 @@ def _ensure_fig_dir():
 def obter_escolas_disponiveis_tde():
     """Obtém a lista de escolas disponíveis nos dados TDE"""
     try:
-        df = pd.read_excel(str(CSV_TABELA_TDE))
+        df = pd.read_csv(str(CSV_TABELA_TDE))
     except:
         # Fallback se não conseguir ler
         return ["Todas"]

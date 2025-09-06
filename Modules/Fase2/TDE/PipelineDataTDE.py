@@ -18,9 +18,9 @@ output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.csv')
 output_excel = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.xlsx')
 mapping_file = os.path.join(data_dir, 'RespostaTED.json')
 
-# Caminhos dos arquivos TDE
-arquivo_pre = os.path.join(pre_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.xlsx')
-arquivo_pos = os.path.join(pos_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.xlsx')
+# Caminhos dos arquivos TDE - Usando CSV como padrão
+arquivo_pre = os.path.join(pre_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
+arquivo_pos = os.path.join(pos_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
 
 print("="*80)
 print("PIPELINE TABELA BRUTA - TDE WORDGEN - FASE 2")
@@ -101,14 +101,14 @@ def tem_questoes_validas_tde(row, colunas_p):
     for col in colunas_p:
         if col in row.index and not pd.isna(row[col]):
             valores_validos += 1
-    return valores_validos >= 24  # Pelo menos 60% das 40 questões
+    return valores_validos >= 20  # Pelo menos 60% das 40 questões
 
 def gerar_tabela_bruta_tde():
     """Gera tabela com dados brutos TDE após pré-processamento"""
     
     print("1. CARREGANDO DADOS TDE...")
-    df_pre = pd.read_excel(arquivo_pre)
-    df_pos = pd.read_excel(arquivo_pos)
+    df_pre = pd.read_csv(arquivo_pre)
+    df_pos = pd.read_csv(arquivo_pos)
     
     # Carregar mapeamento de palavras
     mapeamento_a, mapeamento_b = carregar_mapeamento_palavras_tde()

@@ -52,12 +52,12 @@ def gerar_dicionario_dados():
         return
     
     # Carregar dados para obter informações das colunas
-    if os.path.exists(arquivo_excel):
-        print("📊 Carregando dados do arquivo Excel...")
-        df = pd.read_excel(arquivo_excel, nrows=5)  # Apenas primeiras linhas para estrutura
-    else:
+    if os.path.exists(arquivo_csv):
         print("📊 Carregando dados do arquivo CSV...")
-        df = pd.read_csv(arquivo_csv, nrows=5, encoding='utf-8-sig')
+        df = pd.read_csv(arquivo_csv, nrows=5, encoding='utf-8-sig')  # Apenas primeiras linhas para estrutura
+    else:
+        print("📊 Carregando dados do arquivo Excel...")
+        df = pd.read_excel(arquivo_excel, nrows=5)
     
     # Carregar mapeamento de palavras
     mapeamento_palavras = carregar_mapeamento_palavras()
@@ -83,10 +83,10 @@ def gerar_dicionario_dados():
     dicionario_texto.append("-" * 50)
     
     # Carregar dados completos para estatísticas
-    if os.path.exists(arquivo_excel):
-        df_completo = pd.read_excel(arquivo_excel)
-    else:
+    if os.path.exists(arquivo_csv):
         df_completo = pd.read_csv(arquivo_csv, encoding='utf-8-sig')
+    else:
+        df_completo = pd.read_excel(arquivo_excel)
     
     dicionario_texto.append(f"Total de registros: {len(df_completo)}")
     dicionario_texto.append(f"Total de colunas: {len(df_completo.columns)}")
