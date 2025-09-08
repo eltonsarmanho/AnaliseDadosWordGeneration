@@ -185,17 +185,31 @@ def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple
     # Limpeza básica
     df = df.dropna(subset=['Score_Pre', 'Score_Pos', 'Delta_Score'])
     
+    # Criar novos grupos baseados no ano extraído da turma
+    df['Ano'] = df['Turma'].str.extract(r'(\d+)º')[0]
+    df['GrupoTDE_Novo'] = df['Ano'].map({
+        '6': '6º ano',
+        '7': '7º ano', 
+        '8': '8º ano',
+        '9': '9º ano'
+    })
+    
+    # Filtrar apenas registros com anos válidos
+    df = df.dropna(subset=['GrupoTDE_Novo'])
+    
     # Metadados
     meta = {
         "n_total": len(df),
-        "n_grupo_a": len(df[df['GrupoTDE'] == 'Grupo A (6º/7º anos)']),
-        "n_grupo_b": len(df[df['GrupoTDE'] == 'Grupo B (8º/9º anos)']),
+        "n_6ano": len(df[df['GrupoTDE_Novo'] == '6º ano']),
+        "n_7ano": len(df[df['GrupoTDE_Novo'] == '7º ano']),
+        "n_8ano": len(df[df['GrupoTDE_Novo'] == '8º ano']),
+        "n_9ano": len(df[df['GrupoTDE_Novo'] == '9º ano']),
         "escolas": df['Escola'].unique().tolist(),
         "escola_filtro": escola_filtro
     }
     
     print(f"   Registros após limpeza: {len(df)}")
-    print(f"   Grupos: A={meta['n_grupo_a']}, B={meta['n_grupo_b']}")
+    print(f"   Grupos: 6º={meta['n_6ano']}, 7º={meta['n_7ano']}, 8º={meta['n_8ano']}, 9º={meta['n_9ano']}")
     
     return df, meta
 
@@ -204,7 +218,7 @@ def calcular_indicadores_tde(df: pd.DataFrame, grupo_filtro: str = None) -> Dict
     
     # Aplicar filtro de grupo se especificado
     if grupo_filtro:
-        df = df[df['GrupoTDE'] == grupo_filtro]
+        df = df[df['GrupoTDE_Novo'] == grupo_filtro]
     
     if len(df) == 0:
         return {
@@ -299,7 +313,7 @@ def analisar_palavras_tde(df: pd.DataFrame, grupo_filtro: str = None) -> pd.Data
     
     # Filtrar por grupo se especificado
     if grupo_filtro:
-        df = df[df['GrupoTDE'] == grupo_filtro]
+        df = df[df['GrupoTDE_Novo'] == grupo_filtro]
     
     if len(df) == 0:
         return pd.DataFrame()
@@ -362,11 +376,11 @@ def analisar_palavras_tde(df: pd.DataFrame, grupo_filtro: str = None) -> pd.Data
 # ======================
 
 def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
-    """Gera gráficos de comparação de scores e distribuição de mudanças por grupo etário TDE (4 gráficos em 2x2)."""
+    """Gera gráficos de comparação de scores e distribuição de mudanças por ano (4 gráficos em 2x2)."""
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
-    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
-    cores = ['#3498db', '#e74c3c']
+    grupos = ['6º ano', '7º ano', '8º ano', '9º ano']
+    cores = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
     
     # 1. Médias de scores por grupo
     ax = axes[0, 0]
@@ -376,7 +390,7 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     stds_pos = []
     
     for grupo in grupos:
-        data = df[df['GrupoTDE'] == grupo]
+        data = df[df['GrupoTDE_Novo'] == grupo]
         if len(data) > 0:
             means_pre.append(data['Score_Pre'].mean())
             means_pos.append(data['Score_Pos'].mean())
@@ -390,14 +404,14 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     
     x = np.arange(len(grupos))
     width = 0.35
-    grupos_curtos = [g.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)') for g in grupos]
+    grupos_curtos = grupos  # Usar os nomes já curtos
     
-    ax.bar(x - width/2, means_pre, width, yerr=stds_pre, label='Pré-teste', alpha=0.8, color=cores[0])
-    ax.bar(x + width/2, means_pos, width, yerr=stds_pos, label='Pós-teste', alpha=0.8, color=cores[1])
+    ax.bar(x - width/2, means_pre, width, yerr=stds_pre, label='Pré-teste', alpha=0.8, color='#3498db')
+    ax.bar(x + width/2, means_pos, width, yerr=stds_pos, label='Pós-teste', alpha=0.8, color='#e74c3c')
     
-    ax.set_xlabel('Grupos TDE', fontsize=12)
+    ax.set_xlabel('Anos', fontsize=12)
     ax.set_ylabel('Score Médio', fontsize=12)
-    ax.set_title('Comparação de Médias por Grupo', fontsize=14, fontweight='bold')
+    ax.set_title('Comparação de Médias por Ano', fontsize=14, fontweight='bold')
     ax.set_xticks(x)
     ax.set_xticklabels(grupos_curtos)
     ax.legend()
@@ -407,26 +421,26 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     ax = axes[0, 1]
     deltas_data = []
     for grupo in grupos:
-        data = df[df['GrupoTDE'] == grupo]
+        data = df[df['GrupoTDE_Novo'] == grupo]
         if len(data) > 0:
             deltas_data.append(data['Delta_Score'])
         else:
             deltas_data.append([0])  # Dados vazios
     
-    bp = ax.boxplot(deltas_data, labels=grupos_curtos, patch_artist=True)
+    bp = ax.boxplot(deltas_data, tick_labels=grupos_curtos, patch_artist=True)
     
     for patch, cor in zip(bp['boxes'], cores):
         patch.set_facecolor(cor)
         patch.set_alpha(0.7)
     
     ax.set_ylabel('Mudança (Delta Score)', fontsize=12)
-    ax.set_title('Distribuição de Mudanças por Grupo', fontsize=14, fontweight='bold')
+    ax.set_title('Distribuição de Mudanças por Ano', fontsize=14, fontweight='bold')
     ax.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=2)
     ax.grid(True, alpha=0.3)
     
     # 3. Tamanhos de amostra
     ax = axes[1, 0]
-    sizes = [len(df[df['GrupoTDE'] == grupo]) for grupo in grupos]
+    sizes = [len(df[df['GrupoTDE_Novo'] == grupo]) for grupo in grupos]
     bars = ax.bar(grupos_curtos, sizes, color=cores, alpha=0.8)
     
     for bar, size in zip(bars, sizes):
@@ -442,7 +456,7 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     ax = axes[1, 1]
     cohens_d = []
     for grupo in grupos:
-        data = df[df['GrupoTDE'] == grupo]
+        data = df[df['GrupoTDE_Novo'] == grupo]
         if len(data) > 1:
             pre_scores = data['Score_Pre']
             pos_scores = data['Score_Pos']
@@ -481,13 +495,15 @@ def gerar_grafico_prepos_tde(df: pd.DataFrame) -> str:
     return fig_to_base64(fig)
 
 def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
-    """Gera gráfico das palavras com maior melhora TDE (Top 20 Palavras - Melhora Geral) e Comparação de Melhora - Top 15."""
+    """Gera gráfico das palavras com maior melhora TDE por ano."""
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
     
     # Analisar palavras por grupo
     palavras_geral = analisar_palavras_tde(df)
-    palavras_grupo_a = analisar_palavras_tde(df, "Grupo A (6º/7º anos)")
-    palavras_grupo_b = analisar_palavras_tde(df, "Grupo B (8º/9º anos)")
+    palavras_6ano = analisar_palavras_tde(df, "6º ano")
+    palavras_7ano = analisar_palavras_tde(df, "7º ano")
+    palavras_8ano = analisar_palavras_tde(df, "8º ano")
+    palavras_9ano = analisar_palavras_tde(df, "9º ano")
     
     if len(palavras_geral) == 0:
         # Gráfico vazio se não há dados
@@ -514,34 +530,42 @@ def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
         ax.text(width + 0.5, bar.get_y() + bar.get_height()/2, 
                 f'{valor:.1f}%', ha='left', va='center', fontweight='bold', fontsize=9)
     
-    # 2. Comparação entre grupos - Top 15
+    # 2. Comparação entre anos - Top 15
     ax = axes[1]
     top_15_questoes = palavras_geral.nlargest(15, 'Melhora')['Questao']
     
-    melhoras_ga = []
-    melhoras_gb = []
+    melhoras_6ano = []
+    melhoras_7ano = []
+    melhoras_8ano = []
+    melhoras_9ano = []
     palavras_nomes = []
     
     for questao in top_15_questoes:
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_nomes.append(palavra[:10] + '...' if len(palavra) > 10 else palavra)
         
-        # Buscar melhora para cada grupo
-        melhora_ga = palavras_grupo_a[palavras_grupo_a['Questao'] == questao]['Melhora_Percentual']
-        melhora_gb = palavras_grupo_b[palavras_grupo_b['Questao'] == questao]['Melhora_Percentual']
+        # Buscar melhora para cada ano
+        melhora_6 = palavras_6ano[palavras_6ano['Questao'] == questao]['Melhora_Percentual']
+        melhora_7 = palavras_7ano[palavras_7ano['Questao'] == questao]['Melhora_Percentual']
+        melhora_8 = palavras_8ano[palavras_8ano['Questao'] == questao]['Melhora_Percentual']
+        melhora_9 = palavras_9ano[palavras_9ano['Questao'] == questao]['Melhora_Percentual']
         
-        melhoras_ga.append(melhora_ga.iloc[0] if len(melhora_ga) > 0 else 0)
-        melhoras_gb.append(melhora_gb.iloc[0] if len(melhora_gb) > 0 else 0)
+        melhoras_6ano.append(melhora_6.iloc[0] if len(melhora_6) > 0 else 0)
+        melhoras_7ano.append(melhora_7.iloc[0] if len(melhora_7) > 0 else 0)
+        melhoras_8ano.append(melhora_8.iloc[0] if len(melhora_8) > 0 else 0)
+        melhoras_9ano.append(melhora_9.iloc[0] if len(melhora_9) > 0 else 0)
     
     x = np.arange(len(palavras_nomes))
-    width = 0.35
+    width = 0.2
     
-    ax.bar(x - width/2, melhoras_ga, width, label='Grupo A (6º/7º)', color='#3498db', alpha=0.7)
-    ax.bar(x + width/2, melhoras_gb, width, label='Grupo B (8º/9º)', color='#e74c3c', alpha=0.7)
+    ax.bar(x - 1.5*width, melhoras_6ano, width, label='6º ano', color='#3498db', alpha=0.7)
+    ax.bar(x - 0.5*width, melhoras_7ano, width, label='7º ano', color='#2ecc71', alpha=0.7)
+    ax.bar(x + 0.5*width, melhoras_8ano, width, label='8º ano', color='#e74c3c', alpha=0.7)
+    ax.bar(x + 1.5*width, melhoras_9ano, width, label='9º ano', color='#f39c12', alpha=0.7)
     
     ax.set_xlabel('Palavras', fontsize=12)
     ax.set_ylabel('Melhora (%)', fontsize=12)
-    ax.set_title('Comparação de Melhora TDE - Top 15', fontsize=14, fontweight='bold')
+    ax.set_title('Comparação de Melhora TDE por Ano - Top 15', fontsize=14, fontweight='bold')
     ax.set_xticks(x)
     ax.set_xticklabels(palavras_nomes, rotation=45, ha='right')
     ax.legend()
@@ -554,29 +578,29 @@ def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
     return fig_to_base64(fig)
 
 def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
-    """Gera comparação detalhada entre grupos etários TDE (2 gráficos de densidade separados + distribuição de resultados embaixo)."""
+    """Gera comparação detalhada entre anos (4 gráficos de densidade separados)."""
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
-    grupos = ['Grupo A (6º/7º anos)', 'Grupo B (8º/9º anos)']
-    cores = ['#3498db', '#e74c3c']
+    grupos = ['6º ano', '7º ano', '8º ano', '9º ano']
+    cores = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
     
-    # 1. Distribuição de densidade - GRUPO A (superior esquerdo)
+    # 1. Distribuição de densidade - 6º ANO (superior esquerdo)
     ax = axes[0, 0]
-    data_pre_a = df[df['GrupoTDE'] == grupos[0]]['Score_Pre']
-    data_pos_a = df[df['GrupoTDE'] == grupos[0]]['Score_Pos']
+    data_pre_6 = df[df['GrupoTDE_Novo'] == grupos[0]]['Score_Pre']
+    data_pos_6 = df[df['GrupoTDE_Novo'] == grupos[0]]['Score_Pos']
     
-    if len(data_pre_a) > 0:
-        ax.hist(data_pre_a, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
-        ax.hist(data_pos_a, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
+    if len(data_pre_6) > 0:
+        ax.hist(data_pre_6, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
+        ax.hist(data_pos_6, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
         
         # Adicionar médias como linhas verticais
-        mean_pre_a = data_pre_a.mean()
-        mean_pos_a = data_pos_a.mean()
-        ax.axvline(mean_pre_a, color=cores[0], linestyle='--', alpha=0.6, linewidth=2)
-        ax.axvline(mean_pos_a, color=cores[0], linestyle='-', alpha=0.8, linewidth=2)
+        mean_pre_6 = data_pre_6.mean()
+        mean_pos_6 = data_pos_6.mean()
+        ax.axvline(mean_pre_6, color=cores[0], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_6, color=cores[0], linestyle='-', alpha=0.8, linewidth=2)
         
         # Texto com médias
-        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_a:.1f}\nPós: {mean_pos_a:.1f}', 
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_6:.1f}\nPós: {mean_pos_6:.1f}', 
                 transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
                 verticalalignment='top', fontsize=10)
     else:
@@ -585,27 +609,27 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     
     ax.set_xlabel('Scores TDE', fontsize=12)
     ax.set_ylabel('Densidade', fontsize=12)
-    ax.set_title('Grupo A (6º/7º anos)\nDistribuição de Densidade', fontsize=14, fontweight='bold')
+    ax.set_title('6º ano\nDistribuição de Densidade', fontsize=14, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # 2. Distribuição de densidade - GRUPO B (superior direito)
+    # 2. Distribuição de densidade - 7º ANO (superior direito)
     ax = axes[0, 1]
-    data_pre_b = df[df['GrupoTDE'] == grupos[1]]['Score_Pre']
-    data_pos_b = df[df['GrupoTDE'] == grupos[1]]['Score_Pos']
+    data_pre_7 = df[df['GrupoTDE_Novo'] == grupos[1]]['Score_Pre']
+    data_pos_7 = df[df['GrupoTDE_Novo'] == grupos[1]]['Score_Pos']
     
-    if len(data_pre_b) > 0:
-        ax.hist(data_pre_b, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
-        ax.hist(data_pos_b, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
+    if len(data_pre_7) > 0:
+        ax.hist(data_pre_7, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
+        ax.hist(data_pos_7, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
         
         # Adicionar médias como linhas verticais
-        mean_pre_b = data_pre_b.mean()
-        mean_pos_b = data_pos_b.mean()
-        ax.axvline(mean_pre_b, color=cores[1], linestyle='--', alpha=0.6, linewidth=2)
-        ax.axvline(mean_pos_b, color=cores[1], linestyle='-', alpha=0.8, linewidth=2)
+        mean_pre_7 = data_pre_7.mean()
+        mean_pos_7 = data_pos_7.mean()
+        ax.axvline(mean_pre_7, color=cores[1], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_7, color=cores[1], linestyle='-', alpha=0.8, linewidth=2)
         
         # Texto com médias
-        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_b:.1f}\nPós: {mean_pos_b:.1f}', 
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_7:.1f}\nPós: {mean_pos_7:.1f}', 
                 transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
                 verticalalignment='top', fontsize=10)
     else:
@@ -614,43 +638,68 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     
     ax.set_xlabel('Scores TDE', fontsize=12)
     ax.set_ylabel('Densidade', fontsize=12)
-    ax.set_title('Grupo B (8º/9º anos)\nDistribuição de Densidade', fontsize=14, fontweight='bold')
+    ax.set_title('7º ano\nDistribuição de Densidade', fontsize=14, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # 3. Distribuição de Resultados TDE (inferior, ocupando ambas as colunas)
-    # Remover os subplots inferiores e criar um único subplot na linha inferior
-    axes[1, 0].remove()
-    axes[1, 1].remove()
-    ax = fig.add_subplot(2, 1, 2)  # Criar subplot limpo que ocupa a linha inferior completa
+    # 3. Distribuição de densidade - 8º ANO (inferior esquerdo)
+    ax = axes[1, 0]
+    data_pre_8 = df[df['GrupoTDE_Novo'] == grupos[2]]['Score_Pre']
+    data_pos_8 = df[df['GrupoTDE_Novo'] == grupos[2]]['Score_Pos']
     
-    melhorou = []
-    piorou = []
-    igual = []
-    
-    for grupo in grupos:
-        data = df[df['GrupoTDE'] == grupo]
-        total = len(data)
+    if len(data_pre_8) > 0:
+        ax.hist(data_pre_8, alpha=0.5, label='Pré-teste', color=cores[2], bins=12, density=True)
+        ax.hist(data_pos_8, alpha=0.7, label='Pós-teste', color=cores[2], bins=12, density=True, hatch='//')
         
-        if total > 0:
-            melhorou.append((data['Delta_Score'] > 0).sum() / total * 100)
-            piorou.append((data['Delta_Score'] < 0).sum() / total * 100)
-            igual.append((data['Delta_Score'] == 0).sum() / total * 100)
-        else:
-            melhorou.append(0)
-            piorou.append(0)
-            igual.append(0)
+        # Adicionar médias como linhas verticais
+        mean_pre_8 = data_pre_8.mean()
+        mean_pos_8 = data_pos_8.mean()
+        ax.axvline(mean_pre_8, color=cores[2], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_8, color=cores[2], linestyle='-', alpha=0.8, linewidth=2)
+        
+        # Texto com médias
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_8:.1f}\nPós: {mean_pos_8:.1f}', 
+                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+                verticalalignment='top', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=14)
     
-    x = np.arange(len(grupos))
-    width = 0.25
-    grupos_curtos = [g.replace('Grupo ', '').replace(' (6º/7º anos)', ' (6º/7º)').replace(' (8º/9º anos)', ' (8º/9º)') for g in grupos]
+    ax.set_xlabel('Scores TDE', fontsize=12)
+    ax.set_ylabel('Densidade', fontsize=12)
+    ax.set_title('8º ano\nDistribuição de Densidade', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
     
-    bars1 = ax.bar(x - width, melhorou, width, label='Melhorou', color='#28a745', alpha=0.7)
-    bars2 = ax.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
-    bars3 = ax.bar(x + width, igual, width, label='Manteve', color='#6c757d', alpha=0.7)
+    # 4. Distribuição de densidade - 9º ANO (inferior direito)
+    ax = axes[1, 1]
+    data_pre_9 = df[df['GrupoTDE_Novo'] == grupos[3]]['Score_Pre']
+    data_pos_9 = df[df['GrupoTDE_Novo'] == grupos[3]]['Score_Pos']
     
-    # Calcular valor máximo para ajustar limites do gráfico
-    max_value = max(max(melhorou), max(piorou), max(igual)) if any(melhorou + piorou + igual) else 100
+    if len(data_pre_9) > 0:
+        ax.hist(data_pre_9, alpha=0.5, label='Pré-teste', color=cores[3], bins=12, density=True)
+        ax.hist(data_pos_9, alpha=0.7, label='Pós-teste', color=cores[3], bins=12, density=True, hatch='//')
+        
+        # Adicionar médias como linhas verticais
+        mean_pre_9 = data_pre_9.mean()
+        mean_pos_9 = data_pos_9.mean()
+        ax.axvline(mean_pre_9, color=cores[3], linestyle='--', alpha=0.6, linewidth=2)
+        ax.axvline(mean_pos_9, color=cores[3], linestyle='-', alpha=0.8, linewidth=2)
+        
+        # Texto com médias
+        ax.text(0.05, 0.95, f'Médias:\nPré: {mean_pre_9:.1f}\nPós: {mean_pos_9:.1f}', 
+                transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+                verticalalignment='top', fontsize=10)
+    else:
+        ax.text(0.5, 0.5, 'Dados insuficientes', ha='center', va='center', 
+                transform=ax.transAxes, fontsize=14)
+    
+    ax.set_xlabel('Scores TDE', fontsize=12)
+    ax.set_ylabel('Densidade', fontsize=12)
+    ax.set_title('9º ano\nDistribuição de Densidade', fontsize=14, fontweight='bold')
+    
+    plt.tight_layout()
+    return fig_to_base64(fig)
     
     # Adicionar valores nas barras
     for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
@@ -690,12 +739,14 @@ def gerar_grafico_comparacao_intergrupos_tde(df: pd.DataFrame) -> str:
     return fig_to_base64(fig)
 
 def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -> str:
-    """Gera heatmap do percentual de erros por palavra e grupo TDE."""
+    """Gera heatmap do percentual de erros por palavra e ano TDE."""
     
     # Analisar palavras por grupo
     palavras_geral = analisar_palavras_tde(df)
-    palavras_grupo_a = analisar_palavras_tde(df, "Grupo A (6º/7º anos)")
-    palavras_grupo_b = analisar_palavras_tde(df, "Grupo B (8º/9º anos)")
+    palavras_6ano = analisar_palavras_tde(df, "6º ano")
+    palavras_7ano = analisar_palavras_tde(df, "7º ano")
+    palavras_8ano = analisar_palavras_tde(df, "8º ano")
+    palavras_9ano = analisar_palavras_tde(df, "9º ano")
     
     if len(palavras_geral) == 0:
         fig, ax = plt.subplots(figsize=(8, 12))
@@ -716,14 +767,18 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_labels.append(palavra[:12] + '...' if len(palavra) > 12 else palavra)
         
-        # Erros para cada grupo
-        erro_ga = palavras_grupo_a[palavras_grupo_a['Questao'] == questao][coluna_erro]
-        erro_gb = palavras_grupo_b[palavras_grupo_b['Questao'] == questao][coluna_erro]
+        # Erros para cada ano
+        erro_6 = palavras_6ano[palavras_6ano['Questao'] == questao][coluna_erro]
+        erro_7 = palavras_7ano[palavras_7ano['Questao'] == questao][coluna_erro]
+        erro_8 = palavras_8ano[palavras_8ano['Questao'] == questao][coluna_erro]
+        erro_9 = palavras_9ano[palavras_9ano['Questao'] == questao][coluna_erro]
         
-        erro_ga_val = erro_ga.iloc[0] if len(erro_ga) > 0 else 0
-        erro_gb_val = erro_gb.iloc[0] if len(erro_gb) > 0 else 0
+        erro_6_val = erro_6.iloc[0] if len(erro_6) > 0 else 0
+        erro_7_val = erro_7.iloc[0] if len(erro_7) > 0 else 0
+        erro_8_val = erro_8.iloc[0] if len(erro_8) > 0 else 0
+        erro_9_val = erro_9.iloc[0] if len(erro_9) > 0 else 0
         
-        heatmap_data.append([erro_ga_val, erro_gb_val])
+        heatmap_data.append([erro_6_val, erro_7_val, erro_8_val, erro_9_val])
     
     heatmap_array = np.array(heatmap_data)
     
@@ -732,8 +787,8 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
     im = ax.imshow(heatmap_array, cmap='Reds', aspect='auto')
     
     # Configurar eixos
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(['Grupo A (6º/7º)', 'Grupo B (8º/9º)'])
+    ax.set_xticks([0, 1, 2, 3])
+    ax.set_xticklabels(['6º ano', '7º ano', '8º ano', '9º ano'])
     ax.set_yticks(range(len(palavras_labels)))
     ax.set_yticklabels(palavras_labels)
     
@@ -743,7 +798,7 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
     
     # Adicionar valores
     for i in range(len(palavras_labels)):
-        for j in range(2):
+        for j in range(4):
             valor = heatmap_array[i, j]
             text = ax.text(j, i, f'{valor:.1f}%',
                          ha="center", va="center", 
@@ -812,8 +867,10 @@ def gerar_dados_todas_escolas_tde():
             
             # Calcular indicadores
             indicadores_geral = calcular_indicadores_tde(df)
-            indicadores_grupo_a = calcular_indicadores_tde(df, "Grupo A (6º/7º anos)")
-            indicadores_grupo_b = calcular_indicadores_tde(df, "Grupo B (8º/9º anos)")
+            indicadores_6ano = calcular_indicadores_tde(df, "6º ano")
+            indicadores_7ano = calcular_indicadores_tde(df, "7º ano")
+            indicadores_8ano = calcular_indicadores_tde(df, "8º ano")
+            indicadores_9ano = calcular_indicadores_tde(df, "9º ano")
             
             # Gerar gráficos específicos para esta escola
             print(f"     Gerando gráficos TDE para: {escola}")
@@ -821,8 +878,10 @@ def gerar_dados_todas_escolas_tde():
             
             dados_escolas[escola] = {
                 'indicadores_geral': indicadores_geral,
-                'indicadores_grupo_a': indicadores_grupo_a,
-                'indicadores_grupo_b': indicadores_grupo_b,
+                'indicadores_6ano': indicadores_6ano,
+                'indicadores_7ano': indicadores_7ano,
+                'indicadores_8ano': indicadores_8ano,
+                'indicadores_9ano': indicadores_9ano,
                 'graficos': graficos
             }
             
@@ -1103,7 +1162,7 @@ def gerar_html_tde_interativo():
 <body>
     <div class="header">
         <div class="title">Relatório Visual TDE WordGen - Fase 2</div>
-        <div class="subtitle">Teste de Escrita (Grupos TDE: A - 6º/7º vs B - 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="subtitle">Teste de Escrita (Análise por anos: 6º, 7º, 8º e 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
 
@@ -1310,8 +1369,10 @@ function atualizarInterpretacao(dados) {{
     const container = document.getElementById('interpretacaoContainer');
     
     container.innerHTML = 
-        criarGrupoItem(dados.indicadores_grupo_a, "Grupo A (6º/7º anos)") + 
-        criarGrupoItem(dados.indicadores_grupo_b, "Grupo B (8º/9º anos)");
+        criarGrupoItem(dados.indicadores_6ano, "6º ano") + 
+        criarGrupoItem(dados.indicadores_7ano, "7º ano") +
+        criarGrupoItem(dados.indicadores_8ano, "8º ano") +
+        criarGrupoItem(dados.indicadores_9ano, "9º ano");
 }}
 
 function atualizarGraficos(graficos) {{
@@ -1416,7 +1477,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
     interp_html = _interpretacao_contexto_tde_html(indic)
     
     # Informações dos grupos
-    grupo_info = f"Grupo A: {meta['n_grupo_a']} • Grupo B: {meta['n_grupo_b']}"
+    grupo_info = f"6º ano: {meta['n_6ano']} • 7º ano: {meta['n_7ano']} • 8º ano: {meta['n_8ano']} • 9º ano: {meta['n_9ano']}"
     
     # CSS com compatibilidade iOS
     css_styles = """

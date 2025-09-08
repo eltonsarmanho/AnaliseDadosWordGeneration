@@ -134,13 +134,17 @@ def converter_valor_questao(valor):
             return np.nan
 
 def classificar_grupo_etario(turma):
-    """Classifica estudantes em grupos etários"""
+    """Classifica estudantes em grupos etários individuais por ano"""
     turma_str = str(turma).upper()
     
-    if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str:
-        return "6º/7º anos"
-    elif '8º' in turma_str or '8°' in turma_str or '9º' in turma_str or '9°' in turma_str:
-        return "8º/9º anos"
+    if '6º' in turma_str or '6°' in turma_str:
+        return "6º ano"
+    elif '7º' in turma_str or '7°' in turma_str:
+        return "7º ano"
+    elif '8º' in turma_str or '8°' in turma_str:
+        return "8º ano"
+    elif '9º' in turma_str or '9°' in turma_str:
+        return "9º ano"
     else:
         return "Indefinido"
 
@@ -402,11 +406,11 @@ def analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras
 # ======================
 
 def plot_grupos_barras(scores_df):
-    """Gráfico de barras comparando grupos"""
+    """Gráfico de barras comparando grupos por anos individuais"""
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
-    grupos = ['6º/7º anos', '8º/9º anos']
-    cores = ['#3498db', '#e74c3c']
+    grupos = ['6º ano', '7º ano', '8º ano', '9º ano']
+    cores = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
     
     # 1. Médias de scores
     ax = axes[0, 0]
@@ -425,12 +429,12 @@ def plot_grupos_barras(scores_df):
     x = np.arange(len(grupos))
     width = 0.35
     
-    ax.bar(x - width/2, means_pre, width, yerr=stds_pre, label='Pré-teste', alpha=0.8, color=cores[0])
-    ax.bar(x + width/2, means_pos, width, yerr=stds_pos, label='Pós-teste', alpha=0.8, color=cores[1])
+    ax.bar(x - width/2, means_pre, width, yerr=stds_pre, label='Pré-teste', alpha=0.8, color='#3498db')
+    ax.bar(x + width/2, means_pos, width, yerr=stds_pos, label='Pós-teste', alpha=0.8, color='#e74c3c')
     
-    ax.set_xlabel('Grupos')
+    ax.set_xlabel('Anos')
     ax.set_ylabel('Score Médio')
-    ax.set_title('Comparação de Médias por Grupo')
+    ax.set_title('Comparação de Médias por Ano')
     ax.set_xticks(x)
     ax.set_xticklabels(grupos)
     ax.legend()
@@ -439,14 +443,14 @@ def plot_grupos_barras(scores_df):
     # 2. Boxplot de deltas
     ax = axes[0, 1]
     deltas_data = [scores_df[scores_df['GrupoEtario'] == grupo]['Delta'] for grupo in grupos]
-    bp = ax.boxplot(deltas_data, labels=grupos, patch_artist=True)
+    bp = ax.boxplot(deltas_data, tick_labels=grupos, patch_artist=True)
     
     for patch, cor in zip(bp['boxes'], cores):
         patch.set_facecolor(cor)
         patch.set_alpha(0.7)
     
     ax.set_ylabel('Mudança (Delta)')
-    ax.set_title('Distribuição de Mudanças por Grupo')
+    ax.set_title('Distribuição de Mudanças por Ano')
     ax.axhline(y=0, color='red', linestyle='--', alpha=0.5)
     ax.grid(True, alpha=0.3)
     
@@ -495,8 +499,8 @@ def plot_grupos_barras(scores_df):
     plt.tight_layout()
     return fig
 
-def plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2):
-    """Top palavras com maior melhora - Layout simplificado 2x1"""
+def plot_palavras_top(palavras_df_todos, palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano):
+    """Top palavras com maior melhora - Comparação entre os 4 anos"""
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
     
     # 1. Top 20 palavras geral
@@ -511,34 +515,42 @@ def plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
     ax.set_title('Top 20 Palavras - Melhora Geral')
     ax.grid(True, alpha=0.3)
     
-    # 2. Comparação entre grupos - Top 15
+    # 2. Comparação entre anos - Top 15
     ax = axes[1]
     top_15_questoes = palavras_df_todos.nlargest(15, 'Melhora')['Questao']
     
-    melhoras_g1 = []
-    melhoras_g2 = []
+    melhoras_6ano = []
+    melhoras_7ano = []
+    melhoras_8ano = []
+    melhoras_9ano = []
     palavras_nomes = []
     
     for questao in top_15_questoes:
         palavra = palavras_df_todos[palavras_df_todos['Questao'] == questao]['Palavra'].iloc[0]
         palavras_nomes.append(palavra[:10] + '...' if len(palavra) > 10 else palavra)
         
-        # Buscar melhora para cada grupo
-        melhora_g1 = palavras_df_grupo1[palavras_df_grupo1['Questao'] == questao]['Melhora']
-        melhora_g2 = palavras_df_grupo2[palavras_df_grupo2['Questao'] == questao]['Melhora']
+        # Buscar melhora para cada ano
+        melhora_6 = palavras_df_6ano[palavras_df_6ano['Questao'] == questao]['Melhora']
+        melhora_7 = palavras_df_7ano[palavras_df_7ano['Questao'] == questao]['Melhora']
+        melhora_8 = palavras_df_8ano[palavras_df_8ano['Questao'] == questao]['Melhora']
+        melhora_9 = palavras_df_9ano[palavras_df_9ano['Questao'] == questao]['Melhora']
         
-        melhoras_g1.append(melhora_g1.iloc[0] if len(melhora_g1) > 0 else 0)
-        melhoras_g2.append(melhora_g2.iloc[0] if len(melhora_g2) > 0 else 0)
+        melhoras_6ano.append(melhora_6.iloc[0] if len(melhora_6) > 0 else 0)
+        melhoras_7ano.append(melhora_7.iloc[0] if len(melhora_7) > 0 else 0)
+        melhoras_8ano.append(melhora_8.iloc[0] if len(melhora_8) > 0 else 0)
+        melhoras_9ano.append(melhora_9.iloc[0] if len(melhora_9) > 0 else 0)
     
     x = np.arange(len(palavras_nomes))
-    width = 0.35
+    width = 0.2
     
-    ax.bar(x - width/2, melhoras_g1, width, label='6º/7º anos', color='#3498db', alpha=0.7)
-    ax.bar(x + width/2, melhoras_g2, width, label='8º/9º anos', color='#e74c3c', alpha=0.7)
+    ax.bar(x - 1.5*width, melhoras_6ano, width, label='6º ano', color='#3498db', alpha=0.7)
+    ax.bar(x - 0.5*width, melhoras_7ano, width, label='7º ano', color='#2ecc71', alpha=0.7)
+    ax.bar(x + 0.5*width, melhoras_8ano, width, label='8º ano', color='#e74c3c', alpha=0.7)
+    ax.bar(x + 1.5*width, melhoras_9ano, width, label='9º ano', color='#f39c12', alpha=0.7)
     
     ax.set_xlabel('Palavras')
     ax.set_ylabel('Melhora')
-    ax.set_title('Comparação de Melhora - Top 15')
+    ax.set_title('Comparação de Melhora por Ano - Top 15')
     ax.set_xticks(x)
     ax.set_xticklabels(palavras_nomes, rotation=45, ha='right')
     ax.legend()
@@ -548,94 +560,87 @@ def plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
     return fig
 
 def plot_comparacao_intergrupos(scores_df):
-    """Comparação detalhada entre grupos - Layout 2x2 com densidades separadas e distribuição de resultados abaixo"""
+    """Comparação detalhada entre anos - Layout 2x2 com densidades por ano"""
     fig = plt.figure(figsize=(15, 10))
     
-    grupos = ['6º/7º anos', '8º/9º anos']
-    cores = ['#3498db', '#e74c3c']
+    grupos = ['6º ano', '7º ano', '8º ano', '9º ano']
+    cores = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
     
-    # 1. Distribuição de densidade - GRUPO A (superior esquerdo)
+    # 1. Distribuição de densidade - 6º ANO (superior esquerdo)
     ax1 = plt.subplot(2, 2, 1)
     
-    # Dados do Grupo A (6º/7º anos)
-    data_pre_a = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pre']
-    data_pos_a = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pos']
+    # Dados do 6º ano
+    data_pre_6 = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pre']
+    data_pos_6 = scores_df[scores_df['GrupoEtario'] == grupos[0]]['Score_Pos']
     
-    if len(data_pre_a) > 0:
-        ax1.hist(data_pre_a, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
-        ax1.hist(data_pos_a, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
+    if len(data_pre_6) > 0:
+        ax1.hist(data_pre_6, alpha=0.5, label='Pré-teste', color=cores[0], bins=12, density=True)
+        ax1.hist(data_pos_6, alpha=0.7, label='Pós-teste', color=cores[0], bins=12, density=True, hatch='//')
     
     ax1.set_xlabel('Scores', fontsize=11)
     ax1.set_ylabel('Densidade', fontsize=11)
-    ax1.set_title('Grupo A (6º/7º anos)\nDistribuição de Densidade', fontsize=12, fontweight='bold')
+    ax1.set_title('6º ano\nDistribuição de Densidade', fontsize=12, fontweight='bold')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    # 2. Distribuição de densidade - GRUPO B (superior direito)
+    # 2. Distribuição de densidade - 7º ANO (superior direito)
     ax2 = plt.subplot(2, 2, 2)
     
-    # Dados do Grupo B (8º/9º anos)
-    data_pre_b = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pre']
-    data_pos_b = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pos']
+    # Dados do 7º ano
+    data_pre_7 = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pre']
+    data_pos_7 = scores_df[scores_df['GrupoEtario'] == grupos[1]]['Score_Pos']
     
-    if len(data_pre_b) > 0:
-        ax2.hist(data_pre_b, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
-        ax2.hist(data_pos_b, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
+    if len(data_pre_7) > 0:
+        ax2.hist(data_pre_7, alpha=0.5, label='Pré-teste', color=cores[1], bins=12, density=True)
+        ax2.hist(data_pos_7, alpha=0.7, label='Pós-teste', color=cores[1], bins=12, density=True, hatch='//')
     
     ax2.set_xlabel('Scores', fontsize=11)
     ax2.set_ylabel('Densidade', fontsize=11)
-    ax2.set_title('Grupo B (8º/9º anos)\nDistribuição de Densidade', fontsize=12, fontweight='bold')
+    ax2.set_title('7º ano\nDistribuição de Densidade', fontsize=12, fontweight='bold')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
-    # 3. Distribuição de Resultados (inferior - ocupando as duas posições)
-    ax3 = plt.subplot(2, 1, 2)
+    # 3. Distribuição de densidade - 8º ANO (inferior esquerdo)
+    ax3 = plt.subplot(2, 2, 3)
     
-    melhorou = []
-    piorou = []
-    igual = []
+    # Dados do 8º ano
+    data_pre_8 = scores_df[scores_df['GrupoEtario'] == grupos[2]]['Score_Pre']
+    data_pos_8 = scores_df[scores_df['GrupoEtario'] == grupos[2]]['Score_Pos']
     
-    for grupo in grupos:
-        data = scores_df[scores_df['GrupoEtario'] == grupo]
-        total = len(data)
-        
-        if total > 0:
-            melhorou.append((data['Delta'] > 0).sum() / total * 100)
-            piorou.append((data['Delta'] < 0).sum() / total * 100)
-            igual.append((data['Delta'] == 0).sum() / total * 100)
-        else:
-            melhorou.append(0)
-            piorou.append(0)
-            igual.append(0)
+    if len(data_pre_8) > 0:
+        ax3.hist(data_pre_8, alpha=0.5, label='Pré-teste', color=cores[2], bins=12, density=True)
+        ax3.hist(data_pos_8, alpha=0.7, label='Pós-teste', color=cores[2], bins=12, density=True, hatch='//')
     
-    x = np.arange(len(grupos))
-    width = 0.25
-    
-    ax3.bar(x - width, melhorou, width, label='Melhorou', color='#28a745', alpha=0.7)
-    ax3.bar(x, piorou, width, label='Piorou', color='#dc3545', alpha=0.7)
-    ax3.bar(x + width, igual, width, label='Igual', color='#6c757d', alpha=0.7)
-    
-    # Adicionar valores nas barras
-    for i, (mel, pio, ig) in enumerate(zip(melhorou, piorou, igual)):
-        ax3.text(i - width, mel + 1, f'{mel:.1f}%', ha='center', va='bottom', fontsize=10)
-        ax3.text(i, pio + 1, f'{pio:.1f}%', ha='center', va='bottom', fontsize=10)
-        ax3.text(i + width, ig + 1, f'{ig:.1f}%', ha='center', va='bottom', fontsize=10)
-    
-    ax3.set_xlabel('Grupos', fontsize=12)
-    ax3.set_ylabel('Percentual (%)', fontsize=12)
-    ax3.set_title('Distribuição de Resultados', fontsize=14, fontweight='bold')
-    ax3.set_xticks(x)
-    ax3.set_xticklabels(grupos)
+    ax3.set_xlabel('Scores', fontsize=11)
+    ax3.set_ylabel('Densidade', fontsize=11)
+    ax3.set_title('8º ano\nDistribuição de Densidade', fontsize=12, fontweight='bold')
     ax3.legend()
     ax3.grid(True, alpha=0.3)
+    
+    # 4. Distribuição de densidade - 9º ANO (inferior direito)
+    ax4 = plt.subplot(2, 2, 4)
+    
+    # Dados do 9º ano
+    data_pre_9 = scores_df[scores_df['GrupoEtario'] == grupos[3]]['Score_Pre']
+    data_pos_9 = scores_df[scores_df['GrupoEtario'] == grupos[3]]['Score_Pos']
+    
+    if len(data_pre_9) > 0:
+        ax4.hist(data_pre_9, alpha=0.5, label='Pré-teste', color=cores[3], bins=12, density=True)
+        ax4.hist(data_pos_9, alpha=0.7, label='Pós-teste', color=cores[3], bins=12, density=True, hatch='//')
+    
+    ax4.set_xlabel('Scores', fontsize=11)
+    ax4.set_ylabel('Densidade', fontsize=11)
+    ax4.set_title('9º ano\nDistribuição de Densidade', fontsize=12, fontweight='bold')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
     
     plt.tight_layout()
     return fig
 
-def plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2):
-    """Heatmap de erros por palavra e grupo - Pós-teste"""
+def plot_heatmap_erros_pos(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano):
+    """Heatmap de erros por palavra e ano - Pós-teste"""
     # Selecionar top 20 palavras com maior melhora geral
-    todas_palavras = pd.concat([palavras_df_grupo1, palavras_df_grupo2])
+    todas_palavras = pd.concat([palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano])
     palavras_geral = todas_palavras.groupby('Questao').agg({
         'Melhora': 'mean',
         'Palavra': 'first'
@@ -651,14 +656,18 @@ def plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2):
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_labels.append(palavra[:12] + '...' if len(palavra) > 12 else palavra)
         
-        # Erros no pós-teste para cada grupo
-        erro_g1 = palavras_df_grupo1[palavras_df_grupo1['Questao'] == questao]['Perc_Erro_Pos']
-        erro_g2 = palavras_df_grupo2[palavras_df_grupo2['Questao'] == questao]['Perc_Erro_Pos']
+        # Erros no pós-teste para cada ano
+        erro_6 = palavras_df_6ano[palavras_df_6ano['Questao'] == questao]['Perc_Erro_Pos']
+        erro_7 = palavras_df_7ano[palavras_df_7ano['Questao'] == questao]['Perc_Erro_Pos']
+        erro_8 = palavras_df_8ano[palavras_df_8ano['Questao'] == questao]['Perc_Erro_Pos']
+        erro_9 = palavras_df_9ano[palavras_df_9ano['Questao'] == questao]['Perc_Erro_Pos']
         
-        erro_g1_val = erro_g1.iloc[0] if len(erro_g1) > 0 else 0
-        erro_g2_val = erro_g2.iloc[0] if len(erro_g2) > 0 else 0
+        erro_6_val = erro_6.iloc[0] if len(erro_6) > 0 else 0
+        erro_7_val = erro_7.iloc[0] if len(erro_7) > 0 else 0
+        erro_8_val = erro_8.iloc[0] if len(erro_8) > 0 else 0
+        erro_9_val = erro_9.iloc[0] if len(erro_9) > 0 else 0
         
-        heatmap_data.append([erro_g1_val, erro_g2_val])
+        heatmap_data.append([erro_6_val, erro_7_val, erro_8_val, erro_9_val])
     
     heatmap_array = np.array(heatmap_data)
     
@@ -667,15 +676,15 @@ def plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2):
     im = ax.imshow(heatmap_array, cmap='Reds', aspect='auto')
     
     # Configurar eixos
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(['6º/7º anos', '8º/9º anos'])
+    ax.set_xticks([0, 1, 2, 3])
+    ax.set_xticklabels(['6º ano', '7º ano', '8º ano', '9º ano'])
     ax.set_yticks(range(len(palavras_labels)))
     ax.set_yticklabels(palavras_labels)
-    ax.set_title('Percentual de Erros por Palavra e Grupo\n(Pós-teste - Top 20 palavras)', fontweight='bold')
+    ax.set_title('Percentual de Erros por Palavra e Ano\n(Pós-teste - Top 20 palavras)', fontweight='bold')
     
     # Adicionar valores
     for i in range(len(palavras_labels)):
-        for j in range(2):
+        for j in range(4):
             text = ax.text(j, i, f'{heatmap_array[i, j]:.2f}',
                          ha="center", va="center", 
                          color="white" if heatmap_array[i, j] > 0.5 else "black",
@@ -685,10 +694,10 @@ def plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2):
     plt.tight_layout()
     return fig
 
-def plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2):
-    """Heatmap de erros por palavra e grupo - Pré-teste"""
+def plot_heatmap_erros_pre(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano):
+    """Heatmap de erros por palavra e ano - Pré-teste"""
     # Selecionar top 20 palavras com maior melhora geral (mesma lista do pós-teste para comparação)
-    todas_palavras = pd.concat([palavras_df_grupo1, palavras_df_grupo2])
+    todas_palavras = pd.concat([palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano])
     palavras_geral = todas_palavras.groupby('Questao').agg({
         'Melhora': 'mean',
         'Palavra': 'first'
@@ -704,14 +713,18 @@ def plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2):
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_labels.append(palavra[:12] + '...' if len(palavra) > 12 else palavra)
         
-        # Erros no pré-teste para cada grupo
-        erro_g1 = palavras_df_grupo1[palavras_df_grupo1['Questao'] == questao]['Perc_Erro_Pre']
-        erro_g2 = palavras_df_grupo2[palavras_df_grupo2['Questao'] == questao]['Perc_Erro_Pre']
+        # Erros no pré-teste para cada ano
+        erro_6 = palavras_df_6ano[palavras_df_6ano['Questao'] == questao]['Perc_Erro_Pre']
+        erro_7 = palavras_df_7ano[palavras_df_7ano['Questao'] == questao]['Perc_Erro_Pre']
+        erro_8 = palavras_df_8ano[palavras_df_8ano['Questao'] == questao]['Perc_Erro_Pre']
+        erro_9 = palavras_df_9ano[palavras_df_9ano['Questao'] == questao]['Perc_Erro_Pre']
         
-        erro_g1_val = erro_g1.iloc[0] if len(erro_g1) > 0 else 0
-        erro_g2_val = erro_g2.iloc[0] if len(erro_g2) > 0 else 0
+        erro_6_val = erro_6.iloc[0] if len(erro_6) > 0 else 0
+        erro_7_val = erro_7.iloc[0] if len(erro_7) > 0 else 0
+        erro_8_val = erro_8.iloc[0] if len(erro_8) > 0 else 0
+        erro_9_val = erro_9.iloc[0] if len(erro_9) > 0 else 0
         
-        heatmap_data.append([erro_g1_val, erro_g2_val])
+        heatmap_data.append([erro_6_val, erro_7_val, erro_8_val, erro_9_val])
     
     heatmap_array = np.array(heatmap_data)
     
@@ -720,15 +733,15 @@ def plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2):
     im = ax.imshow(heatmap_array, cmap='Reds', aspect='auto')
     
     # Configurar eixos
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(['6º/7º anos', '8º/9º anos'])
+    ax.set_xticks([0, 1, 2, 3])
+    ax.set_xticklabels(['6º ano', '7º ano', '8º ano', '9º ano'])
     ax.set_yticks(range(len(palavras_labels)))
     ax.set_yticklabels(palavras_labels)
-    ax.set_title('Percentual de Erros por Palavra e Grupo\n(Pré-teste - Top 20 palavras)', fontweight='bold')
+    ax.set_title('Percentual de Erros por Palavra e Ano\n(Pré-teste - Top 20 palavras)', fontweight='bold')
     
     # Adicionar valores
     for i in range(len(palavras_labels)):
-        for j in range(2):
+        for j in range(4):
             text = ax.text(j, i, f'{heatmap_array[i, j]:.2f}',
                          ha="center", va="center", 
                          color="white" if heatmap_array[i, j] > 0.5 else "black",
@@ -775,13 +788,17 @@ def gerar_graficos_escola(escola_filtro=None):
     
     # Calcular indicadores
     indicadores_geral = calcular_indicadores(scores_df)
-    indicadores_grupo1 = calcular_indicadores(scores_df, "6º/7º anos")
-    indicadores_grupo2 = calcular_indicadores(scores_df, "8º/9º anos")
+    indicadores_6ano = calcular_indicadores(scores_df, "6º ano")
+    indicadores_7ano = calcular_indicadores(scores_df, "7º ano")
+    indicadores_8ano = calcular_indicadores(scores_df, "8º ano")
+    indicadores_9ano = calcular_indicadores(scores_df, "9º ano")
     
     # Analisar palavras
     palavras_df_todos = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras)
-    palavras_df_grupo1 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "6º/7º anos")
-    palavras_df_grupo2 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "8º/9º anos")
+    palavras_df_6ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "6º ano")
+    palavras_df_7ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "7º ano")
+    palavras_df_8ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "8º ano")
+    palavras_df_9ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "9º ano")
     
     # Gerar gráficos em memória
     graficos_b64 = {}
@@ -797,7 +814,7 @@ def gerar_graficos_escola(escola_filtro=None):
     buffer1.close()
     
     # Gráfico 2: Top palavras
-    fig2 = plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
+    fig2 = plot_palavras_top(palavras_df_todos, palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     buffer2 = io.BytesIO()
     fig2.savefig(buffer2, format='png', dpi=150, bbox_inches='tight')
     buffer2.seek(0)
@@ -817,7 +834,7 @@ def gerar_graficos_escola(escola_filtro=None):
     buffer4.close()
     
     # Gráfico 5: Heatmap erros pós-teste
-    fig5 = plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2)
+    fig5 = plot_heatmap_erros_pos(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     buffer5 = io.BytesIO()
     fig5.savefig(buffer5, format='png', dpi=150, bbox_inches='tight')
     buffer5.seek(0)
@@ -827,7 +844,7 @@ def gerar_graficos_escola(escola_filtro=None):
     buffer5.close()
     
     # Gráfico 6: Heatmap erros pré-teste
-    fig6 = plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2)
+    fig6 = plot_heatmap_erros_pre(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     buffer6 = io.BytesIO()
     fig6.savefig(buffer6, format='png', dpi=150, bbox_inches='tight')
     buffer6.seek(0)
@@ -864,8 +881,10 @@ def gerar_dados_todas_escolas():
             
             # Calcular indicadores
             indicadores_geral = calcular_indicadores(scores_df)
-            indicadores_grupo1 = calcular_indicadores(scores_df, "6º/7º anos")
-            indicadores_grupo2 = calcular_indicadores(scores_df, "8º/9º anos")
+            indicadores_6ano = calcular_indicadores(scores_df, "6º ano")
+            indicadores_7ano = calcular_indicadores(scores_df, "7º ano")
+            indicadores_8ano = calcular_indicadores(scores_df, "8º ano")
+            indicadores_9ano = calcular_indicadores(scores_df, "9º ano")
             
             # Gerar gráficos específicos para esta escola
             print(f"     Gerando gráficos para: {escola}")
@@ -876,8 +895,10 @@ def gerar_dados_todas_escolas():
             
             dados_escolas[escola] = {
                 'indicadores_geral': indicadores_geral,
-                'indicadores_grupo1': indicadores_grupo1,
-                'indicadores_grupo2': indicadores_grupo2,
+                'indicadores_6ano': indicadores_6ano,
+                'indicadores_7ano': indicadores_7ano,
+                'indicadores_8ano': indicadores_8ano,
+                'indicadores_9ano': indicadores_9ano,
                 'graficos': graficos,
                 'top_palavras': palavras_df_todos.nlargest(10, 'Melhora')[['Palavra', 'Melhora']].to_dict('records') if len(palavras_df_todos) > 0 else []
             }
@@ -1204,8 +1225,10 @@ function interpretarCohenD(d) {{
     }}
     
     container.innerHTML = 
-        criarGrupoItem(dados.indicadores_grupo1, "6º/7º anos") + 
-        criarGrupoItem(dados.indicadores_grupo2, "8º/9º anos");
+        criarGrupoItem(dados.indicadores_6ano, "6º ano") + 
+        criarGrupoItem(dados.indicadores_7ano, "7º ano") +
+        criarGrupoItem(dados.indicadores_8ano, "8º ano") + 
+        criarGrupoItem(dados.indicadores_9ano, "9º ano");
 }}
 
 function atualizarGraficos(graficos) {{
@@ -1234,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', inicializar);
 """
     return html
 
-def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grupo2, 
+def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, indicadores_8ano, indicadores_9ano, 
                         palavras_df_todos, figuras_b64, escola_filtro=None):
     """Gera o relatório HTML completo seguindo padrão da Fase 3"""
     
@@ -1288,7 +1311,10 @@ def gerar_html_relatorio(indicadores_geral, indicadores_grupo1, indicadores_grup
         </div>
         """
     
-    interp_html = get_interpretacao_grupo(indicadores_grupo1, "6º/7º anos") + get_interpretacao_grupo(indicadores_grupo2, "8º/9º anos")
+    interp_html = (get_interpretacao_grupo(indicadores_6ano, "6º ano") + 
+                   get_interpretacao_grupo(indicadores_7ano, "7º ano") +
+                   get_interpretacao_grupo(indicadores_8ano, "8º ano") + 
+                   get_interpretacao_grupo(indicadores_9ano, "9º ano"))
 
     html = f"""
 <!DOCTYPE html>
@@ -1453,14 +1479,18 @@ def gerar_relatorio_completo(escola_filtro=None):
     # 3. Calcular indicadores
     print("4. Calculando indicadores...")
     indicadores_geral = calcular_indicadores(scores_df)
-    indicadores_grupo1 = calcular_indicadores(scores_df, "6º/7º anos")
-    indicadores_grupo2 = calcular_indicadores(scores_df, "8º/9º anos")
+    indicadores_6ano = calcular_indicadores(scores_df, "6º ano")
+    indicadores_7ano = calcular_indicadores(scores_df, "7º ano")
+    indicadores_8ano = calcular_indicadores(scores_df, "8º ano")
+    indicadores_9ano = calcular_indicadores(scores_df, "9º ano")
     
     # 4. Analisar palavras
     print("5. Analisando palavras...")
     palavras_df_todos = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras)
-    palavras_df_grupo1 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "6º/7º anos")
-    palavras_df_grupo2 = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "8º/9º anos")
+    palavras_df_6ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "6º ano")
+    palavras_df_7ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "7º ano")
+    palavras_df_8ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "8º ano")
+    palavras_df_9ano = analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras, "9º ano")
     
     # 5. Gerar figuras
     print("6. Gerando figuras...")
@@ -1471,7 +1501,7 @@ def gerar_relatorio_completo(escola_filtro=None):
     plt.close(fig1)
     
     # Figura 2: Top palavras
-    fig2 = plot_palavras_top(palavras_df_todos, palavras_df_grupo1, palavras_df_grupo2)
+    fig2 = plot_palavras_top(palavras_df_todos, palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     fig2.savefig(FIG_PALAVRAS_TOP, dpi=150, bbox_inches='tight')
     plt.close(fig2)
     
@@ -1481,12 +1511,12 @@ def gerar_relatorio_completo(escola_filtro=None):
     plt.close(fig4)
     
     # Figura 5: Heatmap de erros pós-teste
-    fig5 = plot_heatmap_erros_pos(palavras_df_grupo1, palavras_df_grupo2)
+    fig5 = plot_heatmap_erros_pos(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     fig5.savefig(FIG_HEATMAP_ERROS_POS, dpi=150, bbox_inches='tight')
     plt.close(fig5)
     
     # Figura 6: Heatmap de erros pré-teste
-    fig6 = plot_heatmap_erros_pre(palavras_df_grupo1, palavras_df_grupo2)
+    fig6 = plot_heatmap_erros_pre(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano, palavras_df_9ano)
     fig6.savefig(FIG_HEATMAP_ERROS_PRE, dpi=150, bbox_inches='tight')
     plt.close(fig6)
     
@@ -1510,7 +1540,7 @@ def gerar_relatorio_completo(escola_filtro=None):
     # 7. Gerar relatório HTML
     print("8. Gerando relatório HTML...")
     html_content = gerar_html_relatorio(
-        indicadores_geral, indicadores_grupo1, indicadores_grupo2,
+        indicadores_geral, indicadores_6ano, indicadores_7ano, indicadores_8ano, indicadores_9ano,
         palavras_df_todos, figuras_b64, escola_filtro
     )
     
