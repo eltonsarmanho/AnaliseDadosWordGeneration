@@ -5,7 +5,6 @@ import pathlib
 from scipy import stats
 import numpy as np
 from datetime import datetime
-import io
 import json
 
 # Configurar caminhos
@@ -15,77 +14,57 @@ fase2_dir = os.path.join(data_dir, 'Fase2')
 pre_dir = os.path.join(fase2_dir, 'Pre')
 pos_dir = os.path.join(fase2_dir, 'Pos')
 output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.csv')
-output_excel = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.xlsx')
 mapping_file = os.path.join(data_dir, 'RespostaTED.json')
 
-# Caminhos dos arquivos TDE - Usando CSV como padrão
+# Caminhos dos arquivos TDE - CSV
 arquivo_pre = os.path.join(pre_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
 arquivo_pos = os.path.join(pos_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
 
 print("="*80)
-print("PIPELINE TABELA BRUTA - TDE WORDGEN - FASE 2")
-print("TESTE DE ESCRITA - ANÁLISE PRÉ/PÓS-TESTE")
+print("PIPELINE TDE - WORDGEN FASE 2")
 print("="*80)
-print(f"Data/Hora de execução: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+print(f"Executado em: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print("="*80)
 
-def carregar_mapeamento_palavras_tde():
-    """Carrega o mapeamento das questões TDE para palavras"""
+def carregar_mapeamento_tde():
+    """Carrega mapeamento das questões TDE"""
     try:
         with open(mapping_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Separar por grupos
-        mapeamento_a = {}  # Grupo A (6º/7º anos)
-        mapeamento_b = {}  # Grupo B (8º/9º anos)
-        
+        mapeamento = {}
         for item in data:
             for pergunta_key, pergunta_data in item.items():
                 if 'Pergunta' in pergunta_key:
                     numero = pergunta_key.split(' ')[1]
                     palavra = pergunta_data.get('Palavra Trabalhada', f'Palavra_{numero}')
-                    grupo = pergunta_data.get('Grupo', 'A')
-                    
-                    if grupo == 'A':
-                        mapeamento_a[f'P{numero}'] = palavra
-                    else:
-                        mapeamento_b[f'P{numero}'] = palavra
+                    mapeamento[f'P{numero}'] = palavra
         
-        return mapeamento_a, mapeamento_b
+        return mapeamento
     except Exception as e:
-        print(f"Erro ao carregar mapeamento TDE: {e}")
-        return {}, {}
+        print(f"Erro ao carregar mapeamento: {e}")
+        return {}
 
 def converter_valor_tde(valor):
-    """Converte valores TDE para formato numérico padronizado"""
+    """Converte valores TDE (0=erro, 1=acerto)"""
     if pd.isna(valor):
         return np.nan
     
-    # Converter para string para manipulação
     valor_str = str(valor).strip().upper()
     
-    # Para TDE, valores são geralmente 0 (erro) ou 1 (acerto)
     if valor_str in ['0', '0.0']:
-        return 0  # Erro
+        return 0
     elif valor_str in ['1', '1.0']:
-        return 1  # Acerto
-    elif valor_str in ['D', 'M']:
-        return np.nan  # Neutro (valores desconhecidos)
+        return 1
     else:
-        # Tentar converter para número
         try:
             num_valor = float(valor_str)
-            if num_valor == 0:
-                return 0
-            elif num_valor == 1:
-                return 1
-            else:
-                return np.nan
+            return 1 if num_valor > 0 else 0
         except:
             return np.nan
 
 def classificar_grupo_tde(turma):
-    """Classifica estudantes em grupos TDE baseado na turma"""
+    """Classifica em Grupo A (6º/7º) ou B (8º/9º)"""
     turma_str = str(turma).upper()
     
     if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str:
@@ -95,121 +74,78 @@ def classificar_grupo_tde(turma):
     else:
         return "Indefinido"
 
-def tem_questoes_validas_tde(row, colunas_p):
-    """Verifica se o estudante tem pelo menos 60% das questões TDE respondidas"""
-    valores_validos = 0
-    for col in colunas_p:
-        if col in row.index and not pd.isna(row[col]):
-            valores_validos += 1
-    return valores_validos >= 20  # Pelo menos 60% das 40 questões
-
-def gerar_tabela_bruta_tde():
-    """Gera tabela com dados brutos TDE após pré-processamento"""
+def main():
+    """Pipeline principal TDE"""
     
-    print("1. CARREGANDO DADOS TDE...")
+    # 1. CARREGAR DADOS
+    print("1. CARREGANDO DADOS...")
     df_pre = pd.read_csv(arquivo_pre)
     df_pos = pd.read_csv(arquivo_pos)
+    mapeamento = carregar_mapeamento_tde()
     
-    # Carregar mapeamento de palavras
-    mapeamento_a, mapeamento_b = carregar_mapeamento_palavras_tde()
-    print(f"   Mapeamento Grupo A carregado: {len(mapeamento_a)} questões")
-    print(f"   Mapeamento Grupo B carregado: {len(mapeamento_b)} questões")
+    print(f"   PRÉ-teste: {len(df_pre)} registros")
+    print(f"   PÓS-teste: {len(df_pos)} registros")
+    print(f"   Mapeamento: {len(mapeamento)} questões")
     
-    print("2. APLICANDO PRÉ-PROCESSAMENTO TDE...")
+    # 2. PRÉ-PROCESSAMENTO
+    print("\n2. PRÉ-PROCESSAMENTO...")
     
-    # Colunas das questões TDE (P1 a P40)
+    # Colunas TDE (P1 a P40)
     colunas_p = [f'P{i}' for i in range(1, 41)]
     
-    # Aplicar conversão de valores
+    # Converter valores
     for col in colunas_p:
         if col in df_pre.columns:
             df_pre[col] = df_pre[col].apply(converter_valor_tde)
         if col in df_pos.columns:
             df_pos[col] = df_pos[col].apply(converter_valor_tde)
     
-    # Adicionar grupos TDE
+    # Classificar grupos
     df_pre['GrupoTDE'] = df_pre['Turma'].apply(classificar_grupo_tde)
     df_pos['GrupoTDE'] = df_pos['Turma'].apply(classificar_grupo_tde)
     
-    # Criar identificador único baseado em Nome + Turma
+    # ID único
     df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Turma'].astype(str)
     df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Turma'].astype(str)
     
-    # Filtrar apenas estudantes que participaram de ambos os testes
-    ids_pre = set(df_pre['ID_Unico'])
-    ids_pos = set(df_pos['ID_Unico'])
-    ids_comuns = ids_pre.intersection(ids_pos)
+    # Filtrar IDs comuns
+    ids_comuns = set(df_pre['ID_Unico']).intersection(set(df_pos['ID_Unico']))
+    df_pre = df_pre[df_pre['ID_Unico'].isin(ids_comuns)]
+    df_pos = df_pos[df_pos['ID_Unico'].isin(ids_comuns)]
     
-    print(f"   Total de IDs em PRÉ: {len(ids_pre)}")
-    print(f"   Total de IDs em PÓS: {len(ids_pos)}")
-    print(f"   IDs em comum: {len(ids_comuns)}")
+    # Filtrar questões válidas (mínimo 32/40 = 80%)
+    def tem_questoes_validas(row):
+        validos = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]))
+        return validos >= 32
     
-    # Filtrar DataFrames
-    df_pre_filtrado = df_pre[df_pre['ID_Unico'].isin(ids_comuns)].copy()
-    df_pos_filtrado = df_pos[df_pos['ID_Unico'].isin(ids_comuns)].copy()
+    df_pre = df_pre[df_pre.apply(tem_questoes_validas, axis=1)]
+    df_pos = df_pos[df_pos.apply(tem_questoes_validas, axis=1)]
     
-    # Aplicar filtro de questões válidas (pelo menos 80% preenchidas)
-    mask_pre = df_pre_filtrado.apply(lambda row: tem_questoes_validas_tde(row, colunas_p), axis=1)
-    mask_pos = df_pos_filtrado.apply(lambda row: tem_questoes_validas_tde(row, colunas_p), axis=1)
+    # Filtrar novamente por IDs comuns
+    ids_finais = set(df_pre['ID_Unico']).intersection(set(df_pos['ID_Unico']))
+    df_pre = df_pre[df_pre['ID_Unico'].isin(ids_finais)]
+    df_pos = df_pos[df_pos['ID_Unico'].isin(ids_finais)]
     
-    df_pre_filtrado = df_pre_filtrado[mask_pre]
-    df_pos_filtrado = df_pos_filtrado[mask_pos]
+    print(f"   Registros finais: {len(df_pre)}")
     
-    # Filtrar novamente por IDs comuns após limpeza
-    ids_pre_limpo = set(df_pre_filtrado['ID_Unico'])
-    ids_pos_limpo = set(df_pos_filtrado['ID_Unico'])
-    ids_finais = ids_pre_limpo.intersection(ids_pos_limpo)
+    # 3. GERAR TABELA BRUTA
+    print("\n3. GERANDO TABELA BRUTA...")
     
-    df_pre_final = df_pre_filtrado[df_pre_filtrado['ID_Unico'].isin(ids_finais)]
-    df_pos_final = df_pos_filtrado[df_pos_filtrado['ID_Unico'].isin(ids_finais)]
+    df_pre = df_pre.sort_values('ID_Unico')
+    df_pos = df_pos.sort_values('ID_Unico')
     
-    print(f"   Após limpeza completa:")
-    print(f"   Registros PRÉ: {len(df_pre_final)}")
-    print(f"   Registros PÓS: {len(df_pos_final)}")
-    print(f"   IDs finais: {len(ids_finais)}")
-    
-    print("3. CRIANDO TABELA CONSOLIDADA TDE...")
-    
-    # Criar tabela consolidada
     tabela_bruta = []
     
-    # Ordenar por ID_Unico para garantir correspondência
-    df_pre_final = df_pre_final.sort_values('ID_Unico')
-    df_pos_final = df_pos_final.sort_values('ID_Unico')
-    
-    for _, row_pre in df_pre_final.iterrows():
+    for _, row_pre in df_pre.iterrows():
         id_unico = row_pre['ID_Unico']
+        row_pos = df_pos[df_pos['ID_Unico'] == id_unico].iloc[0]
         
-        # Encontrar correspondente no pós-teste
-        pos_rows = df_pos_final[df_pos_final['ID_Unico'] == id_unico]
-        if len(pos_rows) == 0:
-            continue
-            
-        row_pos = pos_rows.iloc[0]
+        # Calcular scores
+        score_pre = sum(row_pre[col] for col in colunas_p if not pd.isna(row_pre[col]))
+        score_pos = sum(row_pos[col] for col in colunas_p if not pd.isna(row_pos[col]))
+        questoes_validas = sum(1 for col in colunas_p if not pd.isna(row_pre[col]) and not pd.isna(row_pos[col]))
         
-        # Determinar grupo e usar mapeamento correto
-        grupo_tde = row_pre['GrupoTDE']
-        if 'Grupo A' in grupo_tde:
-            mapeamento = mapeamento_a
-        else:
-            mapeamento = mapeamento_b
-        
-        # Calcular scores TDE
-        score_pre = 0
-        score_pos = 0
-        questoes_validas = 0
-        
-        for col in colunas_p:
-            if col in row_pre.index and col in row_pos.index:
-                val_pre = row_pre[col]
-                val_pos = row_pos[col]
-                
-                if not pd.isna(val_pre) and not pd.isna(val_pos):
-                    score_pre += val_pre
-                    score_pos += val_pos
-                    questoes_validas += 1
-        
-        # Criar registro consolidado
+        # Registro base
         registro = {
             'ID_Unico': id_unico,
             'Nome': row_pre['Nome'],
@@ -224,73 +160,76 @@ def gerar_tabela_bruta_tde():
             'Percentual_Pos': (score_pos / questoes_validas) * 100 if questoes_validas > 0 else 0
         }
         
-        # Adicionar respostas individuais das questões TDE
+        # Questões individuais
         for i, col in enumerate(colunas_p, 1):
-            if col in row_pre.index and col in row_pos.index:
-                # Obter palavra correspondente baseada no grupo
-                palavra = mapeamento.get(col, f"Palavra_P{i}")
-                
-                registro[f'P{i:02d}_Pre_{palavra}'] = row_pre[col] if not pd.isna(row_pre[col]) else ''
-                registro[f'P{i:02d}_Pos_{palavra}'] = row_pos[col] if not pd.isna(row_pos[col]) else ''
-                registro[f'P{i:02d}_Delta_{palavra}'] = (row_pos[col] - row_pre[col]) if (not pd.isna(row_pre[col]) and not pd.isna(row_pos[col])) else ''
+            palavra = mapeamento.get(col, f"Palavra_P{i}")
+            registro[f'P{i:02d}_Pre_{palavra}'] = row_pre[col] if not pd.isna(row_pre[col]) else ''
+            registro[f'P{i:02d}_Pos_{palavra}'] = row_pos[col] if not pd.isna(row_pos[col]) else ''
+            registro[f'P{i:02d}_Delta_{palavra}'] = (row_pos[col] - row_pre[col]) if (not pd.isna(row_pre[col]) and not pd.isna(row_pos[col])) else ''
         
         tabela_bruta.append(registro)
     
-    # Converter para DataFrame
     df_tabela = pd.DataFrame(tabela_bruta)
     
-    print("4. CALCULANDO ESTATÍSTICAS RESUMO TDE...")
+    # 4. ESTATÍSTICAS
+    print("\n4. ESTATÍSTICAS DOS DADOS:")
+    print("="*50)
     
-    # Estatísticas por grupo TDE
-    print("\n   ESTATÍSTICAS POR GRUPO TDE:")
+    print(f"TOTAL DE ESTUDANTES: {len(df_tabela)}")
+    print(f"TOTAL DE COLUNAS: {len(df_tabela.columns)}")
+    
+    print("\nPOR GRUPO TDE:")
     for grupo in df_tabela['GrupoTDE'].unique():
         if grupo != 'Indefinido':
-            dados_grupo = df_tabela[df_tabela['GrupoTDE'] == grupo]
-            print(f"   {grupo}: N={len(dados_grupo)}, Média Pré={dados_grupo['Score_Pre'].mean():.2f}, Média Pós={dados_grupo['Score_Pos'].mean():.2f}")
+            dados = df_tabela[df_tabela['GrupoTDE'] == grupo]
+            print(f"  {grupo}:")
+            print(f"    N: {len(dados)}")
+            print(f"    Pré-teste: {dados['Score_Pre'].mean():.2f} ± {dados['Score_Pre'].std():.2f}")
+            print(f"    Pós-teste: {dados['Score_Pos'].mean():.2f} ± {dados['Score_Pos'].std():.2f}")
+            print(f"    Delta: {dados['Delta_Score'].mean():.2f} ± {dados['Delta_Score'].std():.2f}")
+            
+            # Teste t pareado
+            t_stat, p_value = stats.ttest_rel(dados['Score_Pos'], dados['Score_Pre'])
+            cohen_d = (dados['Score_Pos'].mean() - dados['Score_Pre'].mean()) / dados['Delta_Score'].std()
+            print(f"    Teste t: t={t_stat:.3f}, p={p_value:.4f}")
+            print(f"    Cohen's d: {cohen_d:.3f}")
     
-    # Estatísticas por escola
-    print("\n   ESTATÍSTICAS POR ESCOLA:")
+    print("\nPOR ESCOLA:")
     for escola in df_tabela['Escola'].unique():
         if escola != 'N/A':
-            dados_escola = df_tabela[df_tabela['Escola'] == escola]
-            print(f"   {escola}: N={len(dados_escola)}, Δ médio={dados_escola['Delta_Score'].mean():.2f}")
+            dados = df_tabela[df_tabela['Escola'] == escola]
+            print(f"  {escola}: N={len(dados)}, Δ={dados['Delta_Score'].mean():.2f}")
     
-    print("5. SALVANDO TABELA TDE...")
+    print("\nPOR TURMA:")
+    for turma in sorted(df_tabela['Turma'].unique()):
+        dados = df_tabela[df_tabela['Turma'] == turma]
+        print(f"  {turma}: N={len(dados)}, Δ={dados['Delta_Score'].mean():.2f}")
     
-    # Salvar como CSV
+    # Estatísticas gerais
+    print(f"\nESTATÍSTICAS GERAIS:")
+    print(f"  Score Pré-teste: {df_tabela['Score_Pre'].mean():.2f} ± {df_tabela['Score_Pre'].std():.2f}")
+    print(f"  Score Pós-teste: {df_tabela['Score_Pos'].mean():.2f} ± {df_tabela['Score_Pos'].std():.2f}")
+    print(f"  Delta médio: {df_tabela['Delta_Score'].mean():.2f} ± {df_tabela['Delta_Score'].std():.2f}")
+    
+    # Teste t geral
+    t_stat, p_value = stats.ttest_rel(df_tabela['Score_Pos'], df_tabela['Score_Pre'])
+    cohen_d = (df_tabela['Score_Pos'].mean() - df_tabela['Score_Pre'].mean()) / df_tabela['Delta_Score'].std()
+    print(f"  Teste t pareado: t={t_stat:.3f}, p={p_value:.4f}")
+    print(f"  Cohen's d geral: {cohen_d:.3f}")
+    
+    # 5. SALVAR CSV
+    print("\n5. SALVANDO TABELA...")
     df_tabela.to_csv(output_csv, index=False, encoding='utf-8-sig')
     
-    # Salvar como Excel
-    df_tabela.to_excel(output_excel, index=False, engine='openpyxl')
-    
     print("="*80)
-    print("✅ TABELA BRUTA TDE GERADA COM SUCESSO!")
+    print("✅ PIPELINE TDE CONCLUÍDO!")
     print("="*80)
-    print(f"📁 Arquivo CSV: {output_csv}")
-    print(f"📁 Arquivo Excel: {output_excel}")
-    print(f"📊 Total de registros: {len(df_tabela)}")
-    print(f"📋 Total de colunas: {len(df_tabela.columns)}")
+    print(f"📁 Arquivo gerado: {output_csv}")
+    print(f"📊 Registros: {len(df_tabela)}")
+    print(f"📋 Colunas: {len(df_tabela.columns)}")
     print("="*80)
-    
-    # Mostrar preview da tabela
-    print("\n📋 PREVIEW DA TABELA TDE (primeiras 5 linhas, colunas principais):")
-    colunas_preview = ['Nome', 'Escola', 'Turma', 'GrupoTDE', 'Score_Pre', 'Score_Pos', 'Delta_Score', 'Questoes_Validas']
-    print(df_tabela[colunas_preview].head().to_string(index=False))
     
     return df_tabela
-
-def main():
-    """Função principal do pipeline TDE"""
-    try:
-        tabela = gerar_tabela_bruta_tde()
-        print(f"\n✅ Pipeline TDE executado com sucesso!")
-        print(f"🎯 Dados TDE processados e salvos em formato CSV e Excel")
-        return tabela
-    except Exception as e:
-        print(f"\n❌ Erro durante execução do pipeline TDE: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
 
 if __name__ == "__main__":
     main()
