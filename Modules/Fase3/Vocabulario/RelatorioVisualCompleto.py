@@ -994,7 +994,7 @@ def gerar_graficos_escola(escola_filtro=None):
     fig7.savefig(buffer7, format='png', dpi=150, bbox_inches='tight')
     buffer7.seek(0)
     img_b64 = base64.b64encode(buffer7.getvalue()).decode('utf-8')
-    graficos_b64['comparacao_ensinadas'] = f"data:image/png;base64,{img_b64}"
+    graficos_b64['ensinadas_vs_nao'] = f"data:image/png;base64,{img_b64}"
     plt.close(fig7)
     buffer7.close()
     
@@ -1254,8 +1254,358 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
     return html
 
 def gerar_html_relatorio_interativo():
-    """Gera relatório HTML interativo (stub para compatibilidade)"""
-    return "<html><body><h1>Relatório Interativo - Em desenvolvimento</h1></body></html>"
+    """Gera o relatório HTML interativo com menu de escolas"""
+    
+    # Gerar dados para todas as escolas (incluindo gráficos específicos)
+    dados_escolas = gerar_dados_todas_escolas()
+    
+    # Usar os gráficos da escola "Todas" como padrão
+    figuras_b64 = dados_escolas.get('Todas', {}).get('graficos', {})
+    
+    # Gerar HTML interativo
+    return gerar_html_com_menu(dados_escolas, figuras_b64)
+
+def gerar_html_com_menu(dados_escolas, figuras_b64):
+    """Gera HTML com menu interativo para seleção de escolas"""
+    
+    # Converter dados para JSON
+    import json
+    dados_json = json.dumps(dados_escolas, ensure_ascii=False, indent=2)
+    
+    html = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relatório Visual - WordGen Fase 3 - Vocabulário</title>
+<style>
+    :root {{
+        --bg: #f5f6fa;
+        --text: #2c3e50;
+        --muted: #6b7280;
+        --purple1: #6a11cb;
+        --purple2: #8d36ff;
+        --card-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --green-grad: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        --red-grad: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        --yellow-grad: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    }}
+    body {{
+        margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }}
+    .header {{
+        background: linear-gradient(120deg, var(--purple1) 0%, var(--purple2) 100%);
+        color: #fff; padding: 28px 18px; box-shadow: 0 2px 14px rgba(0,0,0,.12);
+    }}
+    .header .title {{
+        font-size: 26px; font-weight: 700; margin: 0;
+    }}
+    .header .subtitle {{
+        font-size: 14px; opacity: 0.95; margin-top: 6px;
+    }}
+    .header .timestamp {{
+        font-size: 12px; opacity: 0.85; margin-top: 4px;
+    }}
+    
+    .menu-container {{
+        background: #fff; margin: 18px auto; max-width: 1200px; border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    }}
+    .menu-title {{
+        font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--purple1);
+    }}
+    .escola-select {{
+        width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; background: #fff; cursor: pointer;
+        transition: border-color 0.3s ease;
+    }}
+    .escola-select:focus {{
+        outline: none; border-color: var(--purple1);
+    }}
+    
+    .container {{
+        max-width: 1200px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 22px; box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }}
+    .cards {{
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px;
+    }}
+    .card {{
+        background: var(--card-grad); color: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }}
+    .card.green {{ background: var(--green-grad); }}
+    .card.red {{ background: var(--red-grad); }}
+    .card.yellow {{ background: var(--yellow-grad); }}
+    .card .card-label {{ font-size: 13px; opacity: 0.95; }}
+    .card .valor {{ font-size: 22px; font-weight: 700; margin-top: 6px; }}
+    .card .desc {{ font-size: 11px; opacity: 0.9; }}
+
+    h2.section {{
+        margin-top: 22px; font-size: 18px; border-left: 4px solid var(--purple1); padding-left: 10px; color: #1f2937;
+    }}
+    .figs {{ display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 10px; }}
+    .fig {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 8px; }}
+    .fig img {{ width: 100%; height: auto; border-radius: 6px; }}
+    .fig .caption {{ font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }}
+
+    .interp {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 14px; }}
+    .grupo-item {{ background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }}
+    .grupo-titulo {{ font-weight: 600; }}
+    .grupo-detalhes {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; color: #374151; font-size: 13px; margin-top: 6px; }}
+    .interpretacao-grupo {{ margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid var(--purple1); }}
+    .interpretacao-grupo p {{ margin: 3px 0; font-size: 12px; }}
+    .interpretacao-grupo strong {{ color: var(--purple1); }}
+
+    .figs-heatmap {{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 10px; }}
+    @media (max-width: 768px) {{ .figs-heatmap {{ grid-template-columns: 1fr; }} }}
+
+    .foot-note {{ font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }}
+    
+    .top-palavras {{ margin-top: 15px; }}
+    .palavra-item {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }}
+    .palavra-nome {{ font-weight: 500; }}
+    .palavra-melhora {{ color: var(--purple1); font-weight: 600; }}
+</style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Relatório Visual WordGen - Fase 3</div>
+        <div class="subtitle">Vocabulário (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
+    </div>
+
+    <div class="menu-container">
+        <div class="menu-title">🏫 Selecionar Escola</div>
+        <select class="escola-select" id="escolaSelect" onchange="atualizarDados()">
+        </select>
+    </div>
+
+    <div class="container">
+        <h2 class="section">📊 Indicadores Principais</h2>
+        <div class="cards" id="cardsContainer">
+        </div>
+
+        <h2 class="section">📈 Análises Visuais</h2>
+        <div class="figs">
+            <div class="fig" id="grafico-grupos">
+                <img src="{figuras_b64.get('grupos_barras', '')}" alt="Comparação de Grupos" />
+                <div class="caption">Comparação de scores e distribuição de mudanças por grupo etário.</div>
+            </div>
+            <div class="fig" id="grafico-palavras">
+                <img src="{figuras_b64.get('palavras_top', '')}" alt="Top Palavras" />
+                <div class="caption">Palavras com maior melhora na taxa de acerto.</div>
+            </div>
+            <div class="fig" id="grafico-intergrupos">
+                <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Intergrupos" />
+                <div class="caption">Comparação detalhada entre grupos etários (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
+            </div>
+            <div class="fig" id="grafico-ensinadas">
+                <img src="{figuras_b64.get('ensinadas_vs_nao', '')}" alt="Palavras Ensinadas vs Não Ensinadas" />
+                <div class="caption">Comparação de performance entre palavras ensinadas (30) e não ensinadas (20).</div>
+            </div>
+        </div>
+
+        <h2 class="section">Percentual de Erros por Palavra e Grupo</h2>
+        <div class="figs-heatmap">
+            <div class="fig" id="grafico-heatmap-pre">
+                <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap de Erros Pré-teste" />
+                <div class="caption">Percentual de erros no pré-teste (Top 20 palavras).</div>
+            </div>
+            <div class="fig" id="grafico-heatmap-pos">
+                <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap de Erros Pós-teste" />
+                <div class="caption">Percentual de erros no pós-teste (Top 20 palavras).</div>
+            </div>
+        </div>
+
+        <h2 class="section">Interpretação contextualizada por grupo etário</h2>
+        <div class="interp">
+            <p style="margin-top:0;color:#374151;">Referências: Cohen (1988) – 0.2/0.5/0.8; Hattie (2009) – d≥0.4 como "bom resultado"; Vocabulário (Marulis & Neuman, 2010) – d≥0.35 significativo.</p>
+            <div id="interpretacaoContainer">
+            </div>
+        </div>
+
+        <div class="foot-note">
+            <p>Notas: ES = Effect Size (Cohen's d) = Δ/SD(Pré). Análise por grupos etários baseada na classificação de turmas. Dados filtrados para estudantes com participação completa (pré e pós-teste).</p>
+        </div>
+    </div>
+
+<script>
+const dadosEscolas = {dados_json};
+
+function inicializar() {{
+    const select = document.getElementById('escolaSelect');
+    
+    // Adicionar opções ao select
+    Object.keys(dadosEscolas).forEach(escola => {{
+        const option = document.createElement('option');
+        option.value = escola;
+        option.textContent = escola;
+        select.appendChild(option);
+    }});
+    
+    // Definir "Todas" como padrão
+    select.value = 'Todas';
+    atualizarDados();
+}}
+
+function atualizarDados() {{
+    const escolaSelecionada = document.getElementById('escolaSelect').value;
+    const dados = dadosEscolas[escolaSelecionada];
+    
+    if (!dados) return;
+    
+    atualizarCards(dados.indicadores_geral);
+    atualizarInterpretacao(dados);
+    atualizarGraficos(dados.graficos);
+}}
+
+function atualizarCards(indicadores) {{
+    const container = document.getElementById('cardsContainer');
+    const maxScore = 100;
+    const meanPrePercent = (indicadores.mean_pre / maxScore * 100).toFixed(1);
+    const meanPosPercent = (indicadores.mean_pos / maxScore * 100).toFixed(1);
+    
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-label">Palavras Testadas</div>
+            <div class="valor">50</div>
+            <div class="desc">questões de vocabulário</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Pontuação Máxima</div>
+            <div class="valor">100</div>
+            <div class="desc">pontos (2 por questão)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Registros</div>
+            <div class="valor">${{indicadores.n}}</div>
+            <div class="desc">alunos após limpeza</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pré</div>
+            <div class="valor">${{indicadores.mean_pre.toFixed(2)}}</div>
+            <div class="desc">(${{meanPrePercent}}% da máxima)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Média Pós</div>
+            <div class="valor">${{indicadores.mean_pos.toFixed(2)}}</div>
+            <div class="desc">(${{meanPosPercent}}% da máxima)</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Delta médio</div>
+            <div class="valor">${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(2)}}</div>
+            <div class="desc">pontos</div>
+        </div>
+        <div class="card green">
+            <div class="card-label">% Melhoraram</div>
+            <div class="valor">${{indicadores.perc_improved.toFixed(1)}}%</div>
+        </div>
+        <div class="card red">
+            <div class="card-label">% Pioraram</div>
+            <div class="valor">${{indicadores.perc_worsened.toFixed(1)}}%</div>
+        </div>
+        <div class="card yellow">
+            <div class="card-label">% Mantiveram</div>
+            <div class="valor">${{indicadores.perc_unchanged.toFixed(1)}}%</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Effect Size</div>
+            <div class="valor">${{indicadores.cohen_d.toFixed(3)}}</div>
+        </div>
+    `;
+}}
+
+function atualizarInterpretacao(dados) {{
+    const container = document.getElementById('interpretacaoContainer');
+    
+    function interpretarCohenD(d) {{
+        const absD = Math.abs(d);
+        const isPositive = d >= 0;
+        let magnitude, hattieStatus, vocabStatus;
+        
+        if (absD >= 0.8) magnitude = "Grande";
+        else if (absD >= 0.5) magnitude = "Médio";
+        else if (absD >= 0.2) magnitude = "Pequeno";
+        else magnitude = "Negligível";
+        
+        // Benchmark Hattie com direção
+        if (absD >= 0.4) {{
+            hattieStatus = isPositive ? 
+                "✅ Acima do benchmark (d≥0.4) - Melhoria significativa" : 
+                "🚨 Acima do benchmark (|d|≥0.4) - ALERTA: Deterioração significativa";
+        }} else {{
+            hattieStatus = isPositive ? 
+                "⚠️ Abaixo do benchmark (d<0.4) - Melhoria limitada" : 
+                "ℹ️ Abaixo do benchmark (|d|<0.4) - Deterioração limitada";
+        }}
+        
+        // Vocabulário com direção
+        if (absD >= 0.35) {{
+            vocabStatus = isPositive ? 
+                "✅ Significativo para vocabulário (d≥0.35) - Ganho relevante" : 
+                "🚨 Significativo para vocabulário (|d|≥0.35) - ALERTA: Perda relevante";
+        }} else {{
+            vocabStatus = isPositive ? 
+                "⚠️ Abaixo do threshold (d<0.35) - Ganho limitado" : 
+                "ℹ️ Abaixo do threshold (|d|<0.35) - Perda limitado";
+        }}
+        
+        return {{ magnitude, hattieStatus, vocabStatus, isPositive }};
+    }}
+    
+    function criarGrupoItem(indicadores, nomeGrupo) {{
+        const d = indicadores.cohen_d;
+        const interp = interpretarCohenD(d);
+        
+        return `
+            <div class="grupo-item">
+                <div class="grupo-titulo">${{nomeGrupo}} (N=${{indicadores.n}})</div>
+                <div class="grupo-detalhes">
+                    <span>Média Pré: ${{indicadores.mean_pre.toFixed(2)}}</span>
+                    <span>Média Pós: ${{indicadores.mean_pos.toFixed(2)}}</span>
+                    <span>Delta: ${{indicadores.mean_delta >= 0 ? '+' : ''}}${{indicadores.mean_delta.toFixed(2)}}</span>
+                    <span>Cohen's d: ${{d.toFixed(3)}}</span>
+                    <span>% Melhoraram: ${{indicadores.perc_improved.toFixed(1)}}%</span>
+                </div>
+                <div class="interpretacao-grupo">
+                    <p><strong>Magnitude:</strong> ${{interp.magnitude}} (Cohen, 1988)</p>
+                    <p><strong>Benchmark Educacional:</strong> ${{interp.hattieStatus}} (Hattie, 2009)</p>
+                    <p><strong>Vocabulário:</strong> ${{interp.vocabStatus}} (Marulis & Neuman, 2010)</p>
+                </div>
+            </div>
+        `;
+    }}
+    
+    container.innerHTML = 
+        criarGrupoItem(dados.indicadores_6ano, "6º ano") + 
+        criarGrupoItem(dados.indicadores_7ano, "7º ano") +
+        criarGrupoItem(dados.indicadores_8ano, "8º ano") + 
+        criarGrupoItem(dados.indicadores_9ano, "9º ano");
+}}
+
+function atualizarGraficos(graficos) {{
+    if (!graficos) return;
+    
+    // Atualizar cada gráfico se existir
+    const atualizarImg = (id, src) => {{
+        const img = document.querySelector(`#${{id}} img`);
+        if (img && src) {{
+            img.src = src;
+        }}
+    }};
+    
+    atualizarImg('grafico-grupos', graficos.grupos_barras);
+    atualizarImg('grafico-palavras', graficos.palavras_top);
+    atualizarImg('grafico-intergrupos', graficos.comparacao_intergrupos);
+    atualizarImg('grafico-ensinadas', graficos.ensinadas_vs_nao);
+    atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
+    atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
+}}
+
+// Inicializar quando a página carregar
+window.onload = inicializar;
+</script>
+</html>
+"""
+    return html
 
 # ======================
 # Função Principal
