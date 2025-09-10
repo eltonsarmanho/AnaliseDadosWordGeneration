@@ -1,6 +1,6 @@
 {
-  "data_processamento": "2025-09-10T11:30:13.629655",
-  "total_estudantes": 6381,
+  "data_processamento": "2025-09-10T12:20:18.896205",
+  "total_estudantes": 6378,
   "fases_analisadas": [
     2,
     3,
@@ -50,15 +50,15 @@
       ]
     },
     "fase_4": {
-      "num_estudantes": 1849,
-      "num_escolas": 8,
-      "num_turmas": 64,
-      "score_pre_medio": 28.7479718766901,
-      "score_pos_medio": 23.012439156300704,
-      "delta_medio": -5.7355327203894,
-      "taxa_melhoria": 36.18171984856679,
+      "num_estudantes": 1846,
+      "num_escolas": 7,
+      "num_turmas": 62,
+      "score_pre_medio": 28.734019501625134,
+      "score_pos_medio": 23.049837486457204,
+      "delta_medio": -5.684182015167931,
+      "taxa_melhoria": 36.24052004333694,
       "distribuicao_sexo": {
-        "F": 970,
+        "F": 967,
         "M": 879
       },
       "escolas": [
@@ -68,27 +68,26 @@
         "EMEB Prof. Ricardo Vieira de Lima",
         "EMEB Profa. Maria Queiroz Ferro",
         "EMEB Ver. Expedito Porfírio",
-        "EMEF Padre José dos Santos Mousinho",
-        "Gabriel Brito"
+        "EMEF Padre José dos Santos Mousinho"
       ]
     }
   },
   "perfil_demografico": {
     "distribuicao_sexo": {
-      "F": 3192,
-      "M": 3189
+      "M": 3189,
+      "F": 3189
     },
-    "idade_media": 9.55665256229431,
-    "escolas_unicas": 12,
-    "turmas_unicas": 194
+    "idade_media": 9.561147695202258,
+    "escolas_unicas": 11,
+    "turmas_unicas": 192
   },
   "performance_geral": {
-    "score_pre_medio": 26.513712584234447,
-    "score_pos_medio": 22.456198088073968,
-    "delta_medio": -4.0575144961604765,
-    "taxa_melhoria": 27.926657263751764,
-    "taxa_manutencao": 35.79376273311393,
-    "taxa_piora": 36.279580003134306
+    "score_pre_medio": 26.50862339291314,
+    "score_pos_medio": 22.466760740043902,
+    "delta_medio": -4.041862652869238,
+    "taxa_melhoria": 27.93979303857008,
+    "taxa_manutencao": 35.81059893383506,
+    "taxa_piora": 36.24960802759486
   },
   "analise_por_escola": {
     "EMEB EXPEDITO PORFÍRIO DOS SANTOS": {
@@ -208,16 +207,6 @@
       "taxa_melhoria": 29.411764705882355,
       "score_pre_medio": 12.867647058823529,
       "score_pos_medio": 12.323529411764707
-    },
-    "Gabriel Brito": {
-      "total_estudantes": 3,
-      "fases_participantes": [
-        4
-      ],
-      "delta_medio": -37.333333333333336,
-      "taxa_melhoria": 0.0,
-      "score_pre_medio": 37.333333333333336,
-      "score_pos_medio": 0.0
     }
   }
 }

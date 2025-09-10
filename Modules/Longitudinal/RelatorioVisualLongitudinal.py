@@ -38,7 +38,7 @@ FIG_DIR = LONGITUDINAL_DIR / "figures"
 
 # Arquivos de dados longitudinais
 CSV_LONGITUDINAL_TDE = LONGITUDINAL_DIR / "dados_longitudinais_TDE.csv"
-CSV_LONGITUDINAL_VOCAB = LONGITUDINAL_DIR / "dados_longitudinais_Vocabulario.json"
+CSV_LONGITUDINAL_VOCAB = LONGITUDINAL_DIR / "dados_longitudinais_Vocabulario.csv"
 JSON_RESUMO_TDE = LONGITUDINAL_DIR / "resumo_longitudinal_TDE.json"
 JSON_RESUMO_VOCAB = LONGITUDINAL_DIR / "resumo_longitudinal_Vocabulario.json"
 
@@ -79,6 +79,7 @@ def carregar_dados_longitudinais():
     """Carrega dados longitudinais consolidados"""
     try:
         df_tde = pd.read_csv(CSV_LONGITUDINAL_TDE) if CSV_LONGITUDINAL_TDE.exists() else pd.DataFrame()
+        df_vocab = pd.read_csv(CSV_LONGITUDINAL_VOCAB) if CSV_LONGITUDINAL_VOCAB.exists() else pd.DataFrame()
         
         with open(JSON_RESUMO_TDE, 'r', encoding='utf-8') as f:
             resumo_tde = json.load(f) if JSON_RESUMO_TDE.exists() else {}
@@ -86,12 +87,12 @@ def carregar_dados_longitudinais():
         with open(JSON_RESUMO_VOCAB, 'r', encoding='utf-8') as f:
             resumo_vocab = json.load(f) if JSON_RESUMO_VOCAB.exists() else {}
             
-        print(f"✅ Dados carregados: {len(df_tde)} registros TDE")
-        return df_tde, resumo_tde, resumo_vocab
+        print(f"✅ Dados carregados: {len(df_tde)} registros TDE, {len(df_vocab)} registros Vocabulário")
+        return df_tde, df_vocab, resumo_tde, resumo_vocab
         
     except Exception as e:
         print(f"❌ Erro ao carregar dados: {e}")
-        return pd.DataFrame(), {}, {}
+        return pd.DataFrame(), pd.DataFrame(), {}, {}
 
 def interpretar_cohen_d(d):
     """Interpreta o Cohen's d conforme benchmarks educacionais"""
@@ -455,7 +456,7 @@ def criar_heatmap_escolas(df_tde):
     plt.tight_layout()
     return fig
 
-def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
+def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
     """Gera o relatório HTML longitudinal"""
     
     # Criar todas as visualizações
@@ -628,6 +629,87 @@ def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
             <div class="content">
                 <div class="section">
                     <h2>📈 Resumo Executivo</h2>
+                    
+                    <h3>📊 Número de Alunos por Fase</h3>
+                    <div class="stats-table">
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                            <thead style="background-color: #f0f0f0;">
+                                <tr>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Fase</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">TDE</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Vocabulário</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Total Agregado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 2</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_estudantes', 0) + resumo_vocab.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_estudantes', 0):,}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 3</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_estudantes', 0) + resumo_vocab.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_estudantes', 0):,}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 4</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_estudantes', 0) + resumo_vocab.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_estudantes', 0):,}</td>
+                                </tr>
+                                <tr style="background-color: #e8f4fd; font-weight: bold;">
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">TOTAL GERAL</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('total_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('total_estudantes', 0):,}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('total_estudantes', 0) + resumo_vocab.get('total_estudantes', 0):,}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h3>🏫 Número de Escolas por Fase</h3>
+                    <div class="stats-table">
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                            <thead style="background-color: #f0f0f0;">
+                                <tr>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Fase</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">TDE</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Vocabulário</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Total Agregado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 2</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{max(resumo_tde.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_escolas', 0), resumo_vocab.get('estatisticas_por_fase', {}).get('fase_2', {}).get('num_escolas', 0))}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 3</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{max(resumo_tde.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_escolas', 0), resumo_vocab.get('estatisticas_por_fase', {}).get('fase_3', {}).get('num_escolas', 0))}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">Fase 4</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_escolas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">{max(resumo_tde.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_escolas', 0), resumo_vocab.get('estatisticas_por_fase', {}).get('fase_4', {}).get('num_escolas', 0))}</td>
+                                </tr>
+                                <tr style="background-color: #e8f4fd; font-weight: bold;">
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">TOTAL GERAL</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{resumo_vocab.get('perfil_demografico', {}).get('escolas_unicas', 0)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{max(resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0), resumo_vocab.get('perfil_demografico', {}).get('escolas_unicas', 0))}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-number">{resumo_tde.get('total_estudantes', 0)}</div>
@@ -638,7 +720,7 @@ def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
                             <div class="stat-label">Estudantes Vocabulário</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-number">{resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0)}</div>
+                            <div class="stat-number">{max(resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0), resumo_vocab.get('perfil_demografico', {}).get('escolas_unicas', 0))}</div>
                             <div class="stat-label">Escolas Participantes</div>
                         </div>
                         <div class="stat-card">
@@ -771,7 +853,7 @@ def main():
     
     # Carregar dados
     print("📂 Carregando dados longitudinais...")
-    df_tde, resumo_tde, resumo_vocab = carregar_dados_longitudinais()
+    df_tde, df_vocab, resumo_tde, resumo_vocab = carregar_dados_longitudinais()
     
     if df_tde.empty:
         print("❌ Nenhum dado TDE encontrado. Execute primeiro os pipelines de dados.")
@@ -782,7 +864,7 @@ def main():
     
     # Gerar relatório HTML
     print("🎨 Gerando relatório HTML...")
-    html_content = gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab)
+    html_content = gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab)
     
     # Salvar relatório
     with open(OUTPUT_HTML, 'w', encoding='utf-8') as f:
