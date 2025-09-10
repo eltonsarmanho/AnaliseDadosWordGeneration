@@ -10,7 +10,7 @@ import json
 # Configurar caminhos
 current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 data_dir = str(current_dir) + '/Data'
-fase2_dir = os.path.join(data_dir, 'Fase2')
+fase2_dir = os.path.join(data_dir, 'Fase 2')
 pre_dir = os.path.join(fase2_dir, 'Pre')
 pos_dir = os.path.join(fase2_dir, 'Pos')
 output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_vocabulario_wordgen.csv')
