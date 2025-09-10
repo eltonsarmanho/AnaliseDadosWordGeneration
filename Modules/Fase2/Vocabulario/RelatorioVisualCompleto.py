@@ -27,6 +27,7 @@ ARQUIVO_PRE = DATA_DIR / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompl
 ARQUIVO_POS = DATA_DIR / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv"
 ARQUIVO_RESPOSTAS = DATA_DIR / "RespostaVocabulario.json"
 OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase2.html"
+ARQUIVO_PALAVRAS_ENSINADAS = DATA_DIR / "Fase2/PalavrasEnsinadasVocabulario.json"
 
 # Figuras
 FIG_GRUPOS_BARRAS = FIG_DIR / "fase2_grupos_barras.png"
@@ -34,6 +35,7 @@ FIG_PALAVRAS_TOP = FIG_DIR / "fase2_palavras_top.png"
 FIG_INTERGRUPOS = FIG_DIR / "fase2_comparacao_intergrupos.png"
 FIG_HEATMAP_ERROS_POS = FIG_DIR / "fase2_heatmap_erros_pos.png"
 FIG_HEATMAP_ERROS_PRE = FIG_DIR / "fase2_heatmap_erros_pre.png"
+FIG_ENSINADAS_VS_NAO = FIG_DIR / "fase2_ensinadas_vs_nao.png"
 
 plt.rcParams.update({
     "figure.dpi": 120,
@@ -149,15 +151,27 @@ def classificar_grupo_etario(turma):
         return "Indefinido"
 
 def carregar_mapeamento_palavras():
-    """Carrega o mapeamento de questões para palavras"""
+    """Carrega o mapeamento de questões para palavras e classifica se foram ensinadas"""
     try:
+        # Carregar respostas das questões
         with open(ARQUIVO_RESPOSTAS, 'r', encoding='utf-8') as f:
             dados_respostas = json.load(f)
+        
+        # Carregar palavras ensinadas
+        with open(ARQUIVO_PALAVRAS_ENSINADAS, 'r', encoding='utf-8') as f:
+            dados_ensinadas = json.load(f)
+        
+        palavras_ensinadas = set(dados_ensinadas.get("Palavras Ensinadas", []))
         
         mapeamento = {}
         for item in dados_respostas:
             for questao, info in item.items():
-                mapeamento[questao] = info['Palavra Trabalhada']
+                palavra = info['Palavra Trabalhada']
+                foi_ensinada = palavra in palavras_ensinadas
+                mapeamento[questao] = {
+                    'palavra': palavra,
+                    'ensinada': foi_ensinada
+                }
         
         return mapeamento
     except Exception as e:
@@ -368,7 +382,9 @@ def analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras
     
     for col in colunas_q:
         if col in df_pre_grupo.columns and col in df_pos_grupo.columns:
-            palavra = mapeamento_palavras.get(col, f"Palavra_{col}")
+            info_palavra = mapeamento_palavras.get(col, {'palavra': f"Palavra_{col}", 'ensinada': False})
+            palavra = info_palavra['palavra']
+            foi_ensinada = info_palavra['ensinada']
             
             valores_pre = df_pre_grupo[col].dropna()
             valores_pos = df_pos_grupo[col].dropna()
@@ -392,6 +408,7 @@ def analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras
                 palavras_data.append({
                     'Questao': col,
                     'Palavra': palavra,
+                    'Ensinada': foi_ensinada,
                     'Taxa_Pre': taxa_pre,
                     'Taxa_Pos': taxa_pos,
                     'Melhora': melhora,
@@ -401,6 +418,38 @@ def analisar_palavras(df_pre_final, df_pos_final, colunas_q, mapeamento_palavras
     
     return pd.DataFrame(palavras_data)
 
+def analisar_palavras_por_categoria(palavras_df):
+    """Analisa performance separando palavras ensinadas das não ensinadas"""
+    
+    # Separar por categoria
+    ensinadas = palavras_df[palavras_df['Ensinada'] == True]
+    nao_ensinadas = palavras_df[palavras_df['Ensinada'] == False]
+    
+    resultados = {}
+    
+    for categoria, df_categoria in [('Ensinadas', ensinadas), ('Não Ensinadas', nao_ensinadas)]:
+        if len(df_categoria) > 0:
+            resultados[categoria] = {
+                'n_palavras': len(df_categoria),
+                'media_melhora': df_categoria['Melhora'].mean(),
+                'media_taxa_pre': df_categoria['Taxa_Pre'].mean(),
+                'media_taxa_pos': df_categoria['Taxa_Pos'].mean(),
+                'media_erro_pre': df_categoria['Perc_Erro_Pre'].mean(),
+                'media_erro_pos': df_categoria['Perc_Erro_Pos'].mean(),
+                'top_melhoras': df_categoria.nlargest(10, 'Melhora')[['Palavra', 'Melhora', 'Taxa_Pre', 'Taxa_Pos']].to_dict('records')
+            }
+        else:
+            resultados[categoria] = {
+                'n_palavras': 0,
+                'media_melhora': 0,
+                'media_taxa_pre': 0,
+                'media_taxa_pos': 0,
+                'media_erro_pre': 0,
+                'media_erro_pos': 0,
+                'top_melhoras': []
+            }
+    
+    return resultados
 # ======================
 # Funções de visualização
 # ======================
@@ -751,6 +800,86 @@ def plot_heatmap_erros_pre(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano,
     plt.tight_layout()
     return fig
 
+def plot_comparacao_ensinadas_vs_nao(palavras_df):
+    """Compara performance de palavras ensinadas vs não ensinadas"""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    
+    # Separar dados
+    ensinadas = palavras_df[palavras_df['Ensinada'] == True]
+    nao_ensinadas = palavras_df[palavras_df['Ensinada'] == False]
+    
+    # 1. Comparação de médias de melhora
+    ax = axes[0, 0]
+    categorias = ['Ensinadas', 'Não Ensinadas']
+    medias_melhora = [
+        ensinadas['Melhora'].mean() if len(ensinadas) > 0 else 0,
+        nao_ensinadas['Melhora'].mean() if len(nao_ensinadas) > 0 else 0
+    ]
+    
+    bars = ax.bar(categorias, medias_melhora, color=['#2ecc71', '#e74c3c'], alpha=0.8)
+    ax.set_ylabel('Melhora Média na Taxa de Acerto')
+    ax.set_title('Comparação de Melhora\n(Palavras Ensinadas vs Não Ensinadas)')
+    ax.grid(True, alpha=0.3)
+    
+    # Adicionar valores nas barras
+    for bar, valor in zip(bars, medias_melhora):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                f'{valor:.3f}', ha='center', va='bottom', fontweight='bold')
+    
+    # 2. Comparação de taxas de erro (pré-teste)
+    ax = axes[0, 1]
+    erros_pre = [
+        ensinadas['Perc_Erro_Pre'].mean() if len(ensinadas) > 0 else 0,
+        nao_ensinadas['Perc_Erro_Pre'].mean() if len(nao_ensinadas) > 0 else 0
+    ]
+    
+    bars = ax.bar(categorias, erros_pre, color=['#2ecc71', '#e74c3c'], alpha=0.8)
+    ax.set_ylabel('Taxa de Erro Média (Pré-teste)')
+    ax.set_title('Comparação de Erros no Pré-teste')
+    ax.grid(True, alpha=0.3)
+    
+    for bar, valor in zip(bars, erros_pre):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                f'{valor:.1%}', ha='center', va='bottom', fontweight='bold')
+    
+    # 3. Comparação de taxas de erro (pós-teste)
+    ax = axes[1, 0]
+    erros_pos = [
+        ensinadas['Perc_Erro_Pos'].mean() if len(ensinadas) > 0 else 0,
+        nao_ensinadas['Perc_Erro_Pos'].mean() if len(nao_ensinadas) > 0 else 0
+    ]
+    
+    bars = ax.bar(categorias, erros_pos, color=['#2ecc71', '#e74c3c'], alpha=0.8)
+    ax.set_ylabel('Taxa de Erro Média (Pós-teste)')
+    ax.set_title('Comparação de Erros no Pós-teste')
+    ax.grid(True, alpha=0.3)
+    
+    for bar, valor in zip(bars, erros_pos):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                f'{valor:.1%}', ha='center', va='bottom', fontweight='bold')
+    
+    # 4. Top 10 palavras com maior melhora (ensinadas)
+    ax = axes[1, 1]
+    if len(ensinadas) > 0:
+        top_ensinadas = ensinadas.nlargest(10, 'Melhora')
+        y_pos = np.arange(len(top_ensinadas))
+        
+        bars = ax.barh(y_pos, top_ensinadas['Melhora'], color='#2ecc71', alpha=0.7)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels([p[:12] + '...' if len(p) > 12 else p for p in top_ensinadas['Palavra']])
+        ax.set_xlabel('Melhora na Taxa de Acerto')
+        ax.set_title('Top 10 Palavras Ensinadas\ncom Maior Melhora')
+        ax.grid(True, alpha=0.3)
+    else:
+        ax.text(0.5, 0.5, 'Nenhuma palavra ensinada\nencontrada', ha='center', va='center', transform=ax.transAxes)
+        ax.set_title('Top 10 Palavras Ensinadas')
+    
+    plt.tight_layout()
+    return fig
+
 # ======================
 # Função de formatação de cards
 # ======================
@@ -852,6 +981,16 @@ def gerar_graficos_escola(escola_filtro=None):
     graficos_b64['heatmap_erros_pre'] = f"data:image/png;base64,{img_b64}"
     plt.close(fig6)
     buffer6.close()
+    
+    # Gráfico 7: Comparação de palavras ensinadas vs não ensinadas
+    fig7 = plot_comparacao_ensinadas_vs_nao(palavras_df_todos)
+    buffer7 = io.BytesIO()
+    fig7.savefig(buffer7, format='png', dpi=150, bbox_inches='tight')
+    buffer7.seek(0)
+    img_b64 = base64.b64encode(buffer7.getvalue()).decode('utf-8')
+    graficos_b64['comparacao_ensinadas_vs_nao'] = f"data:image/png;base64,{img_b64}"
+    plt.close(fig7)
+    buffer7.close()
     
     return graficos_b64
 
@@ -963,7 +1102,6 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
     .header .timestamp {{
         font-size: 12px; opacity: 0.85; margin-top: 4px;
     }}
-    
     .menu-container {{
         background: #fff; margin: 18px auto; max-width: 1200px; border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
     }}
@@ -1014,11 +1152,9 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
     @media (max-width: 768px) {{ .figs-heatmap {{ grid-template-columns: 1fr; }} }}
 
     .foot-note {{ font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }}
-    
-    .top-palavras {{ margin-top: 15px; }}
-    .palavra-item {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }}
-    .palavra-nome {{ font-weight: 500; }}
-    .palavra-melhora {{ color: var(--purple1); font-weight: 600; }}
+
+    .badge {{ display:inline-block; padding:2px 6px; border-radius:999px; font-size:11px; line-height:1.4; }}
+    .badge.warn {{ background:#fff3cd; color:#7a6200; border:1px solid #ffe69c; }}
 </style>
 </head>
 <body>
@@ -1052,6 +1188,14 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
             <div class="fig" id="grafico-intergrupos">
                 <img src="{figuras_b64.get('comparacao_intergrupos', '')}" alt="Comparação Intergrupos" />
                 <div class="caption">Comparação detalhada entre grupos etários (Densidade separada por grupo + Distribuição de resultados embaixo).</div>
+            </div>
+        </div>
+
+        <h2 class="section">Análise de Palavras Ensinadas vs. Não Ensinadas</h2>
+        <div class="figs">
+            <div class="fig" id="grafico-ensinadas-nao-ensinadas">
+                <img src="{figuras_b64.get('comparacao_ensinadas_vs_nao', '')}" alt="Comparação Ensinadas vs Não Ensinadas" />
+                <div class="caption">Comparativo de performance entre palavras que foram explicitamente ensinadas e as que não foram.</div>
             </div>
         </div>
 
@@ -1247,6 +1391,7 @@ function atualizarGraficos(graficos) {{
     atualizarImg('grafico-intergrupos', graficos.comparacao_intergrupos);
     atualizarImg('grafico-heatmap-pre', graficos.heatmap_erros_pre);
     atualizarImg('grafico-heatmap-pos', graficos.heatmap_erros_pos);
+    atualizarImg('grafico-ensinadas-nao-ensinadas', graficos.comparacao_ensinadas_vs_nao);
 }}
 
 // Inicializar quando a página carregar
@@ -1271,8 +1416,8 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
     
     # Calcular pontuação máxima possível (50 questões × 2 pontos cada)
     max_score = 50 * 2  # 100 pontos máximos
-    mean_pre_percent = (indicadores_geral.get('mean_pre', 0) / max_score) * 100
-    mean_pos_percent = (indicadores_geral.get('mean_pos', 0) / max_score) * 100
+    mean_pre_percent = (indicadores_geral.get('mean_pre', 0) / max_score) *  100
+    mean_pos_percent = (indicadores_geral.get('mean_pos', 0) / max_score) *  100
     
     # Cards seguindo o padrão da Fase 3
     cards_html = "".join([
@@ -1351,6 +1496,20 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
     .header .timestamp {{
         font-size: 12px; opacity: 0.85; margin-top: 4px;
     }}
+    .menu-container {{
+        background: #fff; margin: 18px auto; max-width: 1200px; border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    }}
+    .menu-title {{
+        font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--purple1);
+    }}
+    .escola-select {{
+        width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; background: #fff; cursor: pointer;
+        transition: border-color 0.3s ease;
+    }}
+    .escola-select:focus {{
+        outline: none; border-color: var(--purple1);
+    }}
+    
     .container {{
         max-width: 1200px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 22px; box-shadow: 0 10px 24px rgba(0,0,0,.06);
     }}
@@ -1421,13 +1580,21 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
             </div>
         </div>
 
+        <h2 class="section">Análise de Palavras Ensinadas vs. Não Ensinadas</h2>
+        <div class="figs">
+            <div class="fig" id="grafico-ensinadas-nao-ensinadas">
+                <img src="{figuras_b64.get('comparacao_ensinadas_vs_nao', '')}" alt="Comparação Ensinadas vs Não Ensinadas" />
+                <div class="caption">Comparativo de performance entre palavras que foram explicitamente ensinadas e as que não foram.</div>
+            </div>
+        </div>
+
         <h2 class="section">Percentual de Erros por Palavra e Grupo</h2>
         <div class="figs-heatmap">
-            <div class="fig">
+            <div class="fig" id="grafico-heatmap-pre">
                 <img src="{figuras_b64.get('heatmap_erros_pre', '')}" alt="Heatmap de Erros Pré-teste" />
                 <div class="caption">Percentual de erros no pré-teste (Top 20 palavras).</div>
             </div>
-            <div class="fig">
+            <div class="fig" id="grafico-heatmap-pos">
                 <img src="{figuras_b64.get('heatmap_erros_pos', '')}" alt="Heatmap de Erros Pós-teste" />
                 <div class="caption">Percentual de erros no pós-teste (Top 20 palavras).</div>
             </div>
@@ -1520,6 +1687,11 @@ def gerar_relatorio_completo(escola_filtro=None):
     fig6.savefig(FIG_HEATMAP_ERROS_PRE, dpi=150, bbox_inches='tight')
     plt.close(fig6)
     
+    # Figura 7: Comparação de palavras ensinadas vs não ensinadas
+    fig7 = plot_comparacao_ensinadas_vs_nao(palavras_df_todos)
+    fig7.savefig(FIG_ENSINADAS_VS_NAO, dpi=150, bbox_inches='tight')
+    plt.close(fig7)
+    
     # 6. Converter figuras para Base64
     print("7. Convertendo figuras para Base64...")
     figuras_b64 = {}
@@ -1529,7 +1701,8 @@ def gerar_relatorio_completo(escola_filtro=None):
         ('palavras_top', FIG_PALAVRAS_TOP),
         ('comparacao_intergrupos', FIG_INTERGRUPOS),
         ('heatmap_erros_pos', FIG_HEATMAP_ERROS_POS),
-        ('heatmap_erros_pre', FIG_HEATMAP_ERROS_PRE)
+        ('heatmap_erros_pre', FIG_HEATMAP_ERROS_PRE),
+        ('comparacao_ensinadas_vs_nao', FIG_ENSINADAS_VS_NAO)
     ]:
         if caminho.exists():
             with open(caminho, 'rb') as f:
