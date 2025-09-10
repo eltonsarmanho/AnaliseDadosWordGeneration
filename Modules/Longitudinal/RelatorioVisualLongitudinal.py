@@ -76,10 +76,28 @@ def img_to_base64(fig):
     return img_base64
 
 def carregar_dados_longitudinais():
-    """Carrega dados longitudinais consolidados"""
+    """Carrega dados longitudinais consolidados e remove duplicados"""
     try:
         df_tde = pd.read_csv(CSV_LONGITUDINAL_TDE) if CSV_LONGITUDINAL_TDE.exists() else pd.DataFrame()
         df_vocab = pd.read_csv(CSV_LONGITUDINAL_VOCAB) if CSV_LONGITUDINAL_VOCAB.exists() else pd.DataFrame()
+        
+        # Remover duplicados dos dados TDE
+        if not df_tde.empty:
+            tamanho_original_tde = len(df_tde)
+            df_tde = remover_duplicados_dataframe(df_tde, "TDE")
+            tamanho_limpo_tde = len(df_tde)
+            duplicados_removidos_tde = tamanho_original_tde - tamanho_limpo_tde
+        else:
+            duplicados_removidos_tde = 0
+        
+        # Remover duplicados dos dados Vocabulário
+        if not df_vocab.empty:
+            tamanho_original_vocab = len(df_vocab)
+            df_vocab = remover_duplicados_dataframe(df_vocab, "Vocabulário")
+            tamanho_limpo_vocab = len(df_vocab)
+            duplicados_removidos_vocab = tamanho_original_vocab - tamanho_limpo_vocab
+        else:
+            duplicados_removidos_vocab = 0
         
         with open(JSON_RESUMO_TDE, 'r', encoding='utf-8') as f:
             resumo_tde = json.load(f) if JSON_RESUMO_TDE.exists() else {}
@@ -88,11 +106,61 @@ def carregar_dados_longitudinais():
             resumo_vocab = json.load(f) if JSON_RESUMO_VOCAB.exists() else {}
             
         print(f"✅ Dados carregados: {len(df_tde)} registros TDE, {len(df_vocab)} registros Vocabulário")
+        if duplicados_removidos_tde > 0 or duplicados_removidos_vocab > 0:
+            print(f"🧹 Duplicados removidos: {duplicados_removidos_tde} TDE, {duplicados_removidos_vocab} Vocabulário")
+        
         return df_tde, df_vocab, resumo_tde, resumo_vocab
         
     except Exception as e:
         print(f"❌ Erro ao carregar dados: {e}")
         return pd.DataFrame(), pd.DataFrame(), {}, {}
+
+def remover_duplicados_dataframe(df: pd.DataFrame, tipo_dados: str) -> pd.DataFrame:
+    """
+    Remove duplicados baseado em Nome, Escola e Turma
+    Mantém o primeiro registro de cada grupo duplicado
+    """
+    print(f"🔍 Verificando duplicados em {tipo_dados}...")
+    
+    # Colunas para identificar duplicados
+    colunas_duplicados = ['Nome', 'Escola', 'Turma']
+    
+    # Verificar se as colunas existem
+    colunas_existentes = [col for col in colunas_duplicados if col in df.columns]
+    
+    if len(colunas_existentes) < 3:
+        print(f"⚠️  {tipo_dados}: Colunas necessárias não encontradas. Disponíveis: {list(df.columns)}")
+        return df
+    
+    # Identificar duplicados
+    duplicados_mask = df.duplicated(subset=colunas_duplicados, keep=False)
+    num_duplicados = duplicados_mask.sum()
+    
+    if num_duplicados > 0:
+        # Mostrar alguns exemplos de duplicados
+        duplicados_df = df[duplicados_mask]
+        grupos_duplicados = duplicados_df.groupby(colunas_duplicados).size()
+        num_grupos = len(grupos_duplicados)
+        
+        print(f"⚠️  {tipo_dados}: Encontrados {num_duplicados} registros duplicados em {num_grupos} grupos")
+        
+        # Mostrar primeiros 3 grupos como exemplo
+        print(f"📋 Exemplos de duplicados em {tipo_dados}:")
+        for i, (grupo_key, count) in enumerate(grupos_duplicados.head(3).items()):
+            nome, escola, turma = grupo_key
+            print(f"   {i+1}. {nome} | {escola} | {turma} ({count} ocorrências)")
+        
+        # Remover duplicados mantendo o primeiro registro de cada grupo
+        df_limpo = df.drop_duplicates(subset=colunas_duplicados, keep='first')
+        
+        registros_removidos = len(df) - len(df_limpo)
+        print(f"🧹 {tipo_dados}: Removidos {registros_removidos} registros duplicados")
+        
+        return df_limpo
+    
+    else:
+        print(f"✅ {tipo_dados}: Nenhum duplicado encontrado")
+        return df
 
 def interpretar_cohen_d(d):
     """Interpreta o Cohen's d conforme benchmarks educacionais"""
@@ -481,6 +549,9 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
     stats_gerais_tde = resumo_tde.get('performance_geral', {})
     stats_gerais_vocab = resumo_vocab.get('performance_geral', {})
     
+    # Verificar se houve remoção de duplicados (comparando com arquivos originais)
+    info_duplicados = verificar_remocao_duplicados()
+    
     # Template HTML
     html_content = f"""
     <!DOCTYPE html>
@@ -598,6 +669,13 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
                 margin: 20px 0;
                 border-radius: 4px;
             }}
+            .clean-box {{
+                background: #e1f5fe;
+                border-left: 4px solid #00bcd4;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }}
             .footer {{
                 background: #f8f9fa;
                 padding: 20px;
@@ -626,9 +704,15 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
                 <p>Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}</p>
             </div>
             
-            <div class="content">
+            <div class="content">"""
+    
+    # Seção de qualidade dos dados removida conforme solicitado
+    # if info_duplicados['duplicados_removidos'] > 0:
+     
+    
+    html_content += f"""
                 <div class="section">
-                    <h2>📈 Resumo Executivo</h2>
+                    <h2Resumo Executivo</h2>
                     
                     <h3>📊 Número de Alunos por Fase</h3>
                     <div class="stats-table">
@@ -712,12 +796,12 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
                     
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-number">{resumo_tde.get('total_estudantes', 0)}</div>
-                            <div class="stat-label">Estudantes TDE</div>
+                            <div class="stat-number">{len(df_tde)}</div>
+                            <div class="stat-label">Estudantes TDE (Únicos)</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-number">{resumo_vocab.get('total_estudantes', 0)}</div>
-                            <div class="stat-label">Estudantes Vocabulário</div>
+                            <div class="stat-number">{len(df_vocab)}</div>
+                            <div class="stat-label">Estudantes Vocabulário (Únicos)</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-number">{max(resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0), resumo_vocab.get('perfil_demografico', {}).get('escolas_unicas', 0))}</div>
@@ -837,7 +921,7 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
             <div class="footer">
                 <p><strong>WordGen - Sistema de Análise Longitudinal</strong></p>
                 <p>Relatório gerado automaticamente • Dados das Fases 2, 3 e 4</p>
-                <p><em>Foco em melhorias e acertos dos estudantes</em></p>
+                <p><em>Foco em melhorias e acertos dos estudantes • Dados limpos e validados</em></p>
             </div>
         </div>
     </body>
@@ -845,6 +929,51 @@ def gerar_html_relatorio(df_tde, df_vocab, resumo_tde, resumo_vocab):
     """
     
     return html_content
+
+def verificar_remocao_duplicados():
+    """Verifica informações sobre remoção de duplicados"""
+    # Como esta é uma simulação, vamos calcular baseado nos arquivos atuais
+    try:
+        # Ler arquivos originais para comparar
+        df_tde_original = pd.read_csv(CSV_LONGITUDINAL_TDE) if CSV_LONGITUDINAL_TDE.exists() else pd.DataFrame()
+        df_vocab_original = pd.read_csv(CSV_LONGITUDINAL_VOCAB) if CSV_LONGITUDINAL_VOCAB.exists() else pd.DataFrame()
+        
+        # Calcular duplicados originais
+        duplicados_tde = 0
+        duplicados_vocab = 0
+        
+        if not df_tde_original.empty:
+            duplicados_tde = df_tde_original.duplicated(subset=['Nome', 'Escola', 'Turma']).sum()
+        
+        if not df_vocab_original.empty:
+            duplicados_vocab = df_vocab_original.duplicated(subset=['Nome', 'Escola', 'Turma']).sum()
+        
+        total_duplicados = duplicados_tde + duplicados_vocab
+        total_original = len(df_tde_original) + len(df_vocab_original)
+        
+        # Simular dados limpos (após remoção)
+        registros_limpos_tde = len(df_tde_original) - duplicados_tde if not df_tde_original.empty else 0
+        registros_limpos_vocab = len(df_vocab_original) - duplicados_vocab if not df_vocab_original.empty else 0
+        registros_finais = registros_limpos_tde + registros_limpos_vocab
+        
+        taxa_limpeza = ((total_original - total_duplicados) / total_original * 100) if total_original > 0 else 100
+        
+        return {
+            'duplicados_removidos': total_duplicados,
+            'duplicados_tde': duplicados_tde,
+            'duplicados_vocab': duplicados_vocab,
+            'registros_finais': registros_finais,
+            'taxa_limpeza': taxa_limpeza
+        }
+    
+    except Exception:
+        return {
+            'duplicados_removidos': 0,
+            'duplicados_tde': 0,
+            'duplicados_vocab': 0,
+            'registros_finais': 0,
+            'taxa_limpeza': 100
+        }
 
 def main():
     """Função principal para gerar o relatório longitudinal"""
