@@ -17,8 +17,8 @@ output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_vocabulario_wordgen.csv'
 mapping_file = os.path.join(data_dir, 'RespostaVocabulario.json')
 
 # Caminhos dos arquivos - CSV
-arquivo_pre = os.path.join(pre_dir, 'Avaliação de vocabulário - RelaçãoCompletaAlunos.csv')
-arquivo_pos = os.path.join(pos_dir, 'Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv')
+arquivo_pre = os.path.join(pre_dir, 'DadosVocabulario.csv')
+arquivo_pos = os.path.join(pos_dir, 'DadosVocabulario.csv')
 
 print("="*80)
 print("PIPELINE VOCABULÁRIO - WORDGEN FASE 2")

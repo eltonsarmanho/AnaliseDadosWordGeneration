@@ -17,8 +17,8 @@ output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.csv')
 mapping_file = os.path.join(data_dir, 'RespostaTED.json')
 
 # Caminhos dos arquivos TDE - CSV
-arquivo_pre = os.path.join(pre_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
-arquivo_pos = os.path.join(pos_dir, 'Avaliação TDE II - RelaçãoCompletaAlunos.csv')
+arquivo_pre = os.path.join(pre_dir, 'DadosTDE.csv')
+arquivo_pos = os.path.join(pos_dir, 'DadosTDE.csv')
 
 print("="*80)
 print("PIPELINE TDE - WORDGEN FASE 2")

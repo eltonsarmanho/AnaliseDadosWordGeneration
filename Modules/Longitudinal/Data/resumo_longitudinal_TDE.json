@@ -1,0 +1,223 @@
+{
+  "data_processamento": "2025-09-10T11:30:13.629655",
+  "total_estudantes": 6381,
+  "fases_analisadas": [
+    2,
+    3,
+    4
+  ],
+  "estatisticas_por_fase": {
+    "fase_2": {
+      "num_estudantes": 2411,
+      "num_escolas": 6,
+      "num_turmas": 81,
+      "score_pre_medio": 23.67689755288262,
+      "score_pos_medio": 20.6627955205309,
+      "delta_medio": -3.014102032351721,
+      "taxa_melhoria": 28.86768975528826,
+      "distribuicao_sexo": {
+        "M": 1241,
+        "F": 1170
+      },
+      "escolas": [
+        "EMEB EXPEDITO PORFÍRIO DOS SANTOS",
+        "EMEB NATANAEL DA SILVA",
+        "EMEB PADRE ANCHIETA",
+        "EMEB PROFESSOR RICARDO VIEIRA DE LIMA",
+        "EMEB PROFESSORA MARIA QUEIROZ FERRO",
+        "EMEF PADRE JOSÉ DOS SANTOS MOUSINHO"
+      ]
+    },
+    "fase_3": {
+      "num_estudantes": 2121,
+      "num_escolas": 6,
+      "num_turmas": 74,
+      "score_pre_medio": 27.79066478076379,
+      "score_pos_medio": 24.00990099009901,
+      "delta_medio": -3.7807637906647806,
+      "taxa_melhoria": 19.660537482319658,
+      "distribuicao_sexo": {
+        "M": 1069,
+        "F": 1052
+      },
+      "escolas": [
+        "EMEB EXPEDITO PORFÍRIO DOS SANTOS",
+        "EMEB NATANAEL DA SILVA",
+        "EMEB PADRE ANCHIETA",
+        "EMEB PROFESSOR RICARDO VIEIRA DE LIMA",
+        "EMEB PROFESSORA MARIA QUEIROZ FERRO",
+        "EMEF PADRE JOSÉ DOS SANTOS MOUSINHO"
+      ]
+    },
+    "fase_4": {
+      "num_estudantes": 1849,
+      "num_escolas": 8,
+      "num_turmas": 64,
+      "score_pre_medio": 28.7479718766901,
+      "score_pos_medio": 23.012439156300704,
+      "delta_medio": -5.7355327203894,
+      "taxa_melhoria": 36.18171984856679,
+      "distribuicao_sexo": {
+        "F": 970,
+        "M": 879
+      },
+      "escolas": [
+        "EMEB EXPEDITO PORFÍRIO DOS SANTOS",
+        "EMEB PROFESSOR RICARDO VIEIRA DE LIMA",
+        "EMEB Padre anchieta",
+        "EMEB Prof. Ricardo Vieira de Lima",
+        "EMEB Profa. Maria Queiroz Ferro",
+        "EMEB Ver. Expedito Porfírio",
+        "EMEF Padre José dos Santos Mousinho",
+        "Gabriel Brito"
+      ]
+    }
+  },
+  "perfil_demografico": {
+    "distribuicao_sexo": {
+      "F": 3192,
+      "M": 3189
+    },
+    "idade_media": 9.55665256229431,
+    "escolas_unicas": 12,
+    "turmas_unicas": 194
+  },
+  "performance_geral": {
+    "score_pre_medio": 26.513712584234447,
+    "score_pos_medio": 22.456198088073968,
+    "delta_medio": -4.0575144961604765,
+    "taxa_melhoria": 27.926657263751764,
+    "taxa_manutencao": 35.79376273311393,
+    "taxa_piora": 36.279580003134306
+  },
+  "analise_por_escola": {
+    "EMEB EXPEDITO PORFÍRIO DOS SANTOS": {
+      "total_estudantes": 417,
+      "fases_participantes": [
+        2,
+        3,
+        4
+      ],
+      "delta_medio": -5.215827338129497,
+      "taxa_melhoria": 16.06714628297362,
+      "score_pre_medio": 17.290167865707435,
+      "score_pos_medio": 12.074340527577938
+    },
+    "EMEB NATANAEL DA SILVA": {
+      "total_estudantes": 362,
+      "fases_participantes": [
+        2,
+        3
+      ],
+      "delta_medio": -2.2320441988950277,
+      "taxa_melhoria": 13.259668508287293,
+      "score_pre_medio": 24.392265193370164,
+      "score_pos_medio": 22.16022099447514
+    },
+    "EMEB PADRE ANCHIETA": {
+      "total_estudantes": 678,
+      "fases_participantes": [
+        2,
+        3
+      ],
+      "delta_medio": -15.187315634218288,
+      "taxa_melhoria": 16.96165191740413,
+      "score_pre_medio": 26.36873156342183,
+      "score_pos_medio": 11.18141592920354
+    },
+    "EMEB PROFESSOR RICARDO VIEIRA DE LIMA": {
+      "total_estudantes": 1994,
+      "fases_participantes": [
+        2,
+        3,
+        4
+      ],
+      "delta_medio": 0.45035105315947843,
+      "taxa_melhoria": 42.226680040120364,
+      "score_pre_medio": 27.09578736208626,
+      "score_pos_medio": 27.546138415245736
+    },
+    "EMEB PROFESSORA MARIA QUEIROZ FERRO": {
+      "total_estudantes": 886,
+      "fases_participantes": [
+        2,
+        3
+      ],
+      "delta_medio": -3.608352144469526,
+      "taxa_melhoria": 11.62528216704289,
+      "score_pre_medio": 23.426636568848757,
+      "score_pos_medio": 19.818284424379232
+    },
+    "EMEF PADRE JOSÉ DOS SANTOS MOUSINHO": {
+      "total_estudantes": 661,
+      "fases_participantes": [
+        2,
+        3
+      ],
+      "delta_medio": -0.03328290468986384,
+      "taxa_melhoria": 19.51588502269289,
+      "score_pre_medio": 30.4357034795764,
+      "score_pos_medio": 30.402420574886534
+    },
+    "EMEB Profa. Maria Queiroz Ferro": {
+      "total_estudantes": 450,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": -1.8355555555555556,
+      "taxa_melhoria": 40.0,
+      "score_pre_medio": 26.92222222222222,
+      "score_pos_medio": 25.086666666666666
+    },
+    "EMEB Padre anchieta": {
+      "total_estudantes": 333,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": -26.855855855855857,
+      "taxa_melhoria": 8.708708708708707,
+      "score_pre_medio": 32.05705705705706,
+      "score_pos_medio": 5.201201201201201
+    },
+    "EMEB Prof. Ricardo Vieira de Lima": {
+      "total_estudantes": 366,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": -7.14207650273224,
+      "taxa_melhoria": 37.43169398907104,
+      "score_pre_medio": 33.98360655737705,
+      "score_pos_medio": 26.84153005464481
+    },
+    "EMEF Padre José dos Santos Mousinho": {
+      "total_estudantes": 163,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": 13.754601226993865,
+      "taxa_melhoria": 68.71165644171779,
+      "score_pre_medio": 25.447852760736197,
+      "score_pos_medio": 39.20245398773006
+    },
+    "EMEB Ver. Expedito Porfírio": {
+      "total_estudantes": 68,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": -0.5441176470588235,
+      "taxa_melhoria": 29.411764705882355,
+      "score_pre_medio": 12.867647058823529,
+      "score_pos_medio": 12.323529411764707
+    },
+    "Gabriel Brito": {
+      "total_estudantes": 3,
+      "fases_participantes": [
+        4
+      ],
+      "delta_medio": -37.333333333333336,
+      "taxa_melhoria": 0.0,
+      "score_pre_medio": 37.333333333333336,
+      "score_pos_medio": 0.0
+    }
+  }
+}
