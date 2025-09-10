@@ -130,9 +130,9 @@ def interpretar_cohen_d(d):
 # ======================
 
 def criar_grafico_demografico(resumo_tde, resumo_vocab):
-    """Cria gráfico demográfico longitudinal"""
+    """Cria gráfico demográfico longitudinal geral"""
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    fig.suptitle('Perfil Demográfico Longitudinal - Fases 2, 3 e 4', fontsize=16, fontweight='bold')
+    fig.suptitle('Perfil Demográfico Geral - Fases 2, 3 e 4', fontsize=16, fontweight='bold')
     
     # Dados demográficos TDE
     if 'perfil_demografico' in resumo_tde:
@@ -179,6 +179,80 @@ def criar_grafico_demografico(resumo_tde, resumo_vocab):
             # Adicionar valores nas barras
             for i, v in enumerate(valores):
                 axes[1,1].text(i, v + 0.5, str(v), ha='center', va='bottom', fontweight='bold')
+    
+    plt.tight_layout()
+    return fig
+
+def criar_grafico_demografico_por_fase(df_tde, resumo_tde, resumo_vocab):
+    """Cria gráficos demográficos individuais por fase"""
+    fases = [2, 3, 4]
+    fig, axes = plt.subplots(len(fases), 4, figsize=(20, 15))
+    fig.suptitle('Perfil Demográfico por Fase Individual', fontsize=16, fontweight='bold')
+    
+    if not df_tde.empty:
+        for i, fase in enumerate(fases):
+            # Filtrar dados da fase
+            df_fase = df_tde[df_tde['Fase'] == fase]
+            
+            if not df_fase.empty:
+                # Distribuição por sexo - TDE
+                sexo_counts = df_fase['Sexo'].value_counts()
+                if len(sexo_counts) > 0:
+                    axes[i, 0].pie(sexo_counts.values, labels=sexo_counts.index, autopct='%1.1f%%', 
+                                  colors=['#FF6B6B', '#4ECDC4'])
+                axes[i, 0].set_title(f'Sexo - TDE Fase {fase}', fontweight='bold')
+                
+                # Distribuição por escola - TDE
+                escola_counts = df_fase['Escola'].value_counts().head(10)  # Top 10 escolas
+                if len(escola_counts) > 0:
+                    # Encurtar nomes das escolas
+                    escolas_curtas = [nome.replace('EMEB ', '').replace('ESCOLA ', '')[:15] + '...' 
+                                     if len(nome) > 15 else nome.replace('EMEB ', '').replace('ESCOLA ', '') 
+                                     for nome in escola_counts.index]
+                    
+                    bars = axes[i, 1].bar(range(len(escola_counts)), escola_counts.values, 
+                                         color='#95E1D3', alpha=0.8)
+                    axes[i, 1].set_title(f'Top Escolas - TDE Fase {fase}', fontweight='bold')
+                    axes[i, 1].set_xticks(range(len(escola_counts)))
+                    axes[i, 1].set_xticklabels(escolas_curtas, rotation=45, ha='right')
+                    axes[i, 1].set_ylabel('Nº Estudantes')
+                    
+                    # Adicionar valores nas barras
+                    for bar, valor in zip(bars, escola_counts.values):
+                        height = bar.get_height()
+                        axes[i, 1].text(bar.get_x() + bar.get_width()/2., height + 5,
+                                        f'{valor}', ha='center', va='bottom', fontsize=9)
+                
+                # Distribuição de idades
+                if 'Idade' in df_fase.columns and df_fase['Idade'].notna().sum() > 0:
+                    idades_validas = df_fase['Idade'][df_fase['Idade'] > 0]
+                    if len(idades_validas) > 0:
+                        axes[i, 2].hist(idades_validas, bins=10, color='#F8C8DC', alpha=0.7, edgecolor='black')
+                        axes[i, 2].set_title(f'Distribuição Idades - Fase {fase}', fontweight='bold')
+                        axes[i, 2].set_xlabel('Idade')
+                        axes[i, 2].set_ylabel('Frequência')
+                        axes[i, 2].axvline(idades_validas.mean(), color='red', linestyle='--', 
+                                          label=f'Média: {idades_validas.mean():.1f}')
+                        axes[i, 2].legend()
+                
+                # Performance por sexo
+                if len(sexo_counts) > 1:
+                    performance_sexo = df_fase.groupby('Sexo')['Delta'].mean()
+                    bars = axes[i, 3].bar(performance_sexo.index, performance_sexo.values, 
+                                         color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+                    axes[i, 3].set_title(f'Delta Médio por Sexo - Fase {fase}', fontweight='bold')
+                    axes[i, 3].set_ylabel('Delta Médio')
+                    axes[i, 3].grid(True, alpha=0.3)
+                    
+                    # Adicionar valores nas barras
+                    for bar, valor in zip(bars, performance_sexo.values):
+                        height = bar.get_height()
+                        axes[i, 3].text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                                        f'{valor:.1f}', ha='center', va='bottom', fontweight='bold')
+            else:
+                # Se não há dados para a fase, ocultar os gráficos
+                for j in range(4):
+                    axes[i, j].set_visible(False)
     
     plt.tight_layout()
     return fig
@@ -246,7 +320,7 @@ def criar_grafico_evolucao_fases(df_tde, resumo_tde):
         
         # Boxplot dos deltas por fase
         fase_deltas = [df_tde[df_tde['Fase'] == f]['Delta'].values for f in sorted(df_tde['Fase'].unique())]
-        box_plot = axes[1,1].boxplot(fase_deltas, labels=[f'Fase {i}' for i in sorted(df_tde['Fase'].unique())], 
+        box_plot = axes[1,1].boxplot(fase_deltas, tick_labels=[f'Fase {i}' for i in sorted(df_tde['Fase'].unique())], 
                                    patch_artist=True)
         
         # Colorir boxplots
@@ -322,19 +396,27 @@ def criar_grafico_performance_escolas(df_tde, resumo_tde):
         axes[1,0].legend()
         axes[1,0].grid(True, alpha=0.3)
         
-        # Scatter plot: Delta vs Taxa de Melhoria
-        scatter = axes[1,1].scatter(deltas_medios, taxas_melhoria, 
-                                  s=100, alpha=0.6, c=range(len(escolas)), cmap='viridis')
-        axes[1,1].set_xlabel('Delta Médio')
-        axes[1,1].set_ylabel('Taxa de Melhoria (%)')
-        axes[1,1].set_title('Relação Delta vs Taxa de Melhoria', fontweight='bold')
-        axes[1,1].grid(True, alpha=0.3)
-        
-        # Adicionar linha de tendência
-        if len(deltas_medios) > 1:
-            z = np.polyfit(deltas_medios, taxas_melhoria, 1)
-            p = np.poly1d(z)
-            axes[1,1].plot(sorted(deltas_medios), p(sorted(deltas_medios)), "r--", alpha=0.8)
+        # Distribuição de estudantes por escola
+        if not df_tde.empty:
+            estudantes_por_escola = df_tde['Escola'].value_counts().head(10)
+            escolas_estudantes = [nome.replace('EMEB ', '').replace('ESCOLA ', '')[:20] + '...' 
+                                 if len(nome) > 20 else nome.replace('EMEB ', '').replace('ESCOLA ', '') 
+                                 for nome in estudantes_por_escola.index]
+            
+            bars3 = axes[1,1].bar(range(len(estudantes_por_escola)), estudantes_por_escola.values, 
+                                 color='#87CEEB', alpha=0.8)
+            axes[1,1].set_xlabel('Escolas')
+            axes[1,1].set_ylabel('Número de Estudantes')
+            axes[1,1].set_title('Distribuição de Estudantes por Escola', fontweight='bold')
+            axes[1,1].set_xticks(range(len(estudantes_por_escola)))
+            axes[1,1].set_xticklabels(escolas_estudantes, rotation=45, ha='right')
+            axes[1,1].grid(True, alpha=0.3)
+            
+            # Adicionar valores nas barras
+            for bar, valor in zip(bars3, estudantes_por_escola.values):
+                height = bar.get_height()
+                axes[1,1].text(bar.get_x() + bar.get_width()/2., height + 10,
+                              f'{valor}', ha='center', va='bottom', fontweight='bold')
     
     plt.tight_layout()
     return fig
@@ -381,6 +463,9 @@ def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
     
     fig_demografico = criar_grafico_demografico(resumo_tde, resumo_vocab)
     img_demografico = img_to_base64(fig_demografico)
+    
+    fig_demografico_fases = criar_grafico_demografico_por_fase(df_tde, resumo_tde, resumo_vocab)
+    img_demografico_fases = img_to_base64(fig_demografico_fases)
     
     fig_evolucao = criar_grafico_evolucao_fases(df_tde, resumo_tde)
     img_evolucao = img_to_base64(fig_evolucao)
@@ -570,16 +655,31 @@ def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
                 </div>
                 
                 <div class="section">
-                    <h2>👥 Perfil Demográfico</h2>
+                    <h2>👥 Perfil Demográfico Geral</h2>
                     <div class="chart-container">
-                        <img src="data:image/png;base64,{img_demografico}" alt="Perfil Demográfico">
+                        <img src="data:image/png;base64,{img_demografico}" alt="Perfil Demográfico Geral">
                     </div>
                     
                     <div class="insight-box">
-                        <strong>💡 Insights Demográficos:</strong><br>
+                        <strong>💡 Insights Demográficos Gerais:</strong><br>
                         • <strong>Escolas participantes:</strong> {resumo_tde.get('perfil_demografico', {}).get('escolas_unicas', 0)} escolas no TDE<br>
                         • <strong>Distribuição de gênero:</strong> Análise equilibrada entre diferentes perfis<br>
                         • <strong>Abrangência:</strong> {resumo_tde.get('perfil_demografico', {}).get('turmas_unicas', 0)} turmas no total
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>📊 Perfil Demográfico por Fase</h2>
+                    <div class="chart-container">
+                        <img src="data:image/png;base64,{img_demografico_fases}" alt="Perfil Demográfico por Fase">
+                    </div>
+                    
+                    <div class="insight-box">
+                        <strong>🔍 Análise Detalhada por Fase:</strong><br>
+                        • <strong>Fase 2:</strong> Perfil demográfico da linha de base<br>
+                        • <strong>Fase 3:</strong> Evolução da participação e características<br>
+                        • <strong>Fase 4:</strong> Consolidação do perfil longitudinal<br>
+                        • <strong>Comparação:</strong> Identificação de padrões e mudanças ao longo do tempo
                     </div>
                 </div>
                 
@@ -649,24 +749,6 @@ def gerar_html_relatorio(df_tde, resumo_tde, resumo_vocab):
             """
     
     html_content += """
-                </div>
-                
-                <div class="section">
-                    <h2>🎯 Conclusões e Recomendações</h2>
-                    <div class="success-box">
-                        <strong>✅ Pontos Positivos:</strong><br>
-                        • Implementação bem-sucedida da análise longitudinal<br>
-                        • Acompanhamento sistemático da evolução dos estudantes<br>
-                        • Identificação de padrões de melhoria entre fases
-                    </div>
-                    
-                    <div class="insight-box">
-                        <strong>🔍 Recomendações:</strong><br>
-                        • Continuar monitoramento longitudinal para identificar tendências de longo prazo<br>
-                        • Investigar fatores que contribuem para melhorias significativas<br>
-                        • Implementar estratégias baseadas nas melhores práticas identificadas<br>
-                        • Manter foco nos acertos e progressos dos estudantes
-                    </div>
                 </div>
             </div>
             
