@@ -1192,7 +1192,7 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
 <body>
     <div class="header">
         <div class="title">Relatório Visual WordGen{titulo_escola}</div>
-        <div class="subtitle">{subtitulo_escola}Vocabulário – Fase 3 (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="subtitle">{subtitulo_escola}Vocabulário – Fase 3 (Grupos Etários: 6º, 7º, 8º, 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
 

@@ -1160,7 +1160,7 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
 <body>
     <div class="header">
         <div class="title">Relatório Visual WordGen - Fase 2</div>
-        <div class="subtitle">Vocabulário (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
+        <div class="subtitle">Vocabulário (Grupos Etários: 6º,7º, 8º, 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
 
