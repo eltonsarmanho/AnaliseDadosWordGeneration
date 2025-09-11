@@ -23,11 +23,11 @@ DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 
 # Dados da Fase 2 - Usando CSV
-ARQUIVO_PRE = DATA_DIR / "Fase2/Pre/Avaliação de vocabulário - RelaçãoCompletaAlunos.csv"
-ARQUIVO_POS = DATA_DIR / "Fase2/Pos/Avaliação de vocabulário - RelaçãoCompletaAlunos (São Sebastião, WordGen, fase 2 - 2023.2).csv"
+ARQUIVO_PRE = DATA_DIR / "Fase 2/Pre/DadosVocabulario.csv"
+ARQUIVO_POS = DATA_DIR / "Fase 2/Pos/DadosVocabulario.csv"
 ARQUIVO_RESPOSTAS = DATA_DIR / "RespostaVocabulario.json"
 OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase2.html"
-ARQUIVO_PALAVRAS_ENSINADAS = DATA_DIR / "Fase2/PalavrasEnsinadasVocabulario.json"
+ARQUIVO_PALAVRAS_ENSINADAS = DATA_DIR / "Fase 2/PalavrasEnsinadasVocabulario.json"
 
 # Figuras
 FIG_GRUPOS_BARRAS = FIG_DIR / "fase2_grupos_barras.png"
