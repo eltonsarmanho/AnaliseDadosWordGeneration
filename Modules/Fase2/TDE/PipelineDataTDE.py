@@ -74,6 +74,105 @@ def classificar_grupo_tde(turma):
     else:
         return "Indefinido"
 
+def completar_dados_faltantes(df, nome_dataset):
+    """
+    Completa dados faltantes de Escola e/ou Turma para um aluno usando o registro mais próximo
+    """
+    print(f"   Verificando dados incompletos em {nome_dataset}...")
+    registros_incompletos = 0
+    registros_completados = 0
+    
+    for idx, row in df.iterrows():
+        nome = str(row['Nome']).strip()
+        escola_faltante = pd.isna(row['Escola']) or str(row['Escola']).strip() == '' or str(row['Escola']).strip().lower() == 'nan'
+        turma_faltante = pd.isna(row['Turma']) or str(row['Turma']).strip() == '' or str(row['Turma']).strip().lower() == 'nan'
+        
+        if escola_faltante or turma_faltante:
+            registros_incompletos += 1
+            
+            # Buscar registros do mesmo aluno com dados completos
+            registros_mesmo_aluno = df[df['Nome'].str.strip() == nome]
+            
+            for _, reg_completo in registros_mesmo_aluno.iterrows():
+                if reg_completo.name == idx:
+                    continue
+                    
+                escola_completa = not (pd.isna(reg_completo['Escola']) or str(reg_completo['Escola']).strip() == '' or str(reg_completo['Escola']).strip().lower() == 'nan')
+                turma_completa = not (pd.isna(reg_completo['Turma']) or str(reg_completo['Turma']).strip() == '' or str(reg_completo['Turma']).strip().lower() == 'nan')
+                
+                if escola_faltante and escola_completa:
+                    df.at[idx, 'Escola'] = reg_completo['Escola']
+                    registros_completados += 1
+                    print(f"     Completado Escola para {nome}: {reg_completo['Escola']}")
+                
+                if turma_faltante and turma_completa:
+                    df.at[idx, 'Turma'] = reg_completo['Turma']
+                    registros_completados += 1
+                    print(f"     Completado Turma para {nome}: {reg_completo['Turma']}")
+                
+                # Se ambos foram completados, parar a busca
+                if not (escola_faltante and not escola_completa) and not (turma_faltante and not turma_completa):
+                    break
+    
+    print(f"   {registros_incompletos} registros com dados incompletos encontrados")
+    print(f"   {registros_completados} campos completados")
+    return df
+
+def remover_duplicados(df, nome_dataset):
+    """
+    Remove dados duplicados considerando Escola, Turma e Nome
+    """
+    print(f"   Verificando duplicados em {nome_dataset}...")
+    len_inicial = len(df)
+    
+    # Identificar duplicados
+    duplicados = df.duplicated(subset=['Escola', 'Turma', 'Nome'], keep='first')
+    
+    if duplicados.sum() > 0:
+        print(f"     Encontrados {duplicados.sum()} registros duplicados:")
+        for idx in df[duplicados].index:
+            row = df.loc[idx]
+            print(f"       - {row['Nome']} | {row['Escola']} | {row['Turma']}")
+        
+        # Remover duplicados
+        df = df.drop_duplicates(subset=['Escola', 'Turma', 'Nome'], keep='first')
+        print(f"     {len_inicial - len(df)} duplicados removidos")
+    else:
+        print(f"     Nenhum duplicado encontrado")
+    
+    return df
+
+def verificar_questoes_completas(df, colunas_p, nome_dataset):
+    """
+    Remove registros que não possuem dados de todas as questões (P1-P40)
+    """
+    print(f"   Verificando completude das questões em {nome_dataset}...")
+    len_inicial = len(df)
+    
+    def tem_todas_questoes(row):
+        questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
+        return questoes_validas == 40  # Todas as 40 questões devem estar presentes
+    
+    # Identificar registros incompletos
+    registros_completos = df.apply(tem_todas_questoes, axis=1)
+    registros_incompletos = (~registros_completos).sum()
+    
+    if registros_incompletos > 0:
+        print(f"     {registros_incompletos} registros com questões incompletas encontrados")
+        # Mostrar alguns exemplos
+        for idx in df[~registros_completos].head(5).index:
+            row = df.loc[idx]
+            questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
+            print(f"       - {row['Nome']} | {row['Escola']} | {row['Turma']} | Questões: {questoes_validas}/40")
+        
+        # Remover registros incompletos
+        df = df[registros_completos]
+        print(f"     {len_inicial - len(df)} registros com questões incompletas removidos")
+    else:
+        print(f"     Todos os registros possuem questões completas")
+    
+    return df
+
 def main():
     """Pipeline principal TDE"""
     
@@ -87,44 +186,77 @@ def main():
     print(f"   PÓS-teste: {len(df_pos)} registros")
     print(f"   Mapeamento: {len(mapeamento)} questões")
     
-    # 2. PRÉ-PROCESSAMENTO
+    # 2. PRÉ-PROCESSAMENTO MELHORADO
     print("\n2. PRÉ-PROCESSAMENTO...")
     
     # Colunas TDE (P1 a P40)
     colunas_p = [f'P{i}' for i in range(1, 41)]
     
-    # Converter valores
+    # 2.1 Completar dados faltantes de Escola e/ou Turma
+    print("\n2.1 COMPLETANDO DADOS FALTANTES...")
+    df_pre = completar_dados_faltantes(df_pre, "PRÉ-teste")
+    df_pos = completar_dados_faltantes(df_pos, "PÓS-teste")
+    
+    # 2.2 Remover duplicados
+    print("\n2.2 REMOVENDO DUPLICADOS...")
+    df_pre = remover_duplicados(df_pre, "PRÉ-teste")
+    df_pos = remover_duplicados(df_pos, "PÓS-teste")
+    
+    # 2.3 Converter valores
+    print("\n2.3 CONVERTENDO VALORES DAS QUESTÕES...")
     for col in colunas_p:
         if col in df_pre.columns:
             df_pre[col] = df_pre[col].apply(converter_valor_tde)
         if col in df_pos.columns:
             df_pos[col] = df_pos[col].apply(converter_valor_tde)
     
-    # Classificar grupos
+    # 2.4 Verificar questões completas
+    print("\n2.4 VERIFICANDO COMPLETUDE DAS QUESTÕES...")
+    df_pre = verificar_questoes_completas(df_pre, colunas_p, "PRÉ-teste")
+    df_pos = verificar_questoes_completas(df_pos, colunas_p, "PÓS-teste")
+    
+    # 2.5 Classificar grupos
+    print("\n2.5 CLASSIFICANDO GRUPOS...")
     df_pre['GrupoTDE'] = df_pre['Turma'].apply(classificar_grupo_tde)
     df_pos['GrupoTDE'] = df_pos['Turma'].apply(classificar_grupo_tde)
     
-    # ID único
-    df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Turma'].astype(str)
-    df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Turma'].astype(str)
+    # 2.6 ID único
+    print("\n2.6 CRIANDO IDs ÚNICOS...")
+    df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Escola'].astype(str) + "_" + df_pre['Turma'].astype(str)
+    df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Escola'].astype(str) + "_" + df_pos['Turma'].astype(str)
     
-    # Filtrar IDs comuns
-    ids_comuns = set(df_pre['ID_Unico']).intersection(set(df_pos['ID_Unico']))
+    # 2.7 Verificar presença em ambos os testes (PRÉ e PÓS)
+    print("\n2.7 VERIFICANDO PRESENÇA EM AMBOS OS TESTES...")
+    ids_pre = set(df_pre['ID_Unico'])
+    ids_pos = set(df_pos['ID_Unico'])
+    ids_comuns = ids_pre.intersection(ids_pos)
+    
+    print(f"   IDs no PRÉ-teste: {len(ids_pre)}")
+    print(f"   IDs no PÓS-teste: {len(ids_pos)}")
+    print(f"   IDs em ambos os testes: {len(ids_comuns)}")
+    print(f"   IDs apenas no PRÉ: {len(ids_pre - ids_pos)}")
+    print(f"   IDs apenas no PÓS: {len(ids_pos - ids_pre)}")
+    
+    # Mostrar alguns exemplos de registros que serão removidos
+    if len(ids_pre - ids_pos) > 0:
+        print("     Exemplos de registros apenas no PRÉ-teste (serão removidos):")
+        for id_exemplo in list(ids_pre - ids_pos)[:3]:
+            nome_exemplo = df_pre[df_pre['ID_Unico'] == id_exemplo]['Nome'].iloc[0]
+            escola_exemplo = df_pre[df_pre['ID_Unico'] == id_exemplo]['Escola'].iloc[0]
+            turma_exemplo = df_pre[df_pre['ID_Unico'] == id_exemplo]['Turma'].iloc[0]
+            print(f"       - {nome_exemplo} | {escola_exemplo} | {turma_exemplo}")
+    
+    if len(ids_pos - ids_pre) > 0:
+        print("     Exemplos de registros apenas no PÓS-teste (serão removidos):")
+        for id_exemplo in list(ids_pos - ids_pre)[:3]:
+            nome_exemplo = df_pos[df_pos['ID_Unico'] == id_exemplo]['Nome'].iloc[0]
+            escola_exemplo = df_pos[df_pos['ID_Unico'] == id_exemplo]['Escola'].iloc[0]
+            turma_exemplo = df_pos[df_pos['ID_Unico'] == id_exemplo]['Turma'].iloc[0]
+            print(f"       - {nome_exemplo} | {escola_exemplo} | {turma_exemplo}")
+    
+    # Filtrar apenas registros presentes em ambos os testes
     df_pre = df_pre[df_pre['ID_Unico'].isin(ids_comuns)]
     df_pos = df_pos[df_pos['ID_Unico'].isin(ids_comuns)]
-    
-    # Filtrar questões válidas (mínimo 32/40 = 80%)
-    def tem_questoes_validas(row):
-        validos = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]))
-        return validos >= 32
-    
-    df_pre = df_pre[df_pre.apply(tem_questoes_validas, axis=1)]
-    df_pos = df_pos[df_pos.apply(tem_questoes_validas, axis=1)]
-    
-    # Filtrar novamente por IDs comuns
-    ids_finais = set(df_pre['ID_Unico']).intersection(set(df_pos['ID_Unico']))
-    df_pre = df_pre[df_pre['ID_Unico'].isin(ids_finais)]
-    df_pos = df_pos[df_pos['ID_Unico'].isin(ids_finais)]
     
     print(f"   Registros finais: {len(df_pre)}")
     
