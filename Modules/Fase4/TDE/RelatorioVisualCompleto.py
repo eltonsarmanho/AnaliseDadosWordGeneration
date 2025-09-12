@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 2
+RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 4
 Interface visual interativa para análise de dados do Teste de Escrita (TDE)
 
 Baseado na metodologia dos relatórios de vocabulário com adaptações específicas
@@ -13,12 +13,13 @@ Data: 2024
 
 import os
 import io
+import re
 import base64
 import pathlib
 import argparse
 from typing import List, Tuple, Dict
 from datetime import datetime
-import re
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -36,8 +37,8 @@ DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 
 # Arquivos de dados TDE
-CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.csv"  # Usar CSV como padrão
-HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase2.html"
+CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase4_TDE_wordgen.csv"  # Usar CSV como padrão
+HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase4.html"
 MAPPING_FILE = DATA_DIR / "RespostaTED.json"
 
 # Configurações matplotlib
@@ -186,6 +187,10 @@ def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple
     df = df.dropna(subset=['Score_Pre', 'Score_Pos', 'Delta_Score'])
     
     # Criar novos grupos baseados no ano extraído da turma
+    # Regex mais flexível para capturar diferentes formatos:
+    # - "6º ano", "7º ano", etc.
+    # - "6 ANO F", "7 ANO F", etc. 
+    # - "6° ANO F", "7° ANO F", etc.
     df['Ano'] = df['Turma'].str.extract(r'(\d+)(?:º|°|\s+(?:ano|ANO))', flags=re.IGNORECASE)[0]
     df['GrupoTDE_Novo'] = df['Ano'].map({
         '6': '6º ano',
@@ -544,16 +549,31 @@ def gerar_grafico_palavras_top_tde(df: pd.DataFrame) -> str:
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_nomes.append(palavra[:10] + '...' if len(palavra) > 10 else palavra)
         
-        # Buscar melhora para cada ano
-        melhora_6 = palavras_6ano[palavras_6ano['Questao'] == questao]['Melhora_Percentual']
-        melhora_7 = palavras_7ano[palavras_7ano['Questao'] == questao]['Melhora_Percentual']
-        melhora_8 = palavras_8ano[palavras_8ano['Questao'] == questao]['Melhora_Percentual']
-        melhora_9 = palavras_9ano[palavras_9ano['Questao'] == questao]['Melhora_Percentual']
+        # Buscar melhora para cada ano - com validação para DataFrames vazios
+        melhora_6 = 0
+        if len(palavras_6ano) > 0 and 'Questao' in palavras_6ano.columns:
+            match_6 = palavras_6ano[palavras_6ano['Questao'] == questao]['Melhora_Percentual']
+            melhora_6 = match_6.iloc[0] if len(match_6) > 0 else 0
+            
+        melhora_7 = 0
+        if len(palavras_7ano) > 0 and 'Questao' in palavras_7ano.columns:
+            match_7 = palavras_7ano[palavras_7ano['Questao'] == questao]['Melhora_Percentual']
+            melhora_7 = match_7.iloc[0] if len(match_7) > 0 else 0
+            
+        melhora_8 = 0
+        if len(palavras_8ano) > 0 and 'Questao' in palavras_8ano.columns:
+            match_8 = palavras_8ano[palavras_8ano['Questao'] == questao]['Melhora_Percentual']
+            melhora_8 = match_8.iloc[0] if len(match_8) > 0 else 0
+            
+        melhora_9 = 0
+        if len(palavras_9ano) > 0 and 'Questao' in palavras_9ano.columns:
+            match_9 = palavras_9ano[palavras_9ano['Questao'] == questao]['Melhora_Percentual']
+            melhora_9 = match_9.iloc[0] if len(match_9) > 0 else 0
         
-        melhoras_6ano.append(melhora_6.iloc[0] if len(melhora_6) > 0 else 0)
-        melhoras_7ano.append(melhora_7.iloc[0] if len(melhora_7) > 0 else 0)
-        melhoras_8ano.append(melhora_8.iloc[0] if len(melhora_8) > 0 else 0)
-        melhoras_9ano.append(melhora_9.iloc[0] if len(melhora_9) > 0 else 0)
+        melhoras_6ano.append(melhora_6)
+        melhoras_7ano.append(melhora_7)
+        melhoras_8ano.append(melhora_8)
+        melhoras_9ano.append(melhora_9)
     
     x = np.arange(len(palavras_nomes))
     width = 0.2
@@ -767,16 +787,26 @@ def gerar_grafico_heatmap_erros_tde(df: pd.DataFrame, tipo_teste: str = "pos") -
         palavra = palavras_geral[palavras_geral['Questao'] == questao]['Palavra'].iloc[0]
         palavras_labels.append(palavra[:12] + '...' if len(palavra) > 12 else palavra)
         
-        # Erros para cada ano
-        erro_6 = palavras_6ano[palavras_6ano['Questao'] == questao][coluna_erro]
-        erro_7 = palavras_7ano[palavras_7ano['Questao'] == questao][coluna_erro]
-        erro_8 = palavras_8ano[palavras_8ano['Questao'] == questao][coluna_erro]
-        erro_9 = palavras_9ano[palavras_9ano['Questao'] == questao][coluna_erro]
-        
-        erro_6_val = erro_6.iloc[0] if len(erro_6) > 0 else 0
-        erro_7_val = erro_7.iloc[0] if len(erro_7) > 0 else 0
-        erro_8_val = erro_8.iloc[0] if len(erro_8) > 0 else 0
-        erro_9_val = erro_9.iloc[0] if len(erro_9) > 0 else 0
+        # Erros para cada ano - com validação para DataFrames vazios
+        erro_6_val = 0
+        if len(palavras_6ano) > 0 and 'Questao' in palavras_6ano.columns:
+            erro_6_match = palavras_6ano[palavras_6ano['Questao'] == questao][coluna_erro]
+            erro_6_val = erro_6_match.iloc[0] if len(erro_6_match) > 0 else 0
+            
+        erro_7_val = 0
+        if len(palavras_7ano) > 0 and 'Questao' in palavras_7ano.columns:
+            erro_7_match = palavras_7ano[palavras_7ano['Questao'] == questao][coluna_erro]
+            erro_7_val = erro_7_match.iloc[0] if len(erro_7_match) > 0 else 0
+            
+        erro_8_val = 0
+        if len(palavras_8ano) > 0 and 'Questao' in palavras_8ano.columns:
+            erro_8_match = palavras_8ano[palavras_8ano['Questao'] == questao][coluna_erro]
+            erro_8_val = erro_8_match.iloc[0] if len(erro_8_match) > 0 else 0
+            
+        erro_9_val = 0
+        if len(palavras_9ano) > 0 and 'Questao' in palavras_9ano.columns:
+            erro_9_match = palavras_9ano[palavras_9ano['Questao'] == questao][coluna_erro]
+            erro_9_val = erro_9_match.iloc[0] if len(erro_9_match) > 0 else 0
         
         heatmap_data.append([erro_6_val, erro_7_val, erro_8_val, erro_9_val])
     
@@ -935,7 +965,7 @@ def gerar_html_tde_interativo():
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 2</title>
+<title>Relatório Visual TDE WordGen - Fase 3</title>
 <style>
     :root {{
         --bg: #f5f6fa;
@@ -1161,7 +1191,7 @@ def gerar_html_tde_interativo():
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório Visual TDE WordGen - Fase 2</div>
+        <div class="title">Relatório Visual TDE WordGen - Fase 3</div>
         <div class="subtitle">Teste de Escrita (Análise por anos: 6º, 7º, 8º e 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
@@ -1685,7 +1715,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 2{titulo_filtro}</title>
+<title>Relatório Visual TDE WordGen - Fase 3{titulo_filtro}</title>
 <style>
 {css_styles}
 </style>
@@ -1693,7 +1723,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <body>
     <div class="header">
         <div class="title">Relatório Visual TDE WordGen{titulo_filtro}</div>
-        <div class="subtitle">Teste de Escrita – Fase 2 (Pré vs Pós-teste). {grupo_info}</div>
+        <div class="subtitle">Teste de Escrita – Fase 3 (Pré vs Pós-teste). {grupo_info}</div>
         <div class="timestamp">Gerado em: {now}</div>
     </div>
 
@@ -1771,7 +1801,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
             output_path = str(HTML_OUT)
     
     print("="*80)
-    print("🎯 RELATÓRIO VISUAL TDE - WORDGEN FASE 2")
+    print("🎯 RELATÓRIO VISUAL TDE - WORDGEN FASE 4")
     print("="*80)
     
     # Carregar e preparar dados
@@ -1820,7 +1850,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
 def main():
     """Interface de linha de comando."""
     parser = argparse.ArgumentParser(
-        description='Gera relatório visual interativo para dados TDE WordGen Fase 2'
+        description='Gera relatório visual interativo para dados TDE WordGen Fase 3'
     )
     parser.add_argument('--escola', type=str, default=None,
                        help='Filtrar por escola específica')

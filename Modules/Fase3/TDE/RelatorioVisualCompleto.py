@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 2
+RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 3
 Interface visual interativa para análise de dados do Teste de Escrita (TDE)
 
 Baseado na metodologia dos relatórios de vocabulário com adaptações específicas
@@ -12,13 +12,15 @@ Data: 2024
 """
 
 import os
+import re
+
 import io
 import base64
 import pathlib
 import argparse
 from typing import List, Tuple, Dict
 from datetime import datetime
-import re
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -36,8 +38,8 @@ DATA_DIR = BASE_DIR / "Data"
 FIG_DIR = DATA_DIR / "figures"
 
 # Arquivos de dados TDE
-CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.csv"  # Usar CSV como padrão
-HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase2.html"
+CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase3_TDE_wordgen.csv"  # Usar CSV como padrão
+HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase3.html"
 MAPPING_FILE = DATA_DIR / "RespostaTED.json"
 
 # Configurações matplotlib
@@ -935,7 +937,7 @@ def gerar_html_tde_interativo():
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 2</title>
+<title>Relatório Visual TDE WordGen - Fase 3</title>
 <style>
     :root {{
         --bg: #f5f6fa;
@@ -1161,7 +1163,7 @@ def gerar_html_tde_interativo():
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório Visual TDE WordGen - Fase 2</div>
+        <div class="title">Relatório Visual TDE WordGen - Fase 3</div>
         <div class="subtitle">Teste de Escrita (Análise por anos: 6º, 7º, 8º e 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
@@ -1685,7 +1687,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 2{titulo_filtro}</title>
+<title>Relatório Visual TDE WordGen - Fase 3{titulo_filtro}</title>
 <style>
 {css_styles}
 </style>
@@ -1693,7 +1695,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <body>
     <div class="header">
         <div class="title">Relatório Visual TDE WordGen{titulo_filtro}</div>
-        <div class="subtitle">Teste de Escrita – Fase 2 (Pré vs Pós-teste). {grupo_info}</div>
+        <div class="subtitle">Teste de Escrita – Fase 3 (Pré vs Pós-teste). {grupo_info}</div>
         <div class="timestamp">Gerado em: {now}</div>
     </div>
 
@@ -1771,7 +1773,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
             output_path = str(HTML_OUT)
     
     print("="*80)
-    print("🎯 RELATÓRIO VISUAL TDE - WORDGEN FASE 2")
+    print("🎯 RELATÓRIO VISUAL TDE - WORDGEN FASE 3")
     print("="*80)
     
     # Carregar e preparar dados
@@ -1820,7 +1822,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
 def main():
     """Interface de linha de comando."""
     parser = argparse.ArgumentParser(
-        description='Gera relatório visual interativo para dados TDE WordGen Fase 2'
+        description='Gera relatório visual interativo para dados TDE WordGen Fase 3'
     )
     parser.add_argument('--escola', type=str, default=None,
                        help='Filtrar por escola específica')
