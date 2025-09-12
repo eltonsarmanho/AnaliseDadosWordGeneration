@@ -10,10 +10,10 @@ import json
 # Configurar caminhos
 current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 data_dir = str(current_dir) + '/Data'
-fase2_dir = os.path.join(data_dir, 'Fase 2')
-pre_dir = os.path.join(fase2_dir, 'Pre')
-pos_dir = os.path.join(fase2_dir, 'Pos')
-output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.csv')
+fase3_dir = os.path.join(data_dir, 'Fase 3')
+pre_dir = os.path.join(fase3_dir, 'Pre')
+pos_dir = os.path.join(fase3_dir, 'Pos')
+output_csv = os.path.join(data_dir, 'tabela_bruta_fase3_TDE_wordgen.csv')
 mapping_file = os.path.join(data_dir, 'RespostaTED.json')
 
 # Caminhos dos arquivos TDE - CSV
@@ -21,7 +21,7 @@ arquivo_pre = os.path.join(pre_dir, 'DadosTDE.csv')
 arquivo_pos = os.path.join(pos_dir, 'DadosTDE.csv')
 
 print("="*80)
-print("PIPELINE TDE - WORDGEN FASE 2")
+print("PIPELINE TDE - WORDGEN FASE 3")
 print("="*80)
 print(f"Executado em: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print("="*80)
@@ -62,17 +62,6 @@ def converter_valor_tde(valor):
             return 1 if num_valor > 0 else 0
         except:
             return np.nan
-
-def classificar_grupo_tde(turma):
-    """Classifica em Grupo A (6º/7º) ou B (8º/9º)"""
-    turma_str = str(turma).upper()
-    
-    if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str:
-        return "Grupo A (6º/7º anos)"
-    elif '8º' in turma_str or '8°' in turma_str or '9º' in turma_str or '9°' in turma_str:
-        return "Grupo B (8º/9º anos)"
-    else:
-        return "Indefinido"
 
 def completar_dados_faltantes(df, nome_dataset):
     """
@@ -142,36 +131,47 @@ def remover_duplicados(df, nome_dataset):
     
     return df
 
-def verificar_questoes_completas(df, colunas_p, nome_dataset):
+def verificar_questoes_validas(df, colunas_p, nome_dataset):
     """
-    Remove registros que não possuem dados de todas as questões (P1-P40)
+    Remove registros que não possuem pelo menos 25% das questões (10 de 40)
     """
-    print(f"   Verificando completude das questões em {nome_dataset}...")
+    print(f"   Verificando questões válidas em {nome_dataset}...")
     len_inicial = len(df)
     
-    def tem_todas_questoes(row):
+    def tem_questoes_suficientes(row):
         questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
-        return questoes_validas >= 10  # Pelo menos 10 questões devem estar presentes
-
-    # Identificar registros incompletos
-    registros_completos = df.apply(tem_todas_questoes, axis=1)
-    registros_incompletos = (~registros_completos).sum()
+        return questoes_validas >= 10  # Pelo menos 25% das questões (10 de 40)
     
-    if registros_incompletos > 0:
-        print(f"     {registros_incompletos} registros com questões incompletas encontrados")
+    # Identificar registros com questões suficientes
+    registros_validos = df.apply(tem_questoes_suficientes, axis=1)
+    registros_invalidos = (~registros_validos).sum()
+    
+    if registros_invalidos > 0:
+        print(f"     {registros_invalidos} registros com questões insuficientes encontrados")
         # Mostrar alguns exemplos
-        for idx in df[~registros_completos].head(5).index:
+        for idx in df[~registros_validos].head(5).index:
             row = df.loc[idx]
             questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
             print(f"       - {row['Nome']} | {row['Escola']} | {row['Turma']} | Questões: {questoes_validas}/40")
         
-        # Remover registros incompletos
-        df = df[registros_completos]
-        print(f"     {len_inicial - len(df)} registros com questões incompletas removidos")
+        # Remover registros inválidos
+        df = df[registros_validos]
+        print(f"     {len_inicial - len(df)} registros com questões insuficientes removidos")
     else:
-        print(f"     Todos os registros possuem questões completas")
+        print(f"     Todos os registros possuem questões suficientes (≥25%)")
     
     return df
+
+def classificar_grupo_tde(turma):
+    """Classifica em Grupo A (6º/7º) ou B (8º/9º)"""
+    turma_str = str(turma).upper()
+    
+    if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str:
+        return "Grupo A (6º/7º anos)"
+    elif '8º' in turma_str or '8°' in turma_str or '9º' in turma_str or '9°' in turma_str:
+        return "Grupo B (8º/9º anos)"
+    else:
+        return "Indefinido"
 
 def main():
     """Pipeline principal TDE"""
@@ -210,10 +210,10 @@ def main():
         if col in df_pos.columns:
             df_pos[col] = df_pos[col].apply(converter_valor_tde)
     
-    # 2.4 Verificar questões completas
-    print("\n2.4 VERIFICANDO COMPLETUDE DAS QUESTÕES...")
-    df_pre = verificar_questoes_completas(df_pre, colunas_p, "PRÉ-teste")
-    df_pos = verificar_questoes_completas(df_pos, colunas_p, "PÓS-teste")
+    # 2.4 Verificar questões válidas (mínimo 25% = 10 questões)
+    print("\n2.4 VERIFICANDO QUESTÕES VÁLIDAS...")
+    df_pre = verificar_questoes_validas(df_pre, colunas_p, "PRÉ-teste")
+    df_pos = verificar_questoes_validas(df_pos, colunas_p, "PÓS-teste")
     
     # 2.5 Classificar grupos
     print("\n2.5 CLASSIFICANDO GRUPOS...")

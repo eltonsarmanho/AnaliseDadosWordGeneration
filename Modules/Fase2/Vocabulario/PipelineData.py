@@ -144,8 +144,8 @@ def verificar_questoes_completas(df, colunas_q, nome_dataset):
     
     def tem_todas_questoes(row):
         questoes_validas = sum(1 for col in colunas_q if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
-        return questoes_validas == 50  # Todas as 50 questões devem estar presentes
-    
+        return questoes_validas >= 10  # Pelo menos 10 questões devem estar presentes
+
     # Identificar registros incompletos
     registros_completos = df.apply(tem_todas_questoes, axis=1)
     registros_incompletos = (~registros_completos).sum()

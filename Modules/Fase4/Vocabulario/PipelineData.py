@@ -10,43 +10,40 @@ import json
 # Configurar caminhos
 current_dir = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 data_dir = str(current_dir) + '/Data'
-fase2_dir = os.path.join(data_dir, 'Fase 2')
-pre_dir = os.path.join(fase2_dir, 'Pre')
-pos_dir = os.path.join(fase2_dir, 'Pos')
-output_csv = os.path.join(data_dir, 'tabela_bruta_fase2_TDE_wordgen.csv')
-mapping_file = os.path.join(data_dir, 'RespostaTED.json')
+fase4_dir = os.path.join(data_dir, 'Fase 4')
+pre_dir = os.path.join(fase4_dir, 'Pre')
+pos_dir = os.path.join(fase4_dir, 'Pos')
+output_csv = os.path.join(data_dir, 'tabela_bruta_fase4_vocabulario_wordgen.csv')
+mapping_file = os.path.join(data_dir, 'RespostaVocabulario.json')
 
-# Caminhos dos arquivos TDE - CSV
-arquivo_pre = os.path.join(pre_dir, 'DadosTDE.csv')
-arquivo_pos = os.path.join(pos_dir, 'DadosTDE.csv')
+# Caminhos dos arquivos - CSV
+arquivo_pre = os.path.join(pre_dir, 'DadosVocabulario.csv')
+arquivo_pos = os.path.join(pos_dir, 'DadosVocabulario.csv')
 
 print("="*80)
-print("PIPELINE TDE - WORDGEN FASE 2")
+print("PIPELINE VOCABULÁRIO - WORDGEN FASE 4")
 print("="*80)
 print(f"Executado em: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print("="*80)
 
-def carregar_mapeamento_tde():
-    """Carrega mapeamento das questões TDE"""
+def carregar_mapeamento_vocabulario():
+    """Carrega mapeamento das questões de vocabulário"""
     try:
         with open(mapping_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            dados = json.load(f)
         
         mapeamento = {}
-        for item in data:
-            for pergunta_key, pergunta_data in item.items():
-                if 'Pergunta' in pergunta_key:
-                    numero = pergunta_key.split(' ')[1]
-                    palavra = pergunta_data.get('Palavra Trabalhada', f'Palavra_{numero}')
-                    mapeamento[f'P{numero}'] = palavra
+        for item in dados:
+            for questao, info in item.items():
+                mapeamento[questao] = info['Palavra Trabalhada']
         
         return mapeamento
     except Exception as e:
         print(f"Erro ao carregar mapeamento: {e}")
         return {}
 
-def converter_valor_tde(valor):
-    """Converte valores TDE (0=erro, 1=acerto)"""
+def converter_valor_vocabulario(valor):
+    """Converte valores vocabulário (0=erro, 1=parcial, 2=acerto)"""
     if pd.isna(valor):
         return np.nan
     
@@ -56,23 +53,19 @@ def converter_valor_tde(valor):
         return 0
     elif valor_str in ['1', '1.0']:
         return 1
+    elif valor_str in ['2', '2.0']:
+        return 2
     else:
         try:
             num_valor = float(valor_str)
-            return 1 if num_valor > 0 else 0
+            if num_valor <= 0:
+                return 0
+            elif num_valor <= 1:
+                return 1
+            else:
+                return 2
         except:
             return np.nan
-
-def classificar_grupo_tde(turma):
-    """Classifica em Grupo A (6º/7º) ou B (8º/9º)"""
-    turma_str = str(turma).upper()
-    
-    if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str:
-        return "Grupo A (6º/7º anos)"
-    elif '8º' in turma_str or '8°' in turma_str or '9º' in turma_str or '9°' in turma_str:
-        return "Grupo B (8º/9º anos)"
-    else:
-        return "Indefinido"
 
 def completar_dados_faltantes(df, nome_dataset):
     """
@@ -82,33 +75,38 @@ def completar_dados_faltantes(df, nome_dataset):
     registros_incompletos = 0
     registros_completados = 0
     
+    # Ajustar nomes de colunas para Fase 4 (ESCOLA, NOME ao invés de Escola, Nome)
+    escola_col = 'ESCOLA' if 'ESCOLA' in df.columns else 'Escola'
+    nome_col = 'NOME' if 'NOME' in df.columns else 'Nome'
+    turma_col = 'TURMA' if 'TURMA' in df.columns else 'Turma'
+    
     for idx, row in df.iterrows():
-        nome = str(row['Nome']).strip()
-        escola_faltante = pd.isna(row['Escola']) or str(row['Escola']).strip() == '' or str(row['Escola']).strip().lower() == 'nan'
-        turma_faltante = pd.isna(row['Turma']) or str(row['Turma']).strip() == '' or str(row['Turma']).strip().lower() == 'nan'
+        nome = str(row[nome_col]).strip()
+        escola_faltante = pd.isna(row[escola_col]) or str(row[escola_col]).strip() == '' or str(row[escola_col]).strip().lower() == 'nan'
+        turma_faltante = pd.isna(row[turma_col]) or str(row[turma_col]).strip() == '' or str(row[turma_col]).strip().lower() == 'nan'
         
         if escola_faltante or turma_faltante:
             registros_incompletos += 1
             
             # Buscar registros do mesmo aluno com dados completos
-            registros_mesmo_aluno = df[df['Nome'].str.strip() == nome]
+            registros_mesmo_aluno = df[df[nome_col].str.strip() == nome]
             
             for _, reg_completo in registros_mesmo_aluno.iterrows():
                 if reg_completo.name == idx:
                     continue
                     
-                escola_completa = not (pd.isna(reg_completo['Escola']) or str(reg_completo['Escola']).strip() == '' or str(reg_completo['Escola']).strip().lower() == 'nan')
-                turma_completa = not (pd.isna(reg_completo['Turma']) or str(reg_completo['Turma']).strip() == '' or str(reg_completo['Turma']).strip().lower() == 'nan')
+                escola_completa = not (pd.isna(reg_completo[escola_col]) or str(reg_completo[escola_col]).strip() == '' or str(reg_completo[escola_col]).strip().lower() == 'nan')
+                turma_completa = not (pd.isna(reg_completo[turma_col]) or str(reg_completo[turma_col]).strip() == '' or str(reg_completo[turma_col]).strip().lower() == 'nan')
                 
                 if escola_faltante and escola_completa:
-                    df.at[idx, 'Escola'] = reg_completo['Escola']
+                    df.at[idx, escola_col] = reg_completo[escola_col]
                     registros_completados += 1
-                    print(f"     Completado Escola para {nome}: {reg_completo['Escola']}")
+                    print(f"     Completado Escola para {nome}: {reg_completo[escola_col]}")
                 
                 if turma_faltante and turma_completa:
-                    df.at[idx, 'Turma'] = reg_completo['Turma']
+                    df.at[idx, turma_col] = reg_completo[turma_col]
                     registros_completados += 1
-                    print(f"     Completado Turma para {nome}: {reg_completo['Turma']}")
+                    print(f"     Completado Turma para {nome}: {reg_completo[turma_col]}")
                 
                 # Se ambos foram completados, parar a busca
                 if not (escola_faltante and not escola_completa) and not (turma_faltante and not turma_completa):
@@ -125,62 +123,82 @@ def remover_duplicados(df, nome_dataset):
     print(f"   Verificando duplicados em {nome_dataset}...")
     len_inicial = len(df)
     
+    # Ajustar nomes de colunas para Fase 4
+    escola_col = 'ESCOLA' if 'ESCOLA' in df.columns else 'Escola'
+    nome_col = 'NOME' if 'NOME' in df.columns else 'Nome'
+    turma_col = 'TURMA' if 'TURMA' in df.columns else 'Turma'
+    
     # Identificar duplicados
-    duplicados = df.duplicated(subset=['Escola', 'Turma', 'Nome'], keep='first')
+    duplicados = df.duplicated(subset=[escola_col, turma_col, nome_col], keep='first')
     
     if duplicados.sum() > 0:
         print(f"     Encontrados {duplicados.sum()} registros duplicados:")
         for idx in df[duplicados].index:
             row = df.loc[idx]
-            print(f"       - {row['Nome']} | {row['Escola']} | {row['Turma']}")
+            print(f"       - {row[nome_col]} | {row[escola_col]} | {row[turma_col]}")
         
         # Remover duplicados
-        df = df.drop_duplicates(subset=['Escola', 'Turma', 'Nome'], keep='first')
+        df = df.drop_duplicates(subset=[escola_col, turma_col, nome_col], keep='first')
         print(f"     {len_inicial - len(df)} duplicados removidos")
     else:
         print(f"     Nenhum duplicado encontrado")
     
     return df
 
-def verificar_questoes_completas(df, colunas_p, nome_dataset):
+def verificar_questoes_validas(df, colunas_q, nome_dataset):
     """
-    Remove registros que não possuem dados de todas as questões (P1-P40)
+    Remove registros que não possuem pelo menos 25% das questões (12.5 de 50)
     """
-    print(f"   Verificando completude das questões em {nome_dataset}...")
+    print(f"   Verificando questões válidas em {nome_dataset}...")
     len_inicial = len(df)
     
-    def tem_todas_questoes(row):
-        questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
-        return questoes_validas >= 10  # Pelo menos 10 questões devem estar presentes
-
-    # Identificar registros incompletos
-    registros_completos = df.apply(tem_todas_questoes, axis=1)
-    registros_incompletos = (~registros_completos).sum()
+    def tem_questoes_suficientes(row):
+        questoes_validas = sum(1 for col in colunas_q if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
+        return questoes_validas >= 13  # Pelo menos 25% das questões (13 de 50)
     
-    if registros_incompletos > 0:
-        print(f"     {registros_incompletos} registros com questões incompletas encontrados")
+    # Identificar registros com questões suficientes
+    registros_validos = df.apply(tem_questoes_suficientes, axis=1)
+    registros_invalidos = (~registros_validos).sum()
+    
+    if registros_invalidos > 0:
+        print(f"     {registros_invalidos} registros com questões insuficientes encontrados")
         # Mostrar alguns exemplos
-        for idx in df[~registros_completos].head(5).index:
-            row = df.loc[idx]
-            questoes_validas = sum(1 for col in colunas_p if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
-            print(f"       - {row['Nome']} | {row['Escola']} | {row['Turma']} | Questões: {questoes_validas}/40")
+        nome_col = 'NOME' if 'NOME' in df.columns else 'Nome'
+        escola_col = 'ESCOLA' if 'ESCOLA' in df.columns else 'Escola'
+        turma_col = 'TURMA' if 'TURMA' in df.columns else 'Turma'
         
-        # Remover registros incompletos
-        df = df[registros_completos]
-        print(f"     {len_inicial - len(df)} registros com questões incompletas removidos")
+        for idx in df[~registros_validos].head(5).index:
+            row = df.loc[idx]
+            questoes_validas = sum(1 for col in colunas_q if col in row.index and not pd.isna(row[col]) and str(row[col]).strip() != '')
+            print(f"       - {row[nome_col]} | {row[escola_col]} | {row[turma_col]} | Questões: {questoes_validas}/50")
+        
+        # Remover registros inválidos
+        df = df[registros_validos]
+        print(f"     {len_inicial - len(df)} registros com questões insuficientes removidos")
     else:
-        print(f"     Todos os registros possuem questões completas")
+        print(f"     Todos os registros possuem questões suficientes (≥25%)")
     
     return df
 
+def classificar_grupo_etario(turma):
+    """Classifica em grupos etários"""
+    turma_str = str(turma).upper()
+    
+    if '6º' in turma_str or '6°' in turma_str or '7º' in turma_str or '7°' in turma_str or '6 ANO' in turma_str or '7 ANO' in turma_str:
+        return "6º/7º anos"
+    elif '8º' in turma_str or '8°' in turma_str or '9º' in turma_str or '9°' in turma_str or '8 ANO' in turma_str or '9 ANO' in turma_str:
+        return "8º/9º anos"
+    else:
+        return "Indefinido"
+
 def main():
-    """Pipeline principal TDE"""
+    """Pipeline principal Vocabulário"""
     
     # 1. CARREGAR DADOS
     print("1. CARREGANDO DADOS...")
     df_pre = pd.read_csv(arquivo_pre)
     df_pos = pd.read_csv(arquivo_pos)
-    mapeamento = carregar_mapeamento_tde()
+    mapeamento = carregar_mapeamento_vocabulario()
     
     print(f"   PRÉ-teste: {len(df_pre)} registros")
     print(f"   PÓS-teste: {len(df_pos)} registros")
@@ -189,8 +207,8 @@ def main():
     # 2. PRÉ-PROCESSAMENTO MELHORADO
     print("\n2. PRÉ-PROCESSAMENTO...")
     
-    # Colunas TDE (P1 a P40)
-    colunas_p = [f'P{i}' for i in range(1, 41)]
+    # Colunas vocabulário (Q1 a Q50)
+    colunas_q = [f'Q{i}' for i in range(1, 51)]
     
     # 2.1 Completar dados faltantes de Escola e/ou Turma
     print("\n2.1 COMPLETANDO DADOS FALTANTES...")
@@ -204,29 +222,37 @@ def main():
     
     # 2.3 Converter valores
     print("\n2.3 CONVERTENDO VALORES DAS QUESTÕES...")
-    for col in colunas_p:
+    for col in colunas_q:
         if col in df_pre.columns:
-            df_pre[col] = df_pre[col].apply(converter_valor_tde)
+            df_pre[col] = df_pre[col].apply(converter_valor_vocabulario)
         if col in df_pos.columns:
-            df_pos[col] = df_pos[col].apply(converter_valor_tde)
+            df_pos[col] = df_pos[col].apply(converter_valor_vocabulario)
     
-    # 2.4 Verificar questões completas
-    print("\n2.4 VERIFICANDO COMPLETUDE DAS QUESTÕES...")
-    df_pre = verificar_questoes_completas(df_pre, colunas_p, "PRÉ-teste")
-    df_pos = verificar_questoes_completas(df_pos, colunas_p, "PÓS-teste")
+    # 2.4 Verificar questões válidas (mínimo 25% = 13 questões)
+    print("\n2.4 VERIFICANDO QUESTÕES VÁLIDAS...")
+    df_pre = verificar_questoes_validas(df_pre, colunas_q, "PRÉ-teste")
+    df_pos = verificar_questoes_validas(df_pos, colunas_q, "PÓS-teste")
     
-    # 2.5 Classificar grupos
-    print("\n2.5 CLASSIFICANDO GRUPOS...")
-    df_pre['GrupoTDE'] = df_pre['Turma'].apply(classificar_grupo_tde)
-    df_pos['GrupoTDE'] = df_pos['Turma'].apply(classificar_grupo_tde)
+    # 2.5 Padronizar nomes de colunas
+    print("\n2.5 PADRONIZANDO NOMES DE COLUNAS...")
+    # Renomear colunas para manter consistência
+    if 'ESCOLA' in df_pre.columns:
+        df_pre = df_pre.rename(columns={'ESCOLA': 'Escola', 'NOME': 'Nome', 'TURMA': 'Turma'})
+    if 'ESCOLA' in df_pos.columns:
+        df_pos = df_pos.rename(columns={'ESCOLA': 'Escola', 'NOME': 'Nome', 'TURMA': 'Turma'})
     
-    # 2.6 ID único
-    print("\n2.6 CRIANDO IDs ÚNICOS...")
+    # 2.6 Classificar grupos
+    print("\n2.6 CLASSIFICANDO GRUPOS...")
+    df_pre['GrupoEtario'] = df_pre['Turma'].apply(classificar_grupo_etario)
+    df_pos['GrupoEtario'] = df_pos['Turma'].apply(classificar_grupo_etario)
+    
+    # 2.7 ID único
+    print("\n2.7 CRIANDO IDs ÚNICOS...")
     df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Escola'].astype(str) + "_" + df_pre['Turma'].astype(str)
     df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Escola'].astype(str) + "_" + df_pos['Turma'].astype(str)
     
-    # 2.7 Verificar presença em ambos os testes (PRÉ e PÓS)
-    print("\n2.7 VERIFICANDO PRESENÇA EM AMBOS OS TESTES...")
+    # 2.8 Verificar presença em ambos os testes (PRÉ e PÓS)
+    print("\n2.8 VERIFICANDO PRESENÇA EM AMBOS OS TESTES...")
     ids_pre = set(df_pre['ID_Unico'])
     ids_pos = set(df_pos['ID_Unico'])
     ids_comuns = ids_pre.intersection(ids_pos)
@@ -273,9 +299,9 @@ def main():
         row_pos = df_pos[df_pos['ID_Unico'] == id_unico].iloc[0]
         
         # Calcular scores
-        score_pre = sum(row_pre[col] for col in colunas_p if not pd.isna(row_pre[col]))
-        score_pos = sum(row_pos[col] for col in colunas_p if not pd.isna(row_pos[col]))
-        questoes_validas = sum(1 for col in colunas_p if not pd.isna(row_pre[col]) and not pd.isna(row_pos[col]))
+        score_pre = sum(row_pre[col] for col in colunas_q if not pd.isna(row_pre[col]))
+        score_pos = sum(row_pos[col] for col in colunas_q if not pd.isna(row_pos[col]))
+        questoes_validas = sum(1 for col in colunas_q if not pd.isna(row_pre[col]) and not pd.isna(row_pos[col]))
         
         # Registro base
         registro = {
@@ -283,21 +309,21 @@ def main():
             'Nome': row_pre['Nome'],
             'Escola': row_pre.get('Escola', 'N/A'),
             'Turma': row_pre['Turma'],
-            'GrupoTDE': row_pre['GrupoTDE'],
+            'GrupoEtario': row_pre['GrupoEtario'],
             'Score_Pre': score_pre,
             'Score_Pos': score_pos,
             'Delta_Score': score_pos - score_pre,
             'Questoes_Validas': questoes_validas,
-            'Percentual_Pre': (score_pre / questoes_validas) * 100 if questoes_validas > 0 else 0,
-            'Percentual_Pos': (score_pos / questoes_validas) * 100 if questoes_validas > 0 else 0
+            'Percentual_Pre': (score_pre / (questoes_validas * 2)) * 100 if questoes_validas > 0 else 0,  # Max = 2 por questão
+            'Percentual_Pos': (score_pos / (questoes_validas * 2)) * 100 if questoes_validas > 0 else 0
         }
         
         # Questões individuais
-        for i, col in enumerate(colunas_p, 1):
-            palavra = mapeamento.get(col, f"Palavra_P{i}")
-            registro[f'P{i:02d}_Pre_{palavra}'] = row_pre[col] if not pd.isna(row_pre[col]) else ''
-            registro[f'P{i:02d}_Pos_{palavra}'] = row_pos[col] if not pd.isna(row_pos[col]) else ''
-            registro[f'P{i:02d}_Delta_{palavra}'] = (row_pos[col] - row_pre[col]) if (not pd.isna(row_pre[col]) and not pd.isna(row_pos[col])) else ''
+        for i, col in enumerate(colunas_q, 1):
+            palavra = mapeamento.get(col, f"Palavra_Q{i}")
+            registro[f'Q{i:02d}_Pre_{palavra}'] = row_pre[col] if not pd.isna(row_pre[col]) else ''
+            registro[f'Q{i:02d}_Pos_{palavra}'] = row_pos[col] if not pd.isna(row_pos[col]) else ''
+            registro[f'Q{i:02d}_Delta_{palavra}'] = (row_pos[col] - row_pre[col]) if (not pd.isna(row_pre[col]) and not pd.isna(row_pos[col])) else ''
         
         tabela_bruta.append(registro)
     
@@ -310,10 +336,10 @@ def main():
     print(f"TOTAL DE ESTUDANTES: {len(df_tabela)}")
     print(f"TOTAL DE COLUNAS: {len(df_tabela.columns)}")
     
-    print("\nPOR GRUPO TDE:")
-    for grupo in df_tabela['GrupoTDE'].unique():
+    print("\nPOR GRUPO ETÁRIO:")
+    for grupo in df_tabela['GrupoEtario'].unique():
         if grupo != 'Indefinido':
-            dados = df_tabela[df_tabela['GrupoTDE'] == grupo]
+            dados = df_tabela[df_tabela['GrupoEtario'] == grupo]
             print(f"  {grupo}:")
             print(f"    N: {len(dados)}")
             print(f"    Pré-teste: {dados['Score_Pre'].mean():.2f} ± {dados['Score_Pre'].std():.2f}")
@@ -354,7 +380,7 @@ def main():
     df_tabela.to_csv(output_csv, index=False, encoding='utf-8-sig')
     
     print("="*80)
-    print("✅ PIPELINE TDE CONCLUÍDO!")
+    print("✅ PIPELINE VOCABULÁRIO CONCLUÍDO!")
     print("="*80)
     print(f"📁 Arquivo gerado: {output_csv}")
     print(f"📊 Registros: {len(df_tabela)}")
