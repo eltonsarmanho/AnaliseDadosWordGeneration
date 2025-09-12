@@ -965,7 +965,7 @@ def gerar_html_tde_interativo():
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 3</title>
+<title>Relatório Visual TDE WordGen - Fase 4</title>
 <style>
     :root {{
         --bg: #f5f6fa;
@@ -1191,7 +1191,7 @@ def gerar_html_tde_interativo():
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório Visual TDE WordGen - Fase 3</div>
+        <div class="title">Relatório Visual TDE WordGen - Fase 4</div>
         <div class="subtitle">Teste de Escrita (Análise por anos: 6º, 7º, 8º e 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
@@ -1715,7 +1715,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <meta name="format-detection" content="telephone=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Relatório Visual TDE WordGen - Fase 3{titulo_filtro}</title>
+<title>Relatório Visual TDE WordGen - Fase 4{titulo_filtro}</title>
 <style>
 {css_styles}
 </style>
@@ -1723,7 +1723,7 @@ def gerar_html_tde(indic: Dict[str, float], meta: Dict,
 <body>
     <div class="header">
         <div class="title">Relatório Visual TDE WordGen{titulo_filtro}</div>
-        <div class="subtitle">Teste de Escrita – Fase 3 (Pré vs Pós-teste). {grupo_info}</div>
+        <div class="subtitle">Teste de Escrita – Fase 4 (Pré vs Pós-teste). {grupo_info}</div>
         <div class="timestamp">Gerado em: {now}</div>
     </div>
 
@@ -1796,7 +1796,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     if output_path is None:
         if escola_filtro and escola_filtro != "Todas":
             escola_clean = escola_filtro.replace(" ", "_").replace("/", "_")
-            output_path = str(DATA_DIR / f"relatorio_visual_TDE_fase2_{escola_clean}.html")
+            output_path = str(DATA_DIR / f"relatorio_visual_TDE_fase4_{escola_clean}.html")
         else:
             output_path = str(HTML_OUT)
     
@@ -1850,7 +1850,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
 def main():
     """Interface de linha de comando."""
     parser = argparse.ArgumentParser(
-        description='Gera relatório visual interativo para dados TDE WordGen Fase 3'
+        description='Gera relatório visual interativo para dados TDE WordGen Fase 4'
     )
     parser.add_argument('--escola', type=str, default=None,
                        help='Filtrar por escola específica')
@@ -1876,7 +1876,7 @@ def main():
     if args.interativo:
         print("🔄 Gerando relatório TDE interativo...")
         html_content = gerar_html_tde_interativo()
-        arquivo_saida = str(DATA_DIR / "relatorio_visual_TDE_fase2_interativo.html")
+        arquivo_saida = str(DATA_DIR / "relatorio_visual_TDE_fase4_interativo.html")
         
         with open(arquivo_saida, 'w', encoding='utf-8') as f:
             f.write(html_content)

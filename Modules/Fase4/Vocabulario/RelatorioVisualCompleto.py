@@ -199,7 +199,7 @@ def fig_to_base64(fig):
 # ======================
 
 def carregar_e_preparar_dados(escola_filtro=None):
-    """Carrega e prepara os dados da Fase 3"""
+    """Carrega e prepara os dados da Fase 4"""
     print("1. Carregando dados...")
     
     # Carregar dados
@@ -893,7 +893,7 @@ def plot_heatmap_erros_pre(palavras_df_6ano, palavras_df_7ano, palavras_df_8ano,
 # ======================
 
 def format_card(label: str, value: str, extra: str = "", theme: str = "default") -> str:
-    """Formata um card seguindo o padrão da Fase 3"""
+    """Formata um card seguindo o padrão da Fase 4"""
     classes = {
         "default": "card",
         "green": "card green",
@@ -1061,7 +1061,7 @@ def gerar_dados_todas_escolas():
 
 def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, indicadores_8ano, indicadores_9ano, 
                         palavras_df_todos, figuras_b64, escola_filtro=None):
-    """Gera o relatório HTML completo seguindo padrão da Fase 3"""
+    """Gera o relatório HTML completo seguindo padrão da Fase 4"""
     
     # Definir título baseado na escola
     if escola_filtro and escola_filtro != "Todas":
@@ -1076,7 +1076,7 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
     mean_pre_percent = (indicadores_geral.get('mean_pre', 0) / max_score) * 100
     mean_pos_percent = (indicadores_geral.get('mean_pos', 0) / max_score) * 100
     
-    # Cards seguindo o padrão da Fase 3
+    # Cards seguindo o padrão da Fase 4
     cards_html = "".join([
         format_card("Palavras Testadas", "50", "questões de vocabulário", theme="default"),
         format_card("Pontuação Máxima", "100", "pontos (2 por questão)", theme="default"),
@@ -1124,7 +1124,7 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Relatório Visual - WordGen Fase 3 - Vocabulário</title>
+<title>Relatório Visual - WordGen Fase 4 - Vocabulário</title>
 <style>
     :root {{
         --bg: #f5f6fa;
@@ -1197,7 +1197,7 @@ def gerar_html_relatorio(indicadores_geral, indicadores_6ano, indicadores_7ano, 
 <body>
     <div class="header">
         <div class="title">Relatório Visual WordGen{titulo_escola}</div>
-        <div class="subtitle">{subtitulo_escola}Vocabulário – Fase 3 (Grupos Etários: 6º, 7º, 8º, 9º anos). Análise pareada por estudante.</div>
+        <div class="subtitle">{subtitulo_escola}Vocabulário – Fase 4 (Grupos Etários: 6º, 7º, 8º, 9º anos). Análise pareada por estudante.</div>
         <div class="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
 
@@ -1283,7 +1283,7 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Relatório Visual - WordGen Fase 3 - Vocabulário</title>
+<title>Relatório Visual - WordGen Fase 4 - Vocabulário</title>
 <style>
     :root {{
         --bg: #f5f6fa;
@@ -1372,7 +1372,7 @@ def gerar_html_com_menu(dados_escolas, figuras_b64):
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório Visual WordGen - Fase 3</div>
+        <div class="title">Relatório Visual WordGen - Fase 4</div>
         <div class="subtitle">Vocabulário (Grupos Etários: 6º/7º vs 8º/9º anos). Análise pareada por estudante.</div>
         <div class="timestamp" id="timestamp">Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</div>
     </div>
@@ -1718,7 +1718,7 @@ def gerar_relatorio_completo(escola_filtro=None):
     if escola_filtro and escola_filtro != "Todas":
         # Limpar nome da escola para nome de arquivo
         escola_limpa = escola_filtro.replace(" ", "_").replace("/", "_").replace(".", "")
-        output_file = DATA_DIR / f"relatorio_visual_wordgen_fase3_{escola_limpa}.html"
+        output_file = DATA_DIR / f"relatorio_visual_wordgen_fase4_{escola_limpa}.html"
     else:
         output_file = OUTPUT_HTML
     
@@ -1789,7 +1789,7 @@ if __name__ == "__main__":
         elif sys.argv[1] == "--interativo":
             print("🔄 Gerando relatório interativo...")
             html_content = gerar_html_relatorio_interativo()
-            arquivo_saida = "/home/nees/Documents/VSCodigo/AnaliseDadosWordGeneration/Data/relatorio_visual_wordgen_fase3_interativo.html"
+            arquivo_saida = "/home/nees/Documents/VSCodigo/AnaliseDadosWordGeneration/Data/relatorio_visual_wordgen_fase4_interativo.html"
             
             with open(arquivo_saida, 'w', encoding='utf-8') as f:
                 f.write(html_content)

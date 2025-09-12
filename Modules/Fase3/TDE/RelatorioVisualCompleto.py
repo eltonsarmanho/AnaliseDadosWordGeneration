@@ -1768,7 +1768,7 @@ def gerar_relatorio_tde(escola_filtro: str = None, output_path: str = None) -> s
     if output_path is None:
         if escola_filtro and escola_filtro != "Todas":
             escola_clean = escola_filtro.replace(" ", "_").replace("/", "_")
-            output_path = str(DATA_DIR / f"relatorio_visual_TDE_fase2_{escola_clean}.html")
+            output_path = str(DATA_DIR / f"relatorio_visual_TDE_fase3_{escola_clean}.html")
         else:
             output_path = str(HTML_OUT)
     
@@ -1848,7 +1848,7 @@ def main():
     if args.interativo:
         print("🔄 Gerando relatório TDE interativo...")
         html_content = gerar_html_tde_interativo()
-        arquivo_saida = str(DATA_DIR / "relatorio_visual_TDE_fase2_interativo.html")
+        arquivo_saida = str(DATA_DIR / "relatorio_visual_TDE_fase3_interativo.html")
         
         with open(arquivo_saida, 'w', encoding='utf-8') as f:
             f.write(html_content)
