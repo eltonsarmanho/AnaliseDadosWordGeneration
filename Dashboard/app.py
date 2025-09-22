@@ -149,13 +149,17 @@ if not df.empty:
         agrup_mean = agrup_mean.sort_values(['Escola_Base','Fase'])
         custom_cols = ['Escola_Base','Delta','Media_Geral_Delta']
 
+        # Criar coluna numérica para eixo ordinal
+        fase_map = {'2':2,'3':3,'4':4}
+        agrup_mean['FaseNum'] = agrup_mean['Fase'].astype(str).map(fase_map)
+
         fig_lines = px.line(
             agrup_mean,
-            x='Fase', y=y_col, color='Escola_Base',
+            x='FaseNum', y=y_col, color='Escola_Base',
             category_orders={'Escola_Base': list(ordem)},
             custom_data=custom_cols,
             markers=True,
-            labels={'Fase':'Fase','Escola_Base':'Escola', y_col: y_label}
+            labels={'FaseNum':'Fase','Escola_Base':'Escola', y_col: y_label}
         )
         hover_label_name = y_label
         fig_lines.update_traces(
@@ -168,7 +172,11 @@ if not df.empty:
             ),
             opacity=0.8
         )
-        fig_lines.update_layout(legend_title_text='Escola', yaxis_title=y_label)
+        fig_lines.update_layout(
+            legend_title_text='Escola',
+            yaxis_title=y_label,
+            xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase')
+        )
         st.plotly_chart(fig_lines, use_container_width=True)
 
 # ================= EVOLUÇÃO INDIVIDUAL ==================
