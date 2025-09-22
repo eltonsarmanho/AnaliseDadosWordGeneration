@@ -1,0 +1,45 @@
+{
+  "pares": {
+    "TDE_F2_F3": {
+      "pares": 948,
+      "fase_origem": 2,
+      "fase_destino": 3,
+      "prova": "TDE"
+    },
+    "TDE_F3_F4": {
+      "pares": 238,
+      "fase_origem": 3,
+      "fase_destino": 4,
+      "prova": "TDE"
+    },
+    "VOCAB_F2_F3": {
+      "pares": 798,
+      "fase_origem": 2,
+      "fase_destino": 3,
+      "prova": "VOCAB"
+    },
+    "VOCAB_F3_F4": {
+      "pares": 270,
+      "fase_origem": 3,
+      "fase_destino": 4,
+      "prova": "VOCAB"
+    }
+  },
+  "multifase": {
+    "TDE": {
+      "nomes_total": 2581,
+      "nomes_2_fases": 682,
+      "nomes_3_fases": 564
+    },
+    "VOCAB": {
+      "nomes_total": 2586,
+      "nomes_2_fases": 754,
+      "nomes_3_fases": 479
+    }
+  },
+  "metodologia": {
+    "chave_primary": "Nome normalizado + Escola",
+    "progressao_aceita_ano": "0 (mesmo ano) ou +1 (progressão)",
+    "nota": "Possível sobre-identificação se houver homônimos na mesma escola."
+  }
+}
