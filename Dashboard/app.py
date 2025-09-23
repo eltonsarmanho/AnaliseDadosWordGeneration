@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from data_loader import get_datasets
-import unicodedata, re
+import unicodedata, re, math
+import numpy as np
 
 st.set_page_config(page_title="Dashboard Longitudinal WordGen", layout="wide")
 
@@ -59,6 +60,80 @@ col1.metric("Registros", len(df))
 col2.metric("Alunos únicos (Nome)", df['Nome'].nunique())
 col3.metric("Escolas", df['Escola'].nunique())
 col4.metric("Turmas", df['Turma'].nunique())
+
+# ================= EFFECT SIZE (COHEN'S D) ==================
+def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
+    """Calcula d de Cohen para duas medidas (pré e pós) tratadas como grupos independentes.
+    Retorna np.nan se não houver dados suficientes ou variância nula.
+    Obs: Para medidas pareadas poderia-se usar d_av ou dz; aqui segue especificação do usuário.
+    """
+    if df_in is None or df_in.empty:
+        return float('nan')
+    pre = df_in[col_pre].dropna()
+    pos = df_in[col_pos].dropna()
+    n_pre, n_pos = len(pre), len(pos)
+    if n_pre < 2 or n_pos < 2:
+        return float('nan')
+    m_pre, m_pos = pre.mean(), pos.mean()
+    sd_pre, sd_pos = pre.std(ddof=1), pos.std(ddof=1)
+    if (sd_pre == 0 and sd_pos == 0):
+        return float('nan')
+    pooled = math.sqrt(((n_pre - 1) * sd_pre**2 + (n_pos - 1) * sd_pos**2) / (n_pre + n_pos - 2)) if (n_pre + n_pos - 2) > 0 else float('nan')
+    if pooled == 0 or np.isnan(pooled):
+        return float('nan')
+    return (m_pos - m_pre) / pooled
+
+def classificar_geral(d: float) -> str:
+    if np.isnan(d):
+        return 'Sem dados'
+    ad = abs(d)
+    if ad < 0.2: return 'Trivial'
+    if ad < 0.5: return 'Pequeno'
+    if ad < 0.8: return 'Médio'
+    return 'Grande'
+
+def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
+    if np.isnan(d):
+        return ('Sem dados', False)
+    if prova == 'TDE':
+        return ('Bom resultado' if d >= 0.40 else 'Ponto de atenção', d >= 0.40)
+    # Vocabulário
+    return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
+
+def filtrar_dataset(base: pd.DataFrame) -> pd.DataFrame:
+    df_f = base.copy()
+    if escola_sel:
+        df_f = df_f[df_f['Escola'].isin(escola_sel)]
+    if fases_sel:
+        df_f = df_f[df_f['Fase'].isin(fases_sel)]
+    if turmas_sel:
+        df_f = df_f[df_f['Turma'].isin(turmas_sel)]
+    return df_f
+
+with st.expander('Tamanho do Efeito (d de Cohen)', expanded=True):
+    # Usa o dataset filtrado atual (df) conforme PROVA selecionada
+    d_val = calcular_d_cohen(df)
+    prova_norm = 'TDE' if prova_sel.upper().startswith('TDE') else 'VOCAB'
+    cls_espec, ok_flag = benchmark_especifico(d_val, prova_norm if prova_norm=='TDE' else 'VOCAB')
+    geral_cls = classificar_geral(d_val)
+
+    def card_unico(color_bg: str, titulo: str, valor: float, cls: str, geral: str, ok: bool):
+        val_str = '—' if np.isnan(valor) else f"{valor:.2f}"
+        icon = '✅' if ok else ('⚠️' if not np.isnan(valor) else '')
+        html = f"""
+        <div style='background:{color_bg};padding:14px 18px;border-radius:10px;margin-bottom:6px;'>
+          <span style='font-weight:650;font-size:15px;'>{titulo}</span><br>
+          <span style='font-size:30px;font-weight:700;'>{val_str}</span> {icon}<br>
+          <span style='font-size:13px;'>Benchmark: {cls} • Geral: {geral}</span>
+        </div>
+        """
+        st.markdown(html, unsafe_allow_html=True)
+
+    cor = '#1b7837' if ok_flag else '#fdb863'
+    titulo_card = f"{prova_sel} - d de Cohen"
+    card_unico(cor, titulo_card, d_val, cls_espec, geral_cls, ok_flag)
+
+    st.caption('Critérios: TDE ≥ 0.40 (Hattie, 2009); Vocabulário ≥ 0.35 (Marulis & Neuman, 2010); Geral (Cohen, 1988): 0.2 pequeno, 0.5 médio, 0.8 grande. Valores negativos indicam queda.')
 
 # Scores agregados por fase
 if not df.empty:
