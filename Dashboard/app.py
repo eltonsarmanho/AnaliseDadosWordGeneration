@@ -73,13 +73,13 @@ if not df.empty:
     st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO AGRUPADA POR ESCOLA (Plotly Line) ----------------
-    st.markdown("### Evolução Comparativa entre Escolas (Linhas)")
+    st.markdown("### Evolução Comparativa entre Escolas")
     st.caption("Cada linha representa a média de Delta (Pós - Pré) da escola por fase. Passe o mouse para ver detalhes.")
 
     with st.expander("Opções avançadas de visualização", expanded=False):
         agrupar = st.checkbox("Agrupar nomes equivalentes de escolas", value=True, help="Normaliza acentos, caixa e remove termos comuns.")
         preencher_faltantes = st.checkbox("Preencher fases ausentes com média da fase", value=True)
-        normalizar = st.checkbox("Mostrar valores normalizados (z-score por fase)", value=False)
+        normalizar = st.checkbox("Mostrar valores normalizados (z-score por fase)", value=False, help="Z-score é uma medida de distância para a média de um conjunto de dados. Valores positivos indicam acima da média, negativos abaixo. Útil para comparar tendências entre escolas com diferentes níveis de desempenho.")
         ordenar = st.checkbox("Ordenar legenda por média de Delta (desc)", value=True)
 
     def normaliza_escola(nome: str) -> str:
