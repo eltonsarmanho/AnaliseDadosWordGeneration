@@ -67,9 +67,18 @@ if not df.empty:
                        Score_Pos=('Score_Pos','mean'),
                        N=('Nome','nunique'))
                   .reset_index())
-    fig_fase = px.bar(agg_fase, x='Fase', y=['Score_Pre','Score_Pos'], barmode='group',
-                      title='Média Score Pré vs Pós por Fase',
-                      labels={'value':'Score','variable':'Momento', 'Score_Pre':'Pré','Score_Pos':'Pós'})
+    fig_fase = px.bar(
+        agg_fase,
+        x='Fase',
+        y=['Score_Pre','Score_Pos'],
+        barmode='group',
+        title='Média Pré-Teste vs Pós-Teste por Fase',
+        labels={'value':'Score','variable':'Teste', 'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}
+    )
+    # Renomear legendas explicitamente (wide-form mantém nomes originais das colunas)
+    rename_map = {'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}
+    fig_fase.for_each_trace(lambda tr: tr.update(name=rename_map.get(tr.name, tr.name),
+                                                 legendgroup=rename_map.get(tr.name, tr.name)))
     st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO AGRUPADA POR ESCOLA (Plotly Line) ----------------
