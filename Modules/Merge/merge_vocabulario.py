@@ -38,6 +38,14 @@ def carregar_e_processar_fase(fase: int, arquivo_path: str) -> pd.DataFrame:
         
         # Adicionar coluna Fase
         df['Fase'] = fase
+
+        # Incrementar informação da fase no ID_Unico para garantir unicidade por fase
+        # Ex: ID original 'ABC123' na Fase 2 -> 'ABC123_F2'. Se vazio/NaN, mantém vazio antes de sufixar.
+        if 'ID_Unico' in df.columns:
+            df['ID_Unico'] = df['ID_Unico'].astype(str).fillna('').str.strip()
+            # Evitar duplicar sufixo caso script seja reexecutado sobre arquivo já processado
+            mask_has_suffix = df['ID_Unico'].str.endswith(f"_F{fase}")
+            df.loc[~mask_has_suffix, 'ID_Unico'] = df.loc[~mask_has_suffix, 'ID_Unico'] + f"_F{fase}"
         
         # Selecionar apenas as colunas necessárias
         colunas_base = ['ID_Unico', 'Nome', 'Escola', 'Turma', 'Fase', 'Score_Pre', 'Score_Pos']
