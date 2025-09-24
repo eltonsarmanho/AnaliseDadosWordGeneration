@@ -1,18 +1,21 @@
 import pandas as pd
 import unicodedata
 import re
-from pathlib import Path
+import sys
+import os
 import functools
 
-BASE_DIR = Path(__file__).parents[1]
-DATA_DIR = BASE_DIR / 'Data'
+# Configuração de paths para deploy EC2
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
 
-ARQ_TDE = DATA_DIR / 'TDE_consolidado_fases_2_3_4.csv'
-ARQ_VOC = DATA_DIR / 'vocabulario_consolidado_fases_2_3_4.csv'
-MATCH_DIR = DATA_DIR / 'Longitudinal'
+# Caminhos dos arquivos de dados (relativos ao Dashboard)
+ARQ_TDE = os.path.join(os.path.dirname(__file__), 'TDE_consolidado_fases_2_3_4.csv')
+ARQ_VOC = os.path.join(os.path.dirname(__file__), 'vocabulario_consolidado_fases_2_3_4.csv')
+MATCH_DIR = os.path.join(os.path.dirname(__file__), 'Longitudinal')
 
 @functools.lru_cache(maxsize=4)
-def load_csv(path: Path) -> pd.DataFrame:
+def load_csv(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
 
@@ -48,9 +51,12 @@ def get_datasets():
 
 def load_matching():
     resultados = {}
-    for f in MATCH_DIR.glob('matching_*_f*_f*.csv'):
+    if os.path.exists(MATCH_DIR):
         try:
-            resultados[f.name] = pd.read_csv(f)
+            for filename in os.listdir(MATCH_DIR):
+                if filename.startswith('matching_') and filename.endswith('.csv'):
+                    file_path = os.path.join(MATCH_DIR, filename)
+                    resultados[filename] = pd.read_csv(file_path)
         except Exception:
             pass
     return resultados

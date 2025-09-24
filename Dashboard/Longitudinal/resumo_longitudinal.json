@@ -1,0 +1,38 @@
+{
+  "tde_f2_f3": {
+    "pares_correspondidos": 949,
+    "pares_ambiguos": 19,
+    "chaves_comuns": 951,
+    "total_candidatos_expandidos": 969
+  },
+  "tde_f3_f4": {
+    "pares_correspondidos": 318,
+    "pares_ambiguos": 3,
+    "chaves_comuns": 318,
+    "total_candidatos_expandidos": 320
+  },
+  "tde_f2_f4": {
+    "pares_correspondidos": 252,
+    "pares_ambiguos": 9,
+    "chaves_comuns": 253,
+    "total_candidatos_expandidos": 259
+  },
+  "vocab_f2_f3": {
+    "pares_correspondidos": 799,
+    "pares_ambiguos": 19,
+    "chaves_comuns": 801,
+    "total_candidatos_expandidos": 822
+  },
+  "vocab_f3_f4": {
+    "pares_correspondidos": 370,
+    "pares_ambiguos": 2,
+    "chaves_comuns": 371,
+    "total_candidatos_expandidos": 371
+  },
+  "vocab_f2_f4": {
+    "pares_correspondidos": 326,
+    "pares_ambiguos": 8,
+    "chaves_comuns": 327,
+    "total_candidatos_expandidos": 332
+  }
+}
