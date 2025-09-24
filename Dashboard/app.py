@@ -456,7 +456,7 @@ if not df.empty:
             st.plotly_chart(fig_lollipop, use_container_width=True)
             
             # Insights adicionais
-            with st.expander("💡 Insights da Análise Granular", expanded=False):
+            with st.expander("💡 Análise Granular", expanded=False):
                 melhor_questao = df_analise_sorted.iloc[0]
                 pior_questao = df_analise_sorted.iloc[-1]
                 media_variacao = df_analise['Variação (%)'].mean()
@@ -466,9 +466,9 @@ if not df.empty:
                 
                 **📉 Menor Melhoria:** {pior_questao['Questão']} com variação de **{pior_questao['Variação (%)']:+.1f}%**
                 
-                **📊 Variação Média:** **{media_variacao:+.1f}%** across todas as questões
+                **📊 Variação Média:** **{media_variacao:+.1f}%** entre todas as questões
                 
-                **🎯 Questões com Melhoria Significativa (>10%):** {len(df_analise[df_analise['Variação (%)'] > 10])} questões
+                **🎯 Questões com Melhoria Significativa (>10% na variação):** {len(df_analise[df_analise['Variação (%)'] > 10])} questões
                 
                 **⚠️ Questões com Declínio:** {len(df_analise[df_analise['Variação (%)'] < 0])} questões
                 """)
