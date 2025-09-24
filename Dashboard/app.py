@@ -135,25 +135,34 @@ with st.expander('Tamanho do Efeito (d de Cohen)', expanded=True):
 
     st.caption('Critérios: TDE ≥ 0.40 (Hattie, 2009); Vocabulário ≥ 0.35 (Marulis & Neuman, 2010); Geral (Cohen, 1988): 0.2 pequeno, 0.5 médio, 0.8 grande. Valores negativos indicam queda.')
 
-# Scores agregados por fase
+# Distribuição de scores por fase usando boxplot
 if not df.empty:
-    agg_fase = (df.groupby('Fase')
-                  .agg(Score_Pre=('Score_Pre','mean'),
-                       Score_Pos=('Score_Pos','mean'),
-                       N=('Nome','nunique'))
-                  .reset_index())
-    fig_fase = px.bar(
-        agg_fase,
-        x='Fase',
-        y=['Score_Pre','Score_Pos'],
-        barmode='group',
-        title='Média Pré-Teste vs Pós-Teste por Fase',
-        labels={'value':'Score','variable':'Teste', 'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}
+    # Transformar dados para formato longo para o boxplot
+    df_boxplot = df.melt(
+        id_vars=['Fase'], 
+        value_vars=['Score_Pre', 'Score_Pos'],
+        var_name='Momento', 
+        value_name='Score'
     )
-    # Renomear legendas explicitamente (wide-form mantém nomes originais das colunas)
-    rename_map = {'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}
-    fig_fase.for_each_trace(lambda tr: tr.update(name=rename_map.get(tr.name, tr.name),
-                                                 legendgroup=rename_map.get(tr.name, tr.name)))
+    # Renomear para nomes mais amigáveis
+    df_boxplot['Momento'] = df_boxplot['Momento'].replace({
+        'Score_Pre': 'Pré-Teste',
+        'Score_Pos': 'Pós-Teste'
+    })
+    
+    fig_fase = px.box(
+        df_boxplot,
+        x='Fase',
+        y='Score',
+        color='Momento',
+        title='Distribuição Pré-Teste vs Pós-Teste por Fase',
+        labels={'Score': 'Score', 'Momento': 'Teste'},
+        points='outliers'  # Mostra apenas outliers como pontos
+    )
+    fig_fase.update_layout(
+        legend_title_text='Teste',
+        showlegend=True
+    )
     st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO AGRUPADA POR ESCOLA (Plotly Line) ----------------
