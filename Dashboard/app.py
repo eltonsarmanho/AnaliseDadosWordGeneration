@@ -343,29 +343,52 @@ if nome_sel and nome_sel != "<selecione>":
                      }))
         st.dataframe(styled_df, use_container_width=True)
 
-        # Linha evolução com Delta
-        # Preparar dados para o gráfico incluindo Delta
-        df_ind_copy = df_ind.copy()
-        df_ind_copy['Delta'] = df_ind_copy['Score_Pos'] - df_ind_copy['Score_Pre']
+        # Gráficos lado a lado: Pré/Pós-Teste e Delta
+        col1, col2 = st.columns(2)
         
-        long = (df_ind_copy.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos','Delta'],
-                                var_name='Momento', value_name='Score')
-                           .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste','Delta':'Delta'}))
-        
-        fig_line = px.line(long, x='Fase', y='Score', color='Momento', markers=True,
-                           title=f'Evolução Pré vs Pós com Delta - {nome_sel}',
-                           labels={'Momento': 'Teste'})
-        
-        # Configurar eixo X com ticks discretos como coordenadas paralelas
-        fig_line.update_layout(
-            xaxis=dict(
-                tickmode='array',
-                tickvals=[2, 3, 4],
-                ticktext=['2', '3', '4'],
-                title='Fase'
+        with col1:
+            # Gráfico de Pré-Teste vs Pós-Teste (sem Delta)
+            long_scores = (df_ind.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos'],
+                                      var_name='Momento', value_name='Score')
+                                 .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}))
+            
+            fig_scores = px.line(long_scores, x='Fase', y='Score', color='Momento', markers=True,
+                               title=f'Evolução Pré vs Pós - {nome_sel}',
+                               labels={'Momento': 'Teste'})
+            
+            # Configurar eixo X com ticks discretos
+            fig_scores.update_layout(
+                xaxis=dict(
+                    tickmode='array',
+                    tickvals=[2, 3, 4],
+                    ticktext=['2', '3', '4'],
+                    title='Fase'
+                )
             )
-        )
-        st.plotly_chart(fig_line, use_container_width=True)
+            st.plotly_chart(fig_scores, use_container_width=True)
+        
+        with col2:
+            # Gráfico somente do Delta
+            df_delta = df_ind.copy()
+            df_delta['Delta'] = df_delta['Score_Pos'] - df_delta['Score_Pre']
+            
+            fig_delta = px.line(df_delta, x='Fase', y='Delta', markers=True,
+                              title=f'Evolução Delta - {nome_sel}',
+                              labels={'Delta': 'Delta (Pós - Pré)'})
+            
+            # Configurar eixo X com ticks discretos e adicionar linha zero de referência
+            fig_delta.update_layout(
+                xaxis=dict(
+                    tickmode='array',
+                    tickvals=[2, 3, 4],
+                    ticktext=['2', '3', '4'],
+                    title='Fase'
+                )
+            )
+            # Adicionar linha horizontal no zero para referência
+            fig_delta.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+            
+            st.plotly_chart(fig_delta, use_container_width=True)
 
         # Deltas
         # fig_delta = px.bar(df_show, x='Fase', y='Delta', title='Delta (Pós - Pré) por Fase',
