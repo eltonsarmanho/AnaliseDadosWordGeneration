@@ -417,6 +417,33 @@ if not df.empty:
                 hovertemplate='<b>%{y}</b><br>Pós-Teste: %{x:.1f}%<extra></extra>'
             ))
             
+            # Adicionar linha horizontal separando questões com variação positiva/neutra das negativas
+            # Encontrar a posição da linha divisória (entre variação >= 0 e < 0)
+            questoes_positivas = df_lollipop[df_lollipop['Variação (%)'] >= 0]
+            questoes_negativas = df_lollipop[df_lollipop['Variação (%)'] < 0]
+            
+            if len(questoes_negativas) > 0 and len(questoes_positivas) > 0:
+                # Encontrar a posição entre a última questão negativa e a primeira positiva
+                ultima_negativa_idx = df_lollipop[df_lollipop['Variação (%)'] < 0].index[-1]
+                primeira_positiva_idx = df_lollipop[df_lollipop['Variação (%)'] >= 0].index[0]
+                
+                # Como os dados estão ordenados por variação crescente, a linha vai entre essas posições
+                posicao_linha = (df_lollipop.index.get_loc(ultima_negativa_idx) + 
+                               df_lollipop.index.get_loc(primeira_positiva_idx)) / 2
+                
+                # Adicionar linha horizontal
+                fig_lollipop.add_hline(
+                    y=posicao_linha,
+                    line_dash="dash",
+                    line_color="orange",
+                    line_width=2,
+                    opacity=0.7,
+                    annotation_text="Limite Melhoria/Declínio",
+                    annotation_position="top right",
+                    annotation_font_size=12,
+                    annotation_font_color="orange"
+                )
+            
             fig_lollipop.update_layout(
                 title='Evolução do Percentual de Acerto por Questão',
                 xaxis_title='Percentual de Acerto (%)',
