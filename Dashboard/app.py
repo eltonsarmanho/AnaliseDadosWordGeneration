@@ -316,14 +316,55 @@ if nome_sel and nome_sel != "<selecione>":
         # Tabela detalhada
         df_show = df_ind[['Fase','Escola','Turma','Score_Pre','Score_Pos']].copy()
         df_show['Delta'] = df_show['Score_Pos'] - df_show['Score_Pre']
-        st.dataframe(df_show, use_container_width=True)
+        # Renomear colunas para nomes mais amigáveis
+        df_show = df_show.rename(columns={
+            'Score_Pre': 'Pré-Teste',
+            'Score_Pos': 'Pós-Teste'
+        })
+        
+        # Função para estilizar a coluna Delta com cores melhoradas e fonte em negrito
+        def style_delta(val):
+            if pd.isna(val):
+                return ''
+            elif val > 0:
+                return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold; border-left: 4px solid #28a745'  # Verde mais suave
+            elif val == 0:
+                return 'background-color: #f1f3f4; color: #495057; font-weight: bold; border-left: 4px solid #6c757d'  # Cinza neutro
+            else:  # val < 0
+                return 'background-color: #fdf2f2; color: #721c24; font-weight: bold; border-left: 4px solid #dc3545'  # Vermelho mais suave
+        
+        # Aplicar estilo à tabela com formatação de números
+        styled_df = (df_show.style
+                     .applymap(style_delta, subset=['Delta'])
+                     .format({
+                         'Pré-Teste': '{:.1f}',
+                         'Pós-Teste': '{:.1f}',
+                         'Delta': '{:+.1f}'  # Formato com sinal + ou -
+                     }))
+        st.dataframe(styled_df, use_container_width=True)
 
-        # Linha evolução
-        long = (df_ind.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos'],
-                            var_name='Momento', value_name='Score')
-                       .replace({'Score_Pre':'Pré','Score_Pos':'Pós'}))
+        # Linha evolução com Delta
+        # Preparar dados para o gráfico incluindo Delta
+        df_ind_copy = df_ind.copy()
+        df_ind_copy['Delta'] = df_ind_copy['Score_Pos'] - df_ind_copy['Score_Pre']
+        
+        long = (df_ind_copy.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos','Delta'],
+                                var_name='Momento', value_name='Score')
+                           .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste','Delta':'Delta'}))
+        
         fig_line = px.line(long, x='Fase', y='Score', color='Momento', markers=True,
-                           title=f'Evolução Pré vs Pós - {nome_sel}')
+                           title=f'Evolução Pré vs Pós com Delta - {nome_sel}',
+                           labels={'Momento': 'Teste'})
+        
+        # Configurar eixo X com ticks discretos como coordenadas paralelas
+        fig_line.update_layout(
+            xaxis=dict(
+                tickmode='array',
+                tickvals=[2, 3, 4],
+                ticktext=['2', '3', '4'],
+                title='Fase'
+            )
+        )
         st.plotly_chart(fig_line, use_container_width=True)
 
         # Deltas
