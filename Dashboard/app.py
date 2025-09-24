@@ -368,9 +368,9 @@ if nome_sel and nome_sel != "<selecione>":
         st.plotly_chart(fig_line, use_container_width=True)
 
         # Deltas
-        fig_delta = px.bar(df_show, x='Fase', y='Delta', title='Delta (Pós - Pré) por Fase',
-                           text='Delta')
-        st.plotly_chart(fig_delta, use_container_width=True)
+        # fig_delta = px.bar(df_show, x='Fase', y='Delta', title='Delta (Pós - Pré) por Fase',
+        #                    text='Delta')
+        # st.plotly_chart(fig_delta, use_container_width=True)
 else:
     st.info("Selecione um aluno para ver evolução individual.")
 
