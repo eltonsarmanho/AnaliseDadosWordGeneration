@@ -7,10 +7,42 @@ import numpy as np
 
 st.set_page_config(page_title="Dashboard Longitudinal WordGen", layout="wide")
 
+def normalizar_turma(turma_original: str) -> str:
+    """Normaliza valores de turma para formato padrão (5° Ano, 6° Ano, etc.)"""
+    if pd.isna(turma_original):
+        return turma_original
+    
+    turma_str = str(turma_original).upper().strip()
+    
+    # Mapeamento de padrões para anos padronizados
+    if any(x in turma_str for x in ['5', 'QUINTO']):
+        return '5° Ano'
+    elif any(x in turma_str for x in ['6', 'SEXTO']):
+        return '6° Ano'
+    elif any(x in turma_str for x in ['7', 'SETIMO', 'SÉTIMO']):
+        return '7° Ano'
+    elif any(x in turma_str for x in ['8', 'OITAVO']):
+        return '8° Ano'
+    elif any(x in turma_str for x in ['9', 'NONO']):
+        return '9° Ano'
+    else:
+        # Se não conseguir identificar, mantém original
+        return turma_original
+
 @st.cache_data(show_spinner=False)
 def load_data():
-    """Carrega apenas os datasets principais (TDE e Vocabulário)."""
+    """Carrega e normaliza os datasets principais (TDE e Vocabulário)."""
     tde, vocab = get_datasets()
+    
+    # Preservar turmas originais antes da normalização para contagem correta
+    if 'Turma' in tde.columns:
+        tde['Turma_Original'] = tde['Turma'].copy()
+        tde['Turma'] = tde['Turma'].apply(normalizar_turma)
+    
+    if 'Turma' in vocab.columns:
+        vocab['Turma_Original'] = vocab['Turma'].copy()
+        vocab['Turma'] = vocab['Turma'].apply(normalizar_turma)
+    
     return tde, vocab
 
 # ================= HEADER ====================
@@ -59,7 +91,9 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Registros", len(df))
 col2.metric("Alunos únicos (Nome)", df['Nome'].nunique())
 col3.metric("Escolas", df['Escola'].nunique())
-col4.metric("Turmas", df['Turma'].nunique())
+# Contar turmas originais (antes da normalização) para mostrar quantidade real de classes
+turmas_originais = df['Turma_Original'].nunique() if 'Turma_Original' in df.columns else df['Turma'].nunique()
+col4.metric("Turmas", turmas_originais)
 
 # ================= EFFECT SIZE (COHEN'S D) ==================
 def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
@@ -300,20 +334,7 @@ else:
     st.info("Selecione um aluno para ver evolução individual.")
 
 # (Seção de continuidade longitudinal removida conforme solicitação do usuário)
-
-# ================= DISTRIBUIÇÃO DE DELTAS ==================
-st.subheader("Distribuição de Deltas (Pós - Pré)")
-if not df.empty:
-    df['Delta'] = df['Score_Pos'] - df['Score_Pre']
-    fig_hist = px.histogram(df, x='Delta', nbins=30, title='Distribuição dos Deltas', marginal='rug')
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-    agg_turma = (df.groupby('Turma')
-                   .agg(Media_Delta=('Delta','mean'), N=('Nome','nunique'))
-                   .reset_index() 
-                   .sort_values('Media_Delta', ascending=False))
-    st.markdown("**Média de Delta por Turma (top 20)**")
-    st.dataframe(agg_turma.head(20), use_container_width=True)
+# (Seção de distribuição de deltas removida conforme solicitação do usuário)
 
 # ================= FOOTER ==================
 st.markdown("---")
