@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from data_loader import get_datasets
 import unicodedata, re, math
 import numpy as np
@@ -305,6 +306,151 @@ if not df.empty:
             xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase')
         )
         st.plotly_chart(fig_lines, use_container_width=True)
+
+# ================= ANÁLISE GRANULAR POR QUESTÃO ==================
+st.markdown("### Análise Granular por Questão")
+st.caption("Análise detalhada do desempenho por questão específica, mostrando evolução e competências melhor assimiladas.")
+
+if not df.empty:
+    # Identificar colunas de questões (Q1_Pre, Q1_Pos, Q2_Pre, Q2_Pos, etc.)
+    questao_cols = [col for col in df.columns if col.startswith('Q') and ('_Pre' in col or '_Pos' in col)]
+    
+    if questao_cols:
+        # Extrair números das questões disponíveis
+        questoes_nums = set()
+        for col in questao_cols:
+            if '_Pre' in col:
+                q_num = col.split('_Pre')[0]
+                questoes_nums.add(q_num)
+        
+        questoes_nums = sorted(list(questoes_nums), key=lambda x: int(x[1:]))  # Ordenar Q1, Q2, Q3...
+        
+        # 1. Calcular percentual de acerto por questão
+        analise_questoes = []
+        
+        for q_num in questoes_nums:
+            col_pre = f"{q_num}_Pre"
+            col_pos = f"{q_num}_Pos"
+            
+            if col_pre in df.columns and col_pos in df.columns:
+                # Calcular percentuais (assumindo que 1 = acerto, 0 = erro)
+                pct_pre = (df[col_pre].sum() / df[col_pre].count()) * 100 if df[col_pre].count() > 0 else 0
+                pct_pos = (df[col_pos].sum() / df[col_pos].count()) * 100 if df[col_pos].count() > 0 else 0
+                variacao = pct_pos - pct_pre
+                
+                analise_questoes.append({
+                    'Questão': q_num,
+                    '% Acerto Pré': pct_pre,
+                    '% Acerto Pós': pct_pos,
+                    'Variação (%)': variacao
+                })
+        
+        if analise_questoes:
+            df_analise = pd.DataFrame(analise_questoes)
+            
+            # 2. Tabela de Evolução por Competência (ordenada pela maior variação)
+            df_analise_sorted = df_analise.sort_values('Variação (%)', ascending=False)
+            
+            st.markdown("#### Tabela de Evolução por Competência")
+            st.caption("Questões ordenadas pela maior variação (melhoria) no percentual de acerto")
+            
+            # Formatação da tabela com cores
+            def style_variacao(val):
+                if pd.isna(val):
+                    return ''
+                elif val > 0:
+                    return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold'  # Verde
+                elif val < 0:
+                    return 'background-color: #fdf2f2; color: #721c24; font-weight: bold'  # Vermelho
+                else:
+                    return 'background-color: #f1f3f4; color: #495057; font-weight: bold'  # Cinza
+            
+            styled_analise = (df_analise_sorted.style
+                             .applymap(style_variacao, subset=['Variação (%)'])
+                             .format({
+                                 '% Acerto Pré': '{:.1f}%',
+                                 '% Acerto Pós': '{:.1f}%',
+                                 'Variação (%)': '{:+.1f}%'
+                             }))
+            
+            st.dataframe(styled_analise, use_container_width=True)
+            
+            # 3. Gráfico Lollipop
+            st.markdown("#### Gráfico de Evolução por Questão (Lollipop)")
+            st.caption("Comparação visual do desempenho pré vs pós por questão. Linhas conectam os percentuais, mostrando a evolução.")
+            
+            # Preparar dados para o gráfico lollipop
+            df_lollipop = df_analise.copy()
+            df_lollipop = df_lollipop.sort_values('Variação (%)', ascending=True)  # Melhor variação no topo
+            
+            # Criar gráfico lollipop usando plotly
+            fig_lollipop = go.Figure()
+            
+            # Adicionar linhas conectoras
+            for i, row in df_lollipop.iterrows():
+                fig_lollipop.add_trace(go.Scatter(
+                    x=[row['% Acerto Pré'], row['% Acerto Pós']],
+                    y=[row['Questão'], row['Questão']],
+                    mode='lines',
+                    line=dict(color='lightgray', width=2),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            # Adicionar pontos do Pré-teste
+            fig_lollipop.add_trace(go.Scatter(
+                x=df_lollipop['% Acerto Pré'],
+                y=df_lollipop['Questão'],
+                mode='markers',
+                marker=dict(color='#dc3545', size=8),
+                name='Pré-Teste',
+                hovertemplate='<b>%{y}</b><br>Pré-Teste: %{x:.1f}%<extra></extra>'
+            ))
+            
+            # Adicionar pontos do Pós-teste
+            fig_lollipop.add_trace(go.Scatter(
+                x=df_lollipop['% Acerto Pós'],
+                y=df_lollipop['Questão'],
+                mode='markers',
+                marker=dict(color='#28a745', size=8),
+                name='Pós-Teste',
+                hovertemplate='<b>%{y}</b><br>Pós-Teste: %{x:.1f}%<extra></extra>'
+            ))
+            
+            fig_lollipop.update_layout(
+                title='Evolução do Percentual de Acerto por Questão',
+                xaxis_title='Percentual de Acerto (%)',
+                yaxis_title='Questão',
+                showlegend=True,
+                height=max(400, len(questoes_nums) * 25),  # Altura dinâmica baseada no número de questões
+                margin=dict(l=80, r=20, t=60, b=40)
+            )
+            
+            st.plotly_chart(fig_lollipop, use_container_width=True)
+            
+            # Insights adicionais
+            with st.expander("💡 Insights da Análise Granular", expanded=False):
+                melhor_questao = df_analise_sorted.iloc[0]
+                pior_questao = df_analise_sorted.iloc[-1]
+                media_variacao = df_analise['Variação (%)'].mean()
+                
+                st.markdown(f"""
+                **📈 Maior Melhoria:** {melhor_questao['Questão']} com variação de **{melhor_questao['Variação (%)']:+.1f}%**
+                
+                **📉 Menor Melhoria:** {pior_questao['Questão']} com variação de **{pior_questao['Variação (%)']:+.1f}%**
+                
+                **📊 Variação Média:** **{media_variacao:+.1f}%** across todas as questões
+                
+                **🎯 Questões com Melhoria Significativa (>10%):** {len(df_analise[df_analise['Variação (%)'] > 10])} questões
+                
+                **⚠️ Questões com Declínio:** {len(df_analise[df_analise['Variação (%)'] < 0])} questões
+                """)
+        else:
+            st.info("Não foram encontradas questões com dados válidos para análise.")
+    else:
+        st.info("Dataset não contém colunas de questões individuais (Q1_Pre, Q1_Pos, etc.).")
+else:
+    st.info("Nenhum dado disponível para análise granular.")
 
 # ================= EVOLUÇÃO INDIVIDUAL ==================
 st.subheader("Evolução Individual (Pré vs Pós por Fase)")
