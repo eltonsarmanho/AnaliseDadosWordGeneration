@@ -198,7 +198,7 @@ if not df.empty:
         legend_title_text='Teste',
         showlegend=True
     )
-    st.plotly_chart(fig_fase, use_container_width=True)
+    st.plotly_chart(fig_fase, width="stretch")
 
     # ---------------- EVOLUÇÃO AGRUPADA POR ESCOLA (Plotly Line) ----------------
     st.markdown("### Evolução Comparativa Hierárquica (Drill-Down)")
@@ -362,7 +362,7 @@ if not df.empty:
             
             if fig_escolas:
                 # Capturar cliques no gráfico
-                clicked_data = st.plotly_chart(fig_escolas, use_container_width=True, 
+                clicked_data = st.plotly_chart(fig_escolas, width="stretch", 
                                              on_select="rerun", key="escola_chart")
                 
                 # Processar seleção de escola
@@ -420,7 +420,7 @@ if not df.empty:
                 )
                 
                 if fig_turmas:
-                    clicked_data = st.plotly_chart(fig_turmas, use_container_width=True, 
+                    clicked_data = st.plotly_chart(fig_turmas, width="stretch", 
                                                  on_select="rerun", key="turma_chart")
                     
                     if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
@@ -470,7 +470,7 @@ if not df.empty:
                 )
                 
                 if fig_alunos:
-                    st.plotly_chart(fig_alunos, use_container_width=True, key="aluno_chart")
+                    st.plotly_chart(fig_alunos, width="stretch", key="aluno_chart")
             else:
                 st.info("Sem dados suficientes de alunos para esta turma.")
         else:
@@ -542,7 +542,7 @@ if not df.empty:
                                  'Variação (%)': '{:+.1f}%'
                              }))
             
-            st.dataframe(styled_analise, use_container_width=True)
+            st.dataframe(styled_analise, width="stretch")
             # 3. Gráfico de Evolução por Questão
             st.markdown("#### Gráfico de Evolução por Questão")
             st.caption("Comparação visual do desempenho pré vs pós por questão. Linhas conectam os percentuais, mostrando a evolução.")
@@ -621,7 +621,7 @@ if not df.empty:
                 margin=dict(l=80, r=20, t=60, b=40)
             )
             
-            st.plotly_chart(fig_lollipop, use_container_width=True)
+            st.plotly_chart(fig_lollipop, width="stretch")
             
             # Insights adicionais
             with st.expander("💡 Análise Granular", expanded=False):
@@ -682,7 +682,7 @@ if nome_sel and nome_sel != "<selecione>":
                          'Pós-Teste': '{:.1f}',
                          'Delta': '{:+.1f}'  # Formato com sinal + ou -
                      }))
-        st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(styled_df, width="stretch")
 
         # Gráficos lado a lado: Pré/Pós-Teste e Delta
         col1, col2 = st.columns(2)
@@ -706,7 +706,7 @@ if nome_sel and nome_sel != "<selecione>":
                     title='Fase'
                 )
             )
-            st.plotly_chart(fig_scores, use_container_width=True)
+            st.plotly_chart(fig_scores, width="stretch")
         
         with col2:
             # Gráfico somente do Delta
@@ -729,12 +729,12 @@ if nome_sel and nome_sel != "<selecione>":
             # Adicionar linha horizontal no zero para referência
             fig_delta.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
             
-            st.plotly_chart(fig_delta, use_container_width=True)
+            st.plotly_chart(fig_delta, width="stretch")
 
         # Deltas
         # fig_delta = px.bar(df_show, x='Fase', y='Delta', title='Delta (Pós - Pré) por Fase',
         #                    text='Delta')
-        # st.plotly_chart(fig_delta, use_container_width=True)
+        # st.plotly_chart(fig_delta, width="stretch")
 else:
     st.info("Selecione um aluno para ver evolução individual.")
 
