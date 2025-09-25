@@ -226,12 +226,14 @@ def carregar_e_preparar_dados(escola_filtro=None):
             df_pos[col] = df_pos[col].apply(converter_valor_questao)
     
     # Adicionar grupos etários
-    df_pre['GrupoEtario'] = df_pre['TURMA'].apply(classificar_grupo_etario)
-    df_pos['GrupoEtario'] = df_pos['TURMA'].apply(classificar_grupo_etario)
+    df_pre['GrupoEtario'] = df_pre['Turma'].apply(classificar_grupo_etario)
+    df_pos['GrupoEtario'] = df_pos['Turma'].apply(classificar_grupo_etario)
     
-    # Criar identificador único
-    df_pre['ID_Unico'] = df_pre['NOME'].astype(str) + "_" + df_pre['TURMA'].astype(str)
-    df_pos['ID_Unico'] = df_pos['NOME'].astype(str) + "_" + df_pos['TURMA'].astype(str)
+    # Garantir ID_Unico se não existir (mas já temos nos dados consolidados)
+    if 'ID_Unico' not in df_pre.columns:
+        df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Turma'].astype(str)
+    if 'ID_Unico' not in df_pos.columns:
+        df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Turma'].astype(str)
     
     print("2. Limpando dados...")
     

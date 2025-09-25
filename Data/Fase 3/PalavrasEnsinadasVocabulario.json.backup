@@ -1,0 +1,27 @@
+{
+  "palavras_ensinadas": [
+    "CASA",
+    "GATO",
+    "LIVRO",
+    "MESA",
+    "ÁGUA",
+    "ESCOLA",
+    "MENINO",
+    "MENINA",
+    "BOLA",
+    "CARRO",
+    "FLOR",
+    "PÁSSARO",
+    "ÁRVORE",
+    "CACHORRO",
+    "BONECA",
+    "BICICLETA",
+    "COMPUTADOR",
+    "TELEVISÃO",
+    "GELADEIRA",
+    "TELEFONE"
+  ],
+  "total": 20,
+  "fase": 3,
+  "observacoes": "Lista simulada para compatibilidade com relatórios visuais"
+}

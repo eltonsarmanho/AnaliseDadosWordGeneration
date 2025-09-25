@@ -1,34 +1,33 @@
 {
-  "Palavras Ensinadas": [
-    "convencer",
-    "enorme",
-    "integridade",
-    "persistente",
-    "relutante",
+  "palavras_ensinadas": [
+    "ambígua",
+    "contribuiu",
+    "depreciativos",
     "diretriz",
-    "maduro",
-    "ambíguo",
-    "devido",
-    "status",
-    "ajuste",
-    "exposição",
-    "modificar",
-    "monitorar",
-    "transição",
-    "abandono",
-    "frívolo",
-    "contemporâneo",
-    "dramático",
-    "explorar",
-    "acesso",
-    "civil",
-    "apesar de",
-    "integrar",
-    "promover",
-    "analisar",
-    "fator",
+    "dramática",
+    "década",
     "função",
-    "interpretar",
-    "estrutura"
-  ]
+    "indenização",
+    "status"
+  ],
+  "Palavras Ensinadas": [
+    "ambígua",
+    "contribuiu",
+    "depreciativos",
+    "diretriz",
+    "dramática",
+    "década",
+    "função",
+    "indenização",
+    "status"
+  ],
+  "total": 9,
+  "fase": 2,
+  "metodologia": "Identificação baseada em análise estatística de performance",
+  "criterios": [
+    "Delta de melhora acima da média + 0.5 desvio padrão",
+    "Top 40% das palavras com maior melhora",
+    "Delta acima da mediana + 1 desvio padrão"
+  ],
+  "observacoes": "Palavras identificadas automaticamente baseado na análise de 9 palavras da Fase 2"
 }
