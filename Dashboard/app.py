@@ -374,9 +374,8 @@ if not df.empty:
                              }))
             
             st.dataframe(styled_analise, use_container_width=True)
-            
-            # 3. Gráfico Lollipop
-            st.markdown("#### Gráfico de Evolução por Questão (Lollipop)")
+            # 3. Gráfico de Evolução por Questão
+            st.markdown("#### Gráfico de Evolução por Questão")
             st.caption("Comparação visual do desempenho pré vs pós por questão. Linhas conectam os percentuais, mostrando a evolução.")
             
             # Preparar dados para o gráfico lollipop

@@ -1,7 +1,4 @@
-# --- EsRUN pip install --upgrade pip
-COPY requirements.txt .
-# --wheel-dir cria "wheels" pré-compilados, otimizando a instalação no próximo estágio.
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txto 1: Builder ---
+# --- Estágio 1: Builder ---
 # Usamos uma imagem Python completa para instalar as dependências de forma eficiente.
 FROM python:3.11-slim-buster as builder 
 
@@ -12,7 +9,7 @@ WORKDIR /app
 RUN pip install --upgrade pip
 COPY requirements.txt .
 # --wheel-dir cria "wheels" pré-compilados, otimizando a instalação no próximo estágio.
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirement.txt
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 
 # --- Estágio 2: Final ---
