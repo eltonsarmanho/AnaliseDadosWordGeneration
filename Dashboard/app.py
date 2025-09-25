@@ -76,11 +76,24 @@ fases_sel = st.sidebar.multiselect("Fase(s)", fases, default=fases)
 if fases_sel:
     df = df[df['Fase'].isin(fases_sel)]
 
-# Turmas (dependente de escolas/fases)
-turmas = sorted(df['Turma'].dropna().unique())
-turmas_sel = st.sidebar.multiselect("Turma(s)", turmas)
+# Turmas - Opção de agregação
+st.sidebar.markdown("---")
+agregar_turmas = st.sidebar.checkbox("🔄 Agregar turmas por ano", value=False, 
+                                    help="Ative para agrupar turmas do mesmo ano (ex: 7° A, 7° B → 7° Ano)")
+
+# Determinar que coluna de turma usar baseado na opção de agregação
+if agregar_turmas:
+    coluna_turma = 'Turma'  # Usa turmas normalizadas/agregadas
+    turmas_disponiveis = sorted(df['Turma'].dropna().unique())
+    label_turmas = "Turma(s) - Agregadas"
+else:
+    coluna_turma = 'Turma_Original'  # Usa turmas originais/separadas
+    turmas_disponiveis = sorted(df['Turma_Original'].dropna().unique())
+    label_turmas = "Turma(s) - Separadas"
+
+turmas_sel = st.sidebar.multiselect(label_turmas, turmas_disponiveis)
 if turmas_sel:
-    df = df[df['Turma'].isin(turmas_sel)]
+    df = df[df[coluna_turma].isin(turmas_sel)]
 
 # Nome (para acompanhamento individual)
 nomes = sorted(df['Nome'].dropna().unique())
@@ -92,9 +105,10 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Registros", len(df))
 col2.metric("Alunos únicos (Nome)", df['Nome'].nunique())
 col3.metric("Escolas", df['Escola'].nunique())
-# Contar turmas originais (antes da normalização) para mostrar quantidade real de classes
-turmas_originais = df['Turma_Original'].nunique() if 'Turma_Original' in df.columns else df['Turma'].nunique()
-col4.metric("Turmas", turmas_originais)
+# Contar turmas baseado na opção de agregação escolhida
+turmas_count = df[coluna_turma].nunique()
+turma_label = "Turmas (Agregadas)" if agregar_turmas else "Turmas (Separadas)"
+col4.metric(turma_label, turmas_count)
 
 # ================= EFFECT SIZE (COHEN'S D) ==================
 def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
@@ -232,6 +246,7 @@ if not df.empty:
             st.button(f"👥 {st.session_state.selected_turma}", type="primary", disabled=True)
 
     with st.expander("Opções avançadas de visualização", expanded=False):
+        st.info("💡 **Nova funcionalidade**: Use o filtro '🔄 Agregar turmas por ano' na barra lateral para controlar como as turmas são exibidas no drill-down.")
         agrupar = st.checkbox("Agrupar nomes equivalentes de escolas", value=True, help="Normaliza acentos, caixa e remove termos comuns.")
         preencher_faltantes = st.checkbox("Preencher fases ausentes com média da fase", value=True)
         normalizar = st.checkbox("Mostrar valores normalizados (z-score por fase)", value=False, help="Z-score é uma medida de distância para a média de um conjunto de dados. Valores positivos indicam acima da média, negativos abaixo. Útil para comparar tendências entre escolas com diferentes níveis de desempenho.")
@@ -304,6 +319,9 @@ if not df.empty:
         df_lin['Escola_Base'] = df_lin['Escola'].apply(normaliza_escola)
     else:
         df_lin['Escola_Base'] = df_lin['Escola']
+    
+    # Adicionar coluna de turma baseada na escolha do usuário
+    df_lin['Turma_Drill'] = df_lin[coluna_turma]
 
     # Normalização opcional
     if normalizar:
@@ -383,9 +401,11 @@ if not df.empty:
         df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
         
         if not df_escola.empty:
-            agrup_turma = (df_escola.groupby(['Turma','Fase'])['Delta']
+            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])['Delta']
                                   .mean()
                                   .reset_index())
+            # Renomear para manter compatibilidade com o resto do código
+            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma'})
             
             if preencher_faltantes:
                 fases_ord = sorted(set(fases_sel))
@@ -443,7 +463,7 @@ if not df.empty:
         # Filtrar dados da escola e turma selecionadas
         df_turma = df_lin[
             (df_lin['Escola_Base'] == st.session_state.selected_escola) & 
-            (df_lin['Turma'] == st.session_state.selected_turma)
+            (df_lin['Turma_Drill'] == st.session_state.selected_turma)
         ]
         
         if not df_turma.empty:
@@ -743,5 +763,5 @@ else:
 
 # ================= FOOTER ==================
 st.markdown("---")
-st.caption("Dashboard gerado automaticamente - WordGen • Utilize filtros na barra lateral para refinar a análise.")
+st.caption("Dashboard desenvolvido por Elton Sarmanho • Utilize filtros na barra lateral para refinar a análise.")
 
