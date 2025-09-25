@@ -201,8 +201,35 @@ if not df.empty:
     st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO AGRUPADA POR ESCOLA (Plotly Line) ----------------
-    st.markdown("### Evolução Comparativa entre Escolas")
-    st.caption("Cada linha representa a média de Delta (Pós - Pré) da escola por fase. Passe o mouse para ver detalhes.")
+    st.markdown("### Evolução Comparativa Hierárquica (Drill-Down)")
+    st.caption("Cada linha representa a média de Delta (Pós - Pré) por fase. **Clique em uma linha** para navegar: Escola → Turma → Aluno.")
+
+    # Estado do drill-down usando session_state
+    if 'drill_level' not in st.session_state:
+        st.session_state.drill_level = 'escola'
+    if 'selected_escola' not in st.session_state:
+        st.session_state.selected_escola = None
+    if 'selected_turma' not in st.session_state:
+        st.session_state.selected_turma = None
+
+    # Breadcrumb navigation
+    col_nav1, col_nav2, col_nav3 = st.columns([1, 1, 2])
+    with col_nav1:
+        if st.button("🏠 Escolas", type="primary" if st.session_state.drill_level == 'escola' else "secondary"):
+            st.session_state.drill_level = 'escola'
+            st.session_state.selected_escola = None
+            st.session_state.selected_turma = None
+            st.rerun()
+    
+    with col_nav2:
+        if st.session_state.selected_escola and st.button(f"🏫 {st.session_state.selected_escola}", type="primary" if st.session_state.drill_level == 'turma' else "secondary"):
+            st.session_state.drill_level = 'turma'
+            st.session_state.selected_turma = None
+            st.rerun()
+    
+    with col_nav3:
+        if st.session_state.selected_turma:
+            st.button(f"👥 {st.session_state.selected_turma}", type="primary", disabled=True)
 
     with st.expander("Opções avançadas de visualização", expanded=False):
         agrupar = st.checkbox("Agrupar nomes equivalentes de escolas", value=True, help="Normaliza acentos, caixa e remove termos comuns.")
@@ -220,6 +247,57 @@ if not df.empty:
         s = re.sub(r"\s+", " ", s).strip()
         return s
 
+    def criar_grafico_drill(df_data, agrupamento_col, titulo, y_col, y_label, 
+                           custom_cols, nivel_drill, click_callback=None):
+        """Função auxiliar para criar gráficos de drill-down"""
+        if df_data.empty:
+            st.info(f"Sem dados suficientes para plotar {titulo.lower()}.")
+            return None
+            
+        # Ordenar por média se solicitado
+        if ordenar:
+            media_por_grupo = df_data.groupby(agrupamento_col)['Delta'].mean()
+            ordem = media_por_grupo.sort_values(ascending=False).index
+        else:
+            ordem = sorted(df_data[agrupamento_col].unique())
+        
+        df_data[agrupamento_col] = pd.Categorical(df_data[agrupamento_col], 
+                                                  categories=ordem, ordered=True)
+        df_data = df_data.sort_values([agrupamento_col, 'Fase'])
+        
+        # Criar coluna numérica para eixo ordinal
+        fase_map = {'2':2,'3':3,'4':4}
+        df_data['FaseNum'] = df_data['Fase'].astype(str).map(fase_map)
+        
+        fig = px.line(
+            df_data,
+            x='FaseNum', y=y_col, color=agrupamento_col,
+            category_orders={agrupamento_col: list(ordem)},
+            custom_data=custom_cols,
+            markers=True,
+            labels={'FaseNum':'Fase', agrupamento_col: titulo.split()[0], y_col: y_label},
+            title=titulo
+        )
+        
+        hover_template = (
+            f'<b>%{{customdata[0]}}</b><br>'
+            'Fase: %{x}<br>'
+            f'{y_label}: %{{y:.2f}}<br>'
+            'Delta Real: %{customdata[1]:.2f}<br>'
+            'Média Geral Delta: %{customdata[2]:.2f}<extra></extra>'
+        )
+        
+        fig.update_traces(hovertemplate=hover_template, opacity=0.8)
+        fig.update_layout(
+            legend_title_text=titulo.split()[0],
+            yaxis_title=y_label,
+            xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase'),
+            clickmode='event+select'
+        )
+        
+        return fig
+
+    # Preparar dados base
     df_lin = df.copy()
     df_lin['Delta'] = df_lin['Score_Pos'] - df_lin['Score_Pre']
     if agrupar:
@@ -227,85 +305,176 @@ if not df.empty:
     else:
         df_lin['Escola_Base'] = df_lin['Escola']
 
-    agrup_mean = (df_lin.groupby(['Escola_Base','Fase'])['Delta']
-                        .mean()
-                        .reset_index())
-    # Reindex para preencher fases faltantes se necessário
-    if preencher_faltantes:
-        fases_ord = sorted(set(fases_sel))
-        todas = pd.MultiIndex.from_product([agrup_mean['Escola_Base'].unique(), fases_ord], names=['Escola_Base','Fase'])
-        agrup_mean = (agrup_mean.set_index(['Escola_Base','Fase'])
+    # Normalização opcional
+    if normalizar:
+        y_col = 'Delta_Vis'
+        y_label = 'Delta (z-score)'
+    else:
+        y_col = 'Delta'
+        y_label = 'Delta (Pós - Pré)'
+
+    # Lógica do drill-down baseada no nível atual
+    if st.session_state.drill_level == 'escola':
+        # NÍVEL 1: ESCOLAS
+        st.markdown("#### 🏠 Análise por Escola")
+        st.caption("Clique em uma linha para ver as turmas dessa escola")
+        
+        agrup_mean = (df_lin.groupby(['Escola_Base','Fase'])['Delta']
+                            .mean()
+                            .reset_index())
+        
+        # Reindex para preencher fases faltantes se necessário
+        if preencher_faltantes:
+            fases_ord = sorted(set(fases_sel))
+            todas = pd.MultiIndex.from_product([agrup_mean['Escola_Base'].unique(), fases_ord], 
+                                             names=['Escola_Base','Fase'])
+            agrup_mean = (agrup_mean.set_index(['Escola_Base','Fase'])
                                    .reindex(todas)
                                    .reset_index())
-    # Preencher valores faltantes com média da fase
-    if preencher_faltantes:
-        fase_means = agrup_mean.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
-        agrup_mean['Delta'] = agrup_mean['Delta'].fillna(fase_means)
+            # Preencher valores faltantes com média da fase
+            fase_means = agrup_mean.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
+            agrup_mean['Delta'] = agrup_mean['Delta'].fillna(fase_means)
 
-    # Remover escolas com menos de 2 valores não nulos
-    valid_counts = agrup_mean.dropna(subset=['Delta']).groupby('Escola_Base')['Delta'].count()
-    keep_escolas = valid_counts[valid_counts >= 2].index
-    agrup_mean = agrup_mean[agrup_mean['Escola_Base'].isin(keep_escolas)]
+        # Remover escolas com menos de 2 valores não nulos
+        valid_counts = agrup_mean.dropna(subset=['Delta']).groupby('Escola_Base')['Delta'].count()
+        keep_escolas = valid_counts[valid_counts >= 2].index
+        agrup_mean = agrup_mean[agrup_mean['Escola_Base'].isin(keep_escolas)]
 
-    if agrup_mean.empty:
-        st.info("Sem dados suficientes para plotar linhas.")
-    else:
-        # Ordena legenda por média se solicitado
-        media_por_escola = agrup_mean.groupby('Escola_Base')['Delta'].mean()
-        if ordenar:
-            ordem = media_por_escola.sort_values(ascending=False).index
+        if not agrup_mean.empty:
+            # Normalização opcional apenas para a visualização
+            if normalizar:
+                agrup_mean['Delta_Vis'] = agrup_mean.groupby('Fase')['Delta'].transform(
+                    lambda c: (c - c.mean())/c.std(ddof=0) if c.std(ddof=0) not in (0,None) else 0)
+
+            agrup_mean['Fase'] = pd.Categorical(agrup_mean['Fase'], 
+                                              categories=sorted(set(fases_sel)), ordered=True)
+            
+            # Adicionar média geral para hover
+            media_geral = agrup_mean.groupby('Escola_Base')['Delta'].transform('mean')
+            agrup_mean['Media_Geral_Delta'] = media_geral
+            
+            custom_cols = ['Escola_Base','Delta','Media_Geral_Delta']
+            
+            fig_escolas = criar_grafico_drill(
+                agrup_mean, 'Escola_Base', 'Evolução por Escola', 
+                y_col, y_label, custom_cols, 'escola'
+            )
+            
+            if fig_escolas:
+                # Capturar cliques no gráfico
+                clicked_data = st.plotly_chart(fig_escolas, use_container_width=True, 
+                                             on_select="rerun", key="escola_chart")
+                
+                # Processar seleção de escola
+                if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
+                    selected_point = clicked_data['selection']['points'][0]
+                    if 'customdata' in selected_point:
+                        escola_selecionada = selected_point['customdata'][0]
+                        st.session_state.selected_escola = escola_selecionada
+                        st.session_state.drill_level = 'turma'
+                        st.rerun()
+
+    elif st.session_state.drill_level == 'turma':
+        # NÍVEL 2: TURMAS
+        st.markdown(f"#### 🏫 Turmas da Escola: {st.session_state.selected_escola}")
+        st.caption("Clique em uma linha para ver os alunos dessa turma")
+        
+        # Filtrar dados da escola selecionada
+        df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
+        
+        if not df_escola.empty:
+            agrup_turma = (df_escola.groupby(['Turma','Fase'])['Delta']
+                                  .mean()
+                                  .reset_index())
+            
+            if preencher_faltantes:
+                fases_ord = sorted(set(fases_sel))
+                todas_turmas = pd.MultiIndex.from_product([agrup_turma['Turma'].unique(), fases_ord], 
+                                                        names=['Turma','Fase'])
+                agrup_turma = (agrup_turma.set_index(['Turma','Fase'])
+                                        .reindex(todas_turmas)
+                                        .reset_index())
+                fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
+                agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
+
+            valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
+            keep_turmas = valid_counts[valid_counts >= 1].index
+            agrup_turma = agrup_turma[agrup_turma['Turma'].isin(keep_turmas)]
+            
+            if not agrup_turma.empty:
+                if normalizar:
+                    agrup_turma['Delta_Vis'] = agrup_turma.groupby('Fase')['Delta'].transform(
+                        lambda c: (c - c.mean())/c.std(ddof=0) if c.std(ddof=0) not in (0,None) else 0)
+
+                agrup_turma['Fase'] = pd.Categorical(agrup_turma['Fase'], 
+                                                   categories=sorted(set(fases_sel)), ordered=True)
+                
+                media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
+                agrup_turma['Media_Geral_Delta'] = media_geral
+                
+                custom_cols = ['Turma','Delta','Media_Geral_Delta']
+                
+                fig_turmas = criar_grafico_drill(
+                    agrup_turma, 'Turma', 'Evolução por Turma', 
+                    y_col, y_label, custom_cols, 'turma'
+                )
+                
+                if fig_turmas:
+                    clicked_data = st.plotly_chart(fig_turmas, use_container_width=True, 
+                                                 on_select="rerun", key="turma_chart")
+                    
+                    if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
+                        selected_point = clicked_data['selection']['points'][0]
+                        if 'customdata' in selected_point:
+                            turma_selecionada = selected_point['customdata'][0]
+                            st.session_state.selected_turma = turma_selecionada
+                            st.session_state.drill_level = 'aluno'
+                            st.rerun()
+            else:
+                st.info("Sem dados suficientes de turmas para esta escola.")
         else:
-            ordem = sorted(media_por_escola.index)
-        agrup_mean['Escola_Base'] = pd.Categorical(agrup_mean['Escola_Base'], categories=ordem, ordered=True)
+            st.info("Escola selecionada não possui dados.")
 
-        # Normalização opcional apenas para a visualização
-        if normalizar:
-            agrup_mean['Delta_Vis'] = agrup_mean.groupby('Fase')['Delta'].transform(lambda c: (c - c.mean())/c.std(ddof=0) if c.std(ddof=0) not in (0,None) else 0)
-            y_col = 'Delta_Vis'
-            y_label = 'Delta (z-score)'
+    elif st.session_state.drill_level == 'aluno':
+        # NÍVEL 3: ALUNOS
+        st.markdown(f"#### 👥 Alunos da Turma: {st.session_state.selected_turma}")
+        st.caption("Evolução individual de cada aluno")
+        
+        # Filtrar dados da escola e turma selecionadas
+        df_turma = df_lin[
+            (df_lin['Escola_Base'] == st.session_state.selected_escola) & 
+            (df_lin['Turma'] == st.session_state.selected_turma)
+        ]
+        
+        if not df_turma.empty:
+            agrup_aluno = (df_turma.groupby(['Nome','Fase'])['Delta']
+                                  .mean()
+                                  .reset_index())
+            
+            if not agrup_aluno.empty:
+                if normalizar:
+                    agrup_aluno['Delta_Vis'] = agrup_aluno.groupby('Fase')['Delta'].transform(
+                        lambda c: (c - c.mean())/c.std(ddof=0) if c.std(ddof=0) not in (0,None) else 0)
+
+                agrup_aluno['Fase'] = pd.Categorical(agrup_aluno['Fase'], 
+                                                   categories=sorted(set(fases_sel)), ordered=True)
+                
+                media_geral = agrup_aluno.groupby('Nome')['Delta'].transform('mean')
+                agrup_aluno['Media_Geral_Delta'] = media_geral
+                
+                custom_cols = ['Nome','Delta','Media_Geral_Delta']
+                
+                fig_alunos = criar_grafico_drill(
+                    agrup_aluno, 'Nome', 'Evolução por Aluno', 
+                    y_col, y_label, custom_cols, 'aluno'
+                )
+                
+                if fig_alunos:
+                    st.plotly_chart(fig_alunos, use_container_width=True, key="aluno_chart")
+            else:
+                st.info("Sem dados suficientes de alunos para esta turma.")
         else:
-            y_col = 'Delta'
-            y_label = 'Delta (Pós - Pré)'
-
-        agrup_mean['Fase'] = pd.Categorical(agrup_mean['Fase'], categories=sorted(set(fases_sel)), ordered=True)
-
-        # Adicionar média geral para hover
-        media_geral = agrup_mean.groupby('Escola_Base')['Delta'].transform('mean')
-        agrup_mean['Media_Geral_Delta'] = media_geral
-
-        # customdata para hover (Escola Base, Delta real, Média Geral real)
-        agrup_mean = agrup_mean.sort_values(['Escola_Base','Fase'])
-        custom_cols = ['Escola_Base','Delta','Media_Geral_Delta']
-
-        # Criar coluna numérica para eixo ordinal
-        fase_map = {'2':2,'3':3,'4':4}
-        agrup_mean['FaseNum'] = agrup_mean['Fase'].astype(str).map(fase_map)
-
-        fig_lines = px.line(
-            agrup_mean,
-            x='FaseNum', y=y_col, color='Escola_Base',
-            category_orders={'Escola_Base': list(ordem)},
-            custom_data=custom_cols,
-            markers=True,
-            labels={'FaseNum':'Fase','Escola_Base':'Escola', y_col: y_label}
-        )
-        hover_label_name = y_label
-        fig_lines.update_traces(
-            hovertemplate=(
-                '<b>%{customdata[0]}</b><br>'
-                'Fase: %{x}<br>'
-                + hover_label_name + ': %{y:.2f}<br>'
-                'Delta Real: %{customdata[1]:.2f}<br>'
-                'Média Geral Delta: %{customdata[2]:.2f}<extra></extra>'
-            ),
-            opacity=0.8
-        )
-        fig_lines.update_layout(
-            legend_title_text='Escola',
-            yaxis_title=y_label,
-            xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase')
-        )
-        st.plotly_chart(fig_lines, use_container_width=True)
+            st.info("Turma selecionada não possui dados.")
 
 # ================= ANÁLISE GRANULAR POR QUESTÃO ==================
 st.markdown("### Análise Granular por Questão")
@@ -366,7 +535,7 @@ if not df.empty:
                     return 'background-color: #f1f3f4; color: #495057; font-weight: bold'  # Cinza
             
             styled_analise = (df_analise_sorted.style
-                             .applymap(style_variacao, subset=['Variação (%)'])
+                             .map(style_variacao, subset=['Variação (%)'])
                              .format({
                                  '% Acerto Pré': '{:.1f}%',
                                  '% Acerto Pós': '{:.1f}%',
@@ -507,7 +676,7 @@ if nome_sel and nome_sel != "<selecione>":
         
         # Aplicar estilo à tabela com formatação de números
         styled_df = (df_show.style
-                     .applymap(style_delta, subset=['Delta'])
+                     .map(style_delta, subset=['Delta'])
                      .format({
                          'Pré-Teste': '{:.1f}',
                          'Pós-Teste': '{:.1f}',
