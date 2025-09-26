@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from data_loader import get_datasets
 import unicodedata, re, math
 import numpy as np
@@ -318,10 +319,10 @@ if not df.empty:
         df_data['FaseNum'] = df_data['Fase'].astype(str).map(fase_map)
         
         # Template de hover adaptativo baseado no tipo de drill
-        if nivel_drill in ['turma_serie', 'turma_normal'] and len(custom_cols) >= 4:
+        if nivel_drill in ['turma_serie', 'turma_normal'] and len(custom_cols) >= 5:
             hover_template = (
                 f'<b>%{{customdata[0]}}</b><br>'
-                'Fase: %{x:.0f}<br>'
+                'Fase: %{customdata[4]}<br>'
                 'Delta (Pós - Pré): %{customdata[1]:.2f}<br>'
                 'Nº Alunos: %{customdata[3]:.0f}<extra></extra>'
             )
@@ -345,78 +346,186 @@ if not df.empty:
         
         # Verificar se é análise de turmas para usar Lollipop plot
         if nivel_drill in ['turma_serie', 'turma_normal']:
-            # Criar Lollipop plot vertical
-            fig = go.Figure()
-            
-            # Cores para diferentes turmas
-            cores = px.colors.qualitative.Set1[:len(ordem)]
+            if 'Num_Alunos' in df_data.columns:
+                df_data = df_data[df_data['Num_Alunos'].fillna(0) > 0]
+                if df_data.empty:
+                    st.info("Sem turmas com alunos para plotar.")
+                    return None
 
-            # Deslocamentos horizontais para evitar sobreposição
-            num_series = len(ordem)
-            if num_series > 1:
-                offsets = np.linspace(-0.18, 0.18, num_series)
+            fases_plot = sorted(df_data['FaseNum'].dropna().unique())
+            if not fases_plot:
+                st.info("Sem fases disponíveis para plotar turmas.")
+                return None
+
+            subplot_titles = [f"Fase {int(f) if float(f).is_integer() else f}" for f in fases_plot]
+
+            fig = make_subplots(
+                rows=1,
+                cols=len(fases_plot),
+                shared_yaxes=True,
+                subplot_titles=subplot_titles,
+                horizontal_spacing=0.08
+            )
+
+            unique_turmas = list(ordem)
+            if unique_turmas:
+                offsets = np.linspace(-0.25, 0.25, len(unique_turmas))
+                offset_map = {turma: offsets[idx] for idx, turma in enumerate(unique_turmas)}
             else:
-                offsets = [0]
-            
-            for i, turma in enumerate(ordem):
-                df_turma = df_data[df_data[agrupamento_col] == turma]
-                if df_turma.empty:
+                offset_map = {}
+
+            def extrair_ano_label(nome_turma: str) -> str:
+                if nome_turma is None or (isinstance(nome_turma, float) and np.isnan(nome_turma)):
+                    return 'Ano não identificado'
+                texto = str(nome_turma).upper()
+                padrao = re.search(r'(5|6|7|8|9)\s*(?:º|°)?\s*ANO', texto)
+                if padrao:
+                    return f"{padrao.group(1)}º Ano"
+                padrao = re.search(r'(5|6|7|8|9)', texto)
+                if padrao:
+                    return f"{padrao.group(1)}º Ano"
+                return 'Ano não identificado'
+
+            df_turmas_plot = df_data.copy()
+            df_turmas_plot['Ano_Label'] = df_turmas_plot[agrupamento_col].apply(extrair_ano_label)
+
+            palette = {
+                '5º Ano': '#1f77b4',
+                '6º Ano': '#2ca02c',
+                '7º Ano': '#ff7f0e',
+                '8º Ano': '#9467bd',
+                '9º Ano': '#d62728',
+                'Ano não identificado': '#7f7f7f'
+            }
+
+            legend_seen = set()
+
+            for idx_col, fase in enumerate(fases_plot, start=1):
+                fase_data = df_turmas_plot[df_turmas_plot['FaseNum'] == fase]
+                if fase_data.empty:
                     continue
 
-                offset = offsets[i]
-                df_turma = df_turma.copy()
-                df_turma['FaseNumOffset'] = df_turma['FaseNum'] + offset
-                
-                # Adicionar linhas verticais (stems) do zero até o valor
-                for _, row in df_turma.iterrows():
-                    fig.add_trace(go.Scatter(
-                        x=[row['FaseNumOffset'], row['FaseNumOffset']],
-                        y=[0, row[y_col]],
-                        mode='lines',
-                        line=dict(color=cores[i % len(cores)], width=3),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    ))
-                
-                # Adicionar pontos (lollipops)
-                fig.add_trace(go.Scatter(
-                    x=df_turma['FaseNumOffset'],
-                    y=df_turma[y_col],
-                    mode='markers',
-                    marker=dict(
-                        color=cores[i % len(cores)],
-                        size=12,
-                        line=dict(color='white', width=2)
+                # Caixa de distribuição por fase
+                fig.add_trace(
+                    go.Box(
+                        y=fase_data[y_col],
+                        x=[0] * len(fase_data),
+                        name='Distribuição',
+                        boxpoints=False,
+                        fillcolor='rgba(120,120,120,0.12)',
+                        line=dict(color='rgba(120,120,120,0.3)'),
+                        marker=dict(color='rgba(120,120,120,0.2)'),
+                        showlegend=(idx_col == 1),
+                        legendgroup='Distribuição',
+                        hovertemplate=(
+                            f'Fase {int(fase) if float(fase).is_integer() else fase}<br>'
+                            'Delta (Pós - Pré): %{y:.2f}<extra>Distribuição</extra>'
+                        )
                     ),
-                    name=str(turma),
-                    customdata=df_turma[custom_cols].values,
-                    hovertemplate=hover_template
-                ))
-            
-            # Adicionar linha horizontal no zero
-            fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7)
-            
-            fases_plot = sorted(df_data['FaseNum'].dropna().unique())
-            tickvals = fases_plot if fases_plot else [2, 3, 4]
-            ticktext = [f"Fase {int(f)}" if float(f).is_integer() else f"Fase {f}" for f in tickvals]
+                    row=1,
+                    col=idx_col
+                )
 
-            min_fase = min(tickvals) if tickvals else 2
-            max_fase = max(tickvals) if tickvals else 4
-            margem = 0.5 if len(tickvals) > 1 else 0.3
+                for turma in unique_turmas:
+                    turma_data = fase_data[fase_data[agrupamento_col] == turma]
+                    if turma_data.empty:
+                        continue
+
+                    offset = offset_map.get(turma, 0.0)
+                    ano_label = turma_data['Ano_Label'].iloc[0]
+                    cor = palette.get(ano_label, palette['Ano não identificado'])
+                    legenda_visivel = ano_label not in legend_seen
+
+                    if legenda_visivel:
+                        legend_seen.add(ano_label)
+
+                    for _, row in turma_data.iterrows():
+                        fig.add_trace(
+                            go.Scatter(
+                                x=[offset, offset],
+                                y=[0, row[y_col]],
+                                mode='lines',
+                                line=dict(color=cor, width=2),
+                                hoverinfo='skip',
+                                showlegend=False,
+                                legendgroup=ano_label
+                            ),
+                            row=1,
+                            col=idx_col
+                        )
+
+                        custom = [
+                            row[agrupamento_col],
+                            row.get('Delta'),
+                            row.get('Media_Geral_Delta', np.nan),
+                            row.get('Num_Alunos', np.nan),
+                            str(row['Fase'])
+                        ]
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=[offset],
+                                y=[row[y_col]],
+                                mode='markers',
+                                marker=dict(
+                                    color=cor,
+                                    size=11,
+                                    line=dict(color='white', width=1.5)
+                                ),
+                                name=ano_label,
+                                legendgroup=ano_label,
+                                showlegend=legenda_visivel,
+                                customdata=[custom],
+                                hovertemplate=hover_template
+                            ),
+                            row=1,
+                            col=idx_col
+                        )
+
+                        legenda_visivel = False
+
+                fig.add_hline(
+                    y=0,
+                    line_dash="dash",
+                    line_color="rgba(120,120,120,0.6)",
+                    opacity=0.6,
+                    row=1,
+                    col=idx_col
+                )
+
+                fig.update_xaxes(
+                    showticklabels=False,
+                    zeroline=False,
+                    showgrid=False,
+                    range=[-0.4, 0.4],
+                    row=1,
+                    col=idx_col
+                )
+
+            fig.update_yaxes(
+                title_text=y_label,
+                zeroline=False,
+                gridcolor='rgba(200,200,200,0.3)'
+            )
 
             fig.update_layout(
                 title=titulo,
-                xaxis=dict(
-                    tickmode='array', 
-                    tickvals=tickvals, 
-                    ticktext=ticktext, 
-                    title='Fase',
-                    range=[min_fase - margem, max_fase + margem]
-                ),
-                yaxis_title=y_label,
-                legend_title_text=titulo.split()[0],
+                legend_title_text='Ano',
                 clickmode='event+select',
-                height=500
+                height=540,
+                hovermode='closest',
+                margin=dict(l=70, r=40, t=90, b=90)
+            )
+
+            fig.update_layout(
+                legend=dict(
+                    orientation='h',
+                    yanchor='bottom',
+                    y=-0.18,
+                    xanchor='center',
+                    x=0.5,
+                    bgcolor='rgba(255,255,255,0.85)'
+                )
             )
         else:
             # Gráfico de linha tradicional para outros tipos
@@ -653,7 +762,7 @@ if not df.empty:
                 media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
                 agrup_turma['Media_Geral_Delta'] = media_geral
                 
-                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos']
+                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos','Fase']
                 
                 fig_turmas = criar_grafico_drill(
                     agrup_turma, 'Turma', 'Evolução por Turma', 
@@ -667,13 +776,16 @@ if not df.empty:
                     if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
                         selected_point = clicked_data['selection']['points'][0]
                         if 'customdata' in selected_point:
-                            turma_selecionada = selected_point['customdata'][0]
-                            fase_val = selected_point['x']
+                            custom = selected_point['customdata']
+                            if custom and isinstance(custom[0], (list, tuple, np.ndarray)):
+                                custom = custom[0]
+                            turma_selecionada = custom[0] if len(custom) > 0 else None
+                            fase_val = custom[4] if len(custom) > 4 else selected_point.get('x')
                             try:
                                 fase_num = int(round(float(fase_val)))
                             except (TypeError, ValueError):
                                 fase_num = fase_val
-                            fase_selecionada = str(fase_num)
+                            fase_selecionada = str(fase_num) if fase_num is not None else None
                             st.session_state.selected_turma = turma_selecionada
                             st.session_state.selected_fase = fase_selecionada
                             st.session_state.drill_level = 'alunos_turma'
@@ -854,7 +966,7 @@ if not df.empty:
                 media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
                 agrup_turma['Media_Geral_Delta'] = media_geral
                 
-                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos']
+                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos','Fase']
                 
                 fig_turmas = criar_grafico_drill(
                     agrup_turma, 'Turma', 'Evolução por Turma', 
