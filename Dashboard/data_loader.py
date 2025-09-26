@@ -12,7 +12,6 @@ sys.path.append(project_root)
 # Caminhos dos arquivos de dados (relativos ao Dashboard)
 ARQ_TDE = os.path.join(os.path.dirname(__file__), 'TDE_longitudinal.csv')
 ARQ_VOC = os.path.join(os.path.dirname(__file__), 'vocabulario_longitudinal.csv')
-MATCH_DIR = os.path.join(os.path.dirname(__file__), 'Longitudinal')
 
 @functools.lru_cache(maxsize=4)
 def load_csv(path: str) -> pd.DataFrame:
@@ -49,14 +48,4 @@ def get_datasets():
             df['Ano'] = df['Turma'].apply(extract_year)
     return tde, vocab
 
-def load_matching():
-    resultados = {}
-    if os.path.exists(MATCH_DIR):
-        try:
-            for filename in os.listdir(MATCH_DIR):
-                if filename.startswith('matching_') and filename.endswith('.csv'):
-                    file_path = os.path.join(MATCH_DIR, filename)
-                    resultados[filename] = pd.read_csv(file_path)
-        except Exception:
-            pass
-    return resultados
+
