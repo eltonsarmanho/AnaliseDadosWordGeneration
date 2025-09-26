@@ -267,7 +267,7 @@ if not df.empty:
         with col_nav3:
             if st.session_state.analise_tipo:
                 tipo_icon = "👥" if st.session_state.analise_tipo == 'coorte' else "📊"
-                tipo_nome = "Coortes" if st.session_state.analise_tipo == 'coorte' else "Séries"
+                tipo_nome = "Coortes" if st.session_state.analise_tipo == 'coorte' else "Turmas"
                 st.button(f"{tipo_icon} {tipo_nome}", type="primary" if st.session_state.drill_level in ['coorte', 'serie'] else "secondary", disabled=True)
         
         with col_nav4:
@@ -325,13 +325,24 @@ if not df.empty:
             title=titulo
         )
         
-        hover_template = (
-            f'<b>%{{customdata[0]}}</b><br>'
-            'Fase: %{x}<br>'
-            f'{y_label}: %{{y:.2f}}<br>'
-            'Delta Real: %{customdata[1]:.2f}<br>'
-            'Média Geral Delta: %{customdata[2]:.2f}<extra></extra>'
-        )
+        # Template de hover adaptativo baseado no tipo de drill
+        if nivel_drill == 'coorte' and len(custom_cols) >= 4:
+            hover_template = (
+                f'<b>%{{customdata[0]}}</b><br>'
+                'Fase: %{x}<br>'
+                f'{y_label}: %{{y:.2f}}<br>'
+                'Delta Real: %{customdata[1]:.2f}<br>'
+                'Média Geral Delta: %{customdata[2]:.2f}<br>'
+                'Nº Alunos: %{customdata[3]}<extra></extra>'
+            )
+        else:
+            hover_template = (
+                f'<b>%{{customdata[0]}}</b><br>'
+                'Fase: %{x}<br>'
+                f'{y_label}: %{{y:.2f}}<br>'
+                'Delta Real: %{customdata[1]:.2f}<br>'
+                'Média Geral Delta: %{customdata[2]:.2f}<extra></extra>'
+            )
         
         fig.update_traces(hovertemplate=hover_template, opacity=0.8)
         fig.update_layout(
@@ -438,11 +449,11 @@ if not df.empty:
             st.caption("🎯 Para medir a evolução de um mesmo grupo de alunos")
         
         with col_analise2:
-            if st.button("📊 **Análise de Séries**\n(Comparativo Anual)", key="btn_serie", help="Compara o desempenho de uma mesma série ano a ano", use_container_width=True):
+            if st.button("📊 **Análise de Turmas**\n(Por Fase)", key="btn_serie", help="Analisa turmas ao longo das fases", use_container_width=True):
                 st.session_state.analise_tipo = 'serie'
                 st.session_state.drill_level = 'serie'
                 st.rerun()
-            st.caption("📈 Para comparar uma série (ex: 6º Ano) ano a ano")
+            st.caption("📈 Para analisar turmas por fase")
 
     elif st.session_state.drill_level == 'coorte':
         # NÍVEL 3A: ANÁLISE DE COORTES
@@ -453,10 +464,11 @@ if not df.empty:
         df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
         
         if not df_escola.empty and 'Coorte_Origem' in df_escola.columns:
-            # Agrupar por coorte e fase, calculando média do Delta
-            agrup_coorte = (df_escola.groupby(['Coorte_Origem','Fase'])['Delta']
-                                   .mean()
+            # Agrupar por coorte e fase, calculando média do Delta e contando alunos
+            agrup_coorte = (df_escola.groupby(['Coorte_Origem','Fase'])
+                                   .agg({'Delta': 'mean', 'ID_Unico': 'nunique'})
                                    .reset_index())
+            agrup_coorte = agrup_coorte.rename(columns={'ID_Unico': 'Num_Alunos'})
             
             if preencher_faltantes:
                 fases_ord = sorted(set(fases_sel))
@@ -467,6 +479,8 @@ if not df.empty:
                                           .reset_index())
                 fase_means = agrup_coorte.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
                 agrup_coorte['Delta'] = agrup_coorte['Delta'].fillna(fase_means)
+                # Preencher número de alunos como 0 para fases faltantes
+                agrup_coorte['Num_Alunos'] = agrup_coorte['Num_Alunos'].fillna(0)
 
             # Filtrar coortes com dados suficientes
             valid_counts = agrup_coorte.dropna(subset=['Delta']).groupby('Coorte_Origem')['Delta'].count()
@@ -484,7 +498,7 @@ if not df.empty:
                 media_geral = agrup_coorte.groupby('Coorte_Origem')['Delta'].transform('mean')
                 agrup_coorte['Media_Geral_Delta'] = media_geral
                 
-                custom_cols = ['Coorte_Origem','Delta','Media_Geral_Delta']
+                custom_cols = ['Coorte_Origem','Delta','Media_Geral_Delta','Num_Alunos']
                 
                 fig_coortes = criar_grafico_drill(
                     agrup_coorte, 'Coorte_Origem', 'Evolução por Coorte de Origem', 
@@ -508,83 +522,65 @@ if not df.empty:
             st.info("Dados de coorte não disponíveis para esta escola.")
 
     elif st.session_state.drill_level == 'serie':
-        # NÍVEL 3B: ANÁLISE DE SÉRIES
-        st.markdown(f"#### 📊 Análise de Séries - {st.session_state.selected_escola}")
-        st.caption("Comparativo de desempenho de séries ao longo das fases")
+        # NÍVEL 3B: ANÁLISE DE TURMAS (IMPLEMENTAÇÃO TRADICIONAL)
+        st.markdown(f"#### 📊 Turmas da Escola: {st.session_state.selected_escola}")
+        st.caption("Clique em uma linha para ver os alunos dessa turma")
         
         # Filtrar dados da escola selecionada
         df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
         
         if not df_escola.empty:
-            # Seletor de série para análise
-            series_disponiveis = sorted(df_escola['Turma_Drill'].unique())
-            serie_selecionada = st.selectbox("Selecione a série para análise:", 
-                                           ["<selecione>"] + series_disponiveis)
+            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])['Delta']
+                                  .mean()
+                                  .reset_index())
+            # Renomear para manter compatibilidade com o resto do código
+            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma'})
             
-            if serie_selecionada != "<selecione>":
-                st.session_state.selected_turma = serie_selecionada
+            if preencher_faltantes:
+                fases_ord = sorted(set(fases_sel))
+                todas_turmas = pd.MultiIndex.from_product([agrup_turma['Turma'].unique(), fases_ord], 
+                                                        names=['Turma','Fase'])
+                agrup_turma = (agrup_turma.set_index(['Turma','Fase'])
+                                        .reindex(todas_turmas)
+                                        .reset_index())
+                fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
+                agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
+
+            valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
+            keep_turmas = valid_counts[valid_counts >= 1].index
+            agrup_turma = agrup_turma[agrup_turma['Turma'].isin(keep_turmas)]
+            
+            if not agrup_turma.empty:
+                if normalizar:
+                    agrup_turma['Delta_Vis'] = agrup_turma.groupby('Fase')['Delta'].transform(
+                        lambda c: (c - c.mean())/c.std(ddof=0) if c.std(ddof=0) not in (0,None) else 0)
+
+                agrup_turma['Fase'] = pd.Categorical(agrup_turma['Fase'], 
+                                                   categories=sorted(set(fases_sel)), ordered=True)
                 
-                # Filtrar dados apenas da série selecionada
-                df_serie = df_escola[df_escola['Turma_Drill'] == serie_selecionada]
+                media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
+                agrup_turma['Media_Geral_Delta'] = media_geral
                 
-                # Agrupar por fase (cada fase terá um grupo diferente de alunos da mesma série)
-                dados_serie = df_serie.groupby('Fase').agg({
-                    'Delta': ['mean', 'std', 'count'],
-                    'Score_Pre': 'mean',
-                    'Score_Pos': 'mean'
-                }).round(2)
+                custom_cols = ['Turma','Delta','Media_Geral_Delta']
                 
-                # Achatar colunas
-                dados_serie.columns = ['_'.join(col).strip() for col in dados_serie.columns]
-                dados_serie = dados_serie.reset_index()
-                
-                # Calcular d de Cohen para cada fase
-                dados_serie['d_cohen'] = dados_serie.apply(
-                    lambda row: calcular_d_cohen(
-                        df_serie[df_serie['Fase'] == row['Fase']]
-                    ), axis=1
+                fig_turmas = criar_grafico_drill(
+                    agrup_turma, 'Turma', 'Evolução por Turma', 
+                    y_col, y_label, custom_cols, 'turma'
                 )
                 
-                # Gráfico de barras para análise de séries
-                st.markdown(f"##### Comparativo de Desempenho da Série: {serie_selecionada}")
-                
-                fig_serie = go.Figure()
-                
-                fig_serie.add_trace(go.Bar(
-                    x=dados_serie['Fase'],
-                    y=dados_serie['Delta_mean'],
-                    error_y=dict(type='data', array=dados_serie['Delta_std']),
-                    name='Média Delta',
-                    text=dados_serie['Delta_mean'].round(2),
-                    textposition='auto',
-                    hovertemplate=(
-                        '<b>Fase %{x}</b><br>' +
-                        'Média Delta: %{y:.2f}<br>' +
-                        'Desvio Padrão: %{customdata[0]:.2f}<br>' +
-                        'N Alunos: %{customdata[1]}<br>' +
-                        'd de Cohen: %{customdata[2]:.2f}<br>' +
-                        '<extra></extra>'
-                    ),
-                    customdata=np.column_stack((dados_serie['Delta_std'], 
-                                              dados_serie['Delta_count'],
-                                              dados_serie['d_cohen']))
-                ))
-                
-                fig_serie.update_layout(
-                    title=f"Desempenho da Série '{serie_selecionada}' por Fase",
-                    xaxis_title="Fase",
-                    yaxis_title="Delta (Pós - Pré)",
-                    showlegend=False
-                )
-                
-                st.plotly_chart(fig_serie, use_container_width=True)
-                
-                # Tabela detalhada
-                st.markdown("**Detalhes por Fase:**")
-                dados_display = dados_serie[['Fase', 'Delta_mean', 'Delta_std', 'Delta_count', 'd_cohen']].copy()
-                dados_display.columns = ['Fase', 'Média Delta', 'Desvio Padrão', 'N° Alunos', 'd de Cohen']
-                st.dataframe(dados_display, use_container_width=True)
-            
+                if fig_turmas:
+                    clicked_data = st.plotly_chart(fig_turmas, use_container_width=True, 
+                                                 on_select="rerun", key="turma_serie_chart")
+                    
+                    if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
+                        selected_point = clicked_data['selection']['points'][0]
+                        if 'customdata' in selected_point:
+                            turma_selecionada = selected_point['customdata'][0]
+                            st.session_state.selected_turma = turma_selecionada
+                            st.session_state.drill_level = 'alunos_turma'
+                            st.rerun()
+            else:
+                st.info("Sem dados suficientes de turmas para esta escola.")
         else:
             st.info("Escola selecionada não possui dados.")
 
@@ -628,6 +624,73 @@ if not df.empty:
                 st.info("Sem dados suficientes de alunos para esta coorte.")
         else:
             st.info("Coorte selecionada não possui dados.")
+
+    elif st.session_state.drill_level == 'alunos_turma':
+        # NÍVEL 4: ALUNOS DA TURMA (GRÁFICO DE BARRAS)
+        st.markdown(f"#### 👥 Alunos da Turma: {st.session_state.selected_turma}")
+        st.caption("Delta individual de cada aluno da turma (gráfico de barras)")
+        
+        # Filtrar dados da escola e turma selecionadas
+        df_turma_alunos = df_lin[
+            (df_lin['Escola_Base'] == st.session_state.selected_escola) & 
+            (df_lin['Turma_Drill'] == st.session_state.selected_turma)
+        ]
+        
+        if not df_turma_alunos.empty:
+            # Agrupar por aluno, calculando média do Delta por aluno
+            agrup_aluno_turma = (df_turma_alunos.groupby('Nome')['Delta']
+                                               .mean()
+                                               .sort_values(ascending=False)
+                                               .reset_index())
+            
+            if not agrup_aluno_turma.empty:
+                # Reordenar para maior delta primeiro (descrescente)
+                agrup_aluno_turma = agrup_aluno_turma.sort_values('Delta', ascending=True)  # Ascending=True para que o maior apareça no topo
+                
+                # Criar gráfico de barras horizontais
+                fig_barras = go.Figure()
+                
+                # Definir cores baseadas no valor do Delta
+                cores = ['#28a745' if delta >= 0 else '#dc3545' for delta in agrup_aluno_turma['Delta']]
+                
+                fig_barras.add_trace(go.Bar(
+                    x=agrup_aluno_turma['Delta'],
+                    y=agrup_aluno_turma['Nome'],
+                    orientation='h',  # Orientação horizontal
+                    marker_color=cores,
+                    text=agrup_aluno_turma['Delta'].round(2),
+                    textposition='auto',
+                    hovertemplate=(
+                        '<b>%{y}</b><br>' +
+                        'Delta: %{x:.2f}<br>' +
+                        '<extra></extra>'
+                    )
+                ))
+                
+                fig_barras.update_layout(
+                    title=f"Delta Individual dos Alunos - {st.session_state.selected_turma}",
+                    xaxis_title="Delta (Pós - Pré)",
+                    yaxis_title="Alunos",
+                    showlegend=False,
+                    height=max(400, len(agrup_aluno_turma) * 25)  # Altura dinâmica baseada no número de alunos
+                )
+                
+                # Adicionar linha vertical no zero (para gráfico horizontal)
+                fig_barras.add_vline(x=0, line_dash="dash", line_color="gray", opacity=0.7)
+                
+                st.plotly_chart(fig_barras, use_container_width=True)
+                
+                # Estatísticas resumidas
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Total de Alunos", len(agrup_aluno_turma))
+                col2.metric("Delta Médio", f"{agrup_aluno_turma['Delta'].mean():.2f}")
+                col3.metric("Melhor Delta", f"{agrup_aluno_turma['Delta'].max():.2f}")
+                col4.metric("Pior Delta", f"{agrup_aluno_turma['Delta'].min():.2f}")
+                
+            else:
+                st.info("Sem dados suficientes de alunos para esta turma.")
+        else:
+            st.info("Turma selecionada não possui dados.")
 
     elif st.session_state.drill_level == 'turma':
         # NÍVEL 2: TURMAS
