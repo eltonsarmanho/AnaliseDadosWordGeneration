@@ -317,42 +317,126 @@ if not df.empty:
         fase_map = {'2':2,'3':3,'4':4}
         df_data['FaseNum'] = df_data['Fase'].astype(str).map(fase_map)
         
-        fig = px.line(
-            df_data,
-            x='FaseNum', y=y_col, color=agrupamento_col,
-            category_orders={agrupamento_col: list(ordem)},
-            custom_data=custom_cols,
-            markers=True,
-            labels={'FaseNum':'Fase', agrupamento_col: titulo.split()[0], y_col: y_label},
-            title=titulo
-        )
-        
         # Template de hover adaptativo baseado no tipo de drill
-        if (nivel_drill == 'coorte' or nivel_drill == 'turma_serie' or nivel_drill == 'turma_normal') and len(custom_cols) >= 4:
+        if nivel_drill in ['turma_serie', 'turma_normal'] and len(custom_cols) >= 4:
             hover_template = (
                 f'<b>%{{customdata[0]}}</b><br>'
-                'Fase: %{x}<br>'
+                'Fase: %{x:.0f}<br>'
+                'Delta (Pós - Pré): %{customdata[1]:.2f}<br>'
+                'Nº Alunos: %{customdata[3]:.0f}<extra></extra>'
+            )
+        elif nivel_drill == 'coorte' and len(custom_cols) >= 4:
+            hover_template = (
+                f'<b>%{{customdata[0]}}</b><br>'
+                'Fase: %{x:.0f}<br>'
                 f'{y_label}: %{{y:.2f}}<br>'
                 'Delta Real: %{customdata[1]:.2f}<br>'
                 'Média Geral Delta: %{customdata[2]:.2f}<br>'
-                'Nº Alunos: %{customdata[3]}<extra></extra>'
+                'Nº Alunos: %{customdata[3]:.0f}<extra></extra>'
             )
         else:
             hover_template = (
                 f'<b>%{{customdata[0]}}</b><br>'
-                'Fase: %{x}<br>'
+                'Fase: %{x:.0f}<br>'
                 f'{y_label}: %{{y:.2f}}<br>'
                 'Delta Real: %{customdata[1]:.2f}<br>'
                 'Média Geral Delta: %{customdata[2]:.2f}<extra></extra>'
             )
         
-        fig.update_traces(hovertemplate=hover_template, opacity=0.8)
-        fig.update_layout(
-            legend_title_text=titulo.split()[0],
-            yaxis_title=y_label,
-            xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase'),
-            clickmode='event+select'
-        )
+        # Verificar se é análise de turmas para usar Lollipop plot
+        if nivel_drill in ['turma_serie', 'turma_normal']:
+            # Criar Lollipop plot vertical
+            fig = go.Figure()
+            
+            # Cores para diferentes turmas
+            cores = px.colors.qualitative.Set1[:len(ordem)]
+
+            # Deslocamentos horizontais para evitar sobreposição
+            num_series = len(ordem)
+            if num_series > 1:
+                offsets = np.linspace(-0.18, 0.18, num_series)
+            else:
+                offsets = [0]
+            
+            for i, turma in enumerate(ordem):
+                df_turma = df_data[df_data[agrupamento_col] == turma]
+                if df_turma.empty:
+                    continue
+
+                offset = offsets[i]
+                df_turma = df_turma.copy()
+                df_turma['FaseNumOffset'] = df_turma['FaseNum'] + offset
+                
+                # Adicionar linhas verticais (stems) do zero até o valor
+                for _, row in df_turma.iterrows():
+                    fig.add_trace(go.Scatter(
+                        x=[row['FaseNumOffset'], row['FaseNumOffset']],
+                        y=[0, row[y_col]],
+                        mode='lines',
+                        line=dict(color=cores[i % len(cores)], width=3),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ))
+                
+                # Adicionar pontos (lollipops)
+                fig.add_trace(go.Scatter(
+                    x=df_turma['FaseNumOffset'],
+                    y=df_turma[y_col],
+                    mode='markers',
+                    marker=dict(
+                        color=cores[i % len(cores)],
+                        size=12,
+                        line=dict(color='white', width=2)
+                    ),
+                    name=str(turma),
+                    customdata=df_turma[custom_cols].values,
+                    hovertemplate=hover_template
+                ))
+            
+            # Adicionar linha horizontal no zero
+            fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7)
+            
+            fases_plot = sorted(df_data['FaseNum'].dropna().unique())
+            tickvals = fases_plot if fases_plot else [2, 3, 4]
+            ticktext = [f"Fase {int(f)}" if float(f).is_integer() else f"Fase {f}" for f in tickvals]
+
+            min_fase = min(tickvals) if tickvals else 2
+            max_fase = max(tickvals) if tickvals else 4
+            margem = 0.5 if len(tickvals) > 1 else 0.3
+
+            fig.update_layout(
+                title=titulo,
+                xaxis=dict(
+                    tickmode='array', 
+                    tickvals=tickvals, 
+                    ticktext=ticktext, 
+                    title='Fase',
+                    range=[min_fase - margem, max_fase + margem]
+                ),
+                yaxis_title=y_label,
+                legend_title_text=titulo.split()[0],
+                clickmode='event+select',
+                height=500
+            )
+        else:
+            # Gráfico de linha tradicional para outros tipos
+            fig = px.line(
+                df_data,
+                x='FaseNum', y=y_col, color=agrupamento_col,
+                category_orders={agrupamento_col: list(ordem)},
+                custom_data=custom_cols,
+                markers=True,
+                labels={'FaseNum':'Fase', agrupamento_col: titulo.split()[0], y_col: y_label},
+                title=titulo
+            )
+            
+            fig.update_traces(hovertemplate=hover_template, opacity=0.8)
+            fig.update_layout(
+                legend_title_text=titulo.split()[0],
+                yaxis_title=y_label,
+                xaxis=dict(tickmode='array', tickvals=[2,3,4], ticktext=['2','3','4'], title='Fase'),
+                clickmode='event+select'
+            )
         
         return fig
 
@@ -548,8 +632,11 @@ if not df.empty:
                                         .reset_index())
                 fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
                 agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
-                # Preencher número de alunos com 0 para fases faltantes
+
+            if 'Num_Alunos' in agrup_turma.columns:
                 agrup_turma['Num_Alunos'] = agrup_turma['Num_Alunos'].fillna(0)
+                total_alunos_turma = agrup_turma.groupby('Turma')['Num_Alunos'].transform('sum')
+                agrup_turma = agrup_turma[total_alunos_turma > 0]
 
             valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
             keep_turmas = valid_counts[valid_counts >= 1].index
@@ -581,7 +668,12 @@ if not df.empty:
                         selected_point = clicked_data['selection']['points'][0]
                         if 'customdata' in selected_point:
                             turma_selecionada = selected_point['customdata'][0]
-                            fase_selecionada = str(int(selected_point['x']))  # Converter para int depois string para evitar decimais
+                            fase_val = selected_point['x']
+                            try:
+                                fase_num = int(round(float(fase_val)))
+                            except (TypeError, ValueError):
+                                fase_num = fase_val
+                            fase_selecionada = str(fase_num)
                             st.session_state.selected_turma = turma_selecionada
                             st.session_state.selected_fase = fase_selecionada
                             st.session_state.drill_level = 'alunos_turma'
@@ -741,8 +833,11 @@ if not df.empty:
                                         .reset_index())
                 fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
                 agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
-                # Preencher número de alunos com 0 para fases faltantes na seção turma
+
+            if 'Num_Alunos' in agrup_turma.columns:
                 agrup_turma['Num_Alunos'] = agrup_turma['Num_Alunos'].fillna(0)
+                total_alunos_turma = agrup_turma.groupby('Turma')['Num_Alunos'].transform('sum')
+                agrup_turma = agrup_turma[total_alunos_turma > 0]
 
             valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
             keep_turmas = valid_counts[valid_counts >= 1].index
