@@ -10,8 +10,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
 # Caminhos dos arquivos de dados (relativos ao Dashboard)
-ARQ_TDE = os.path.join(os.path.dirname(__file__), 'TDE_consolidado_fases_2_3_4.csv')
-ARQ_VOC = os.path.join(os.path.dirname(__file__), 'vocabulario_consolidado_fases_2_3_4.csv')
+ARQ_TDE = os.path.join(os.path.dirname(__file__), 'TDE_longitudinal.csv')
+ARQ_VOC = os.path.join(os.path.dirname(__file__), 'vocabulario_longitudinal.csv')
 MATCH_DIR = os.path.join(os.path.dirname(__file__), 'Longitudinal')
 
 @functools.lru_cache(maxsize=4)
