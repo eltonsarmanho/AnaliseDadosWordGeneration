@@ -229,6 +229,8 @@ if not df.empty:
         st.session_state.analise_tipo = None
     if 'selected_coorte' not in st.session_state:
         st.session_state.selected_coorte = None
+    if 'selected_fase' not in st.session_state:
+        st.session_state.selected_fase = None
 
     # Breadcrumb navigation - Sistema Híbrido
     if st.session_state.drill_level == 'escola':
@@ -326,7 +328,7 @@ if not df.empty:
         )
         
         # Template de hover adaptativo baseado no tipo de drill
-        if nivel_drill == 'coorte' and len(custom_cols) >= 4:
+        if (nivel_drill == 'coorte' or nivel_drill == 'turma_serie' or nivel_drill == 'turma_normal') and len(custom_cols) >= 4:
             hover_template = (
                 f'<b>%{{customdata[0]}}</b><br>'
                 'Fase: %{x}<br>'
@@ -530,11 +532,12 @@ if not df.empty:
         df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
         
         if not df_escola.empty:
-            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])['Delta']
-                                  .mean()
-                                  .reset_index())
+            # Calcular média e número de alunos por turma e fase
+            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])
+                                   .agg({'Delta': 'mean', 'ID_Unico': 'nunique'})
+                                   .reset_index())
             # Renomear para manter compatibilidade com o resto do código
-            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma'})
+            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma', 'ID_Unico': 'Num_Alunos'})
             
             if preencher_faltantes:
                 fases_ord = sorted(set(fases_sel))
@@ -545,6 +548,8 @@ if not df.empty:
                                         .reset_index())
                 fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
                 agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
+                # Preencher número de alunos com 0 para fases faltantes
+                agrup_turma['Num_Alunos'] = agrup_turma['Num_Alunos'].fillna(0)
 
             valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
             keep_turmas = valid_counts[valid_counts >= 1].index
@@ -561,11 +566,11 @@ if not df.empty:
                 media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
                 agrup_turma['Media_Geral_Delta'] = media_geral
                 
-                custom_cols = ['Turma','Delta','Media_Geral_Delta']
+                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos']
                 
                 fig_turmas = criar_grafico_drill(
                     agrup_turma, 'Turma', 'Evolução por Turma', 
-                    y_col, y_label, custom_cols, 'turma'
+                    y_col, y_label, custom_cols, 'turma_serie'
                 )
                 
                 if fig_turmas:
@@ -576,7 +581,9 @@ if not df.empty:
                         selected_point = clicked_data['selection']['points'][0]
                         if 'customdata' in selected_point:
                             turma_selecionada = selected_point['customdata'][0]
+                            fase_selecionada = str(int(selected_point['x']))  # Converter para int depois string para evitar decimais
                             st.session_state.selected_turma = turma_selecionada
+                            st.session_state.selected_fase = fase_selecionada
                             st.session_state.drill_level = 'alunos_turma'
                             st.rerun()
             else:
@@ -627,14 +634,27 @@ if not df.empty:
 
     elif st.session_state.drill_level == 'alunos_turma':
         # NÍVEL 4: ALUNOS DA TURMA (GRÁFICO DE BARRAS)
-        st.markdown(f"#### 👥 Alunos da Turma: {st.session_state.selected_turma}")
-        st.caption("Delta individual de cada aluno da turma (gráfico de barras)")
+        # Botão para voltar
+        if st.button("⬅️ Voltar para Turmas", key="voltar_turmas"):
+            st.session_state.drill_level = 'serie'
+            if hasattr(st.session_state, 'selected_fase'):
+                delattr(st.session_state, 'selected_fase')
+            st.rerun()
         
-        # Filtrar dados da escola e turma selecionadas
+        fase_info = f" - Fase {st.session_state.selected_fase}" if hasattr(st.session_state, 'selected_fase') else ""
+        st.markdown(f"#### 👥 Alunos da Turma: {st.session_state.selected_turma}{fase_info}")
+        st.caption("Delta individual de cada aluno da turma e fase específica (gráfico de barras)")
+        
+        # Filtrar dados da escola, turma e fase selecionadas
         df_turma_alunos = df_lin[
             (df_lin['Escola_Base'] == st.session_state.selected_escola) & 
             (df_lin['Turma_Drill'] == st.session_state.selected_turma)
         ]
+        
+        # Adicionar filtro de fase se disponível
+        if hasattr(st.session_state, 'selected_fase') and st.session_state.selected_fase:
+            # Converter ambos para string para garantir comparação correta
+            df_turma_alunos = df_turma_alunos[df_turma_alunos['Fase'].astype(str) == str(st.session_state.selected_fase)]
         
         if not df_turma_alunos.empty:
             # Agrupar por aluno, calculando média do Delta por aluno
@@ -667,8 +687,12 @@ if not df.empty:
                     )
                 ))
                 
+                titulo_grafico = f"Delta Individual dos Alunos - {st.session_state.selected_turma}"
+                if hasattr(st.session_state, 'selected_fase') and st.session_state.selected_fase:
+                    titulo_grafico += f" - Fase {st.session_state.selected_fase}"
+                
                 fig_barras.update_layout(
-                    title=f"Delta Individual dos Alunos - {st.session_state.selected_turma}",
+                    title=titulo_grafico,
                     xaxis_title="Delta (Pós - Pré)",
                     yaxis_title="Alunos",
                     showlegend=False,
@@ -701,11 +725,12 @@ if not df.empty:
         df_escola = df_lin[df_lin['Escola_Base'] == st.session_state.selected_escola]
         
         if not df_escola.empty:
-            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])['Delta']
-                                  .mean()
-                                  .reset_index())
+            # Calcular média e número de alunos por turma e fase
+            agrup_turma = (df_escola.groupby(['Turma_Drill','Fase'])
+                                   .agg({'Delta': 'mean', 'ID_Unico': 'nunique'})
+                                   .reset_index())
             # Renomear para manter compatibilidade com o resto do código
-            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma'})
+            agrup_turma = agrup_turma.rename(columns={'Turma_Drill': 'Turma', 'ID_Unico': 'Num_Alunos'})
             
             if preencher_faltantes:
                 fases_ord = sorted(set(fases_sel))
@@ -716,6 +741,8 @@ if not df.empty:
                                         .reset_index())
                 fase_means = agrup_turma.groupby('Fase')['Delta'].transform(lambda s: s.fillna(s.mean()))
                 agrup_turma['Delta'] = agrup_turma['Delta'].fillna(fase_means)
+                # Preencher número de alunos com 0 para fases faltantes na seção turma
+                agrup_turma['Num_Alunos'] = agrup_turma['Num_Alunos'].fillna(0)
 
             valid_counts = agrup_turma.dropna(subset=['Delta']).groupby('Turma')['Delta'].count()
             keep_turmas = valid_counts[valid_counts >= 1].index
@@ -732,11 +759,11 @@ if not df.empty:
                 media_geral = agrup_turma.groupby('Turma')['Delta'].transform('mean')
                 agrup_turma['Media_Geral_Delta'] = media_geral
                 
-                custom_cols = ['Turma','Delta','Media_Geral_Delta']
+                custom_cols = ['Turma','Delta','Media_Geral_Delta','Num_Alunos']
                 
                 fig_turmas = criar_grafico_drill(
                     agrup_turma, 'Turma', 'Evolução por Turma', 
-                    y_col, y_label, custom_cols, 'turma'
+                    y_col, y_label, custom_cols, 'turma_normal'
                 )
                 
                 if fig_turmas:
