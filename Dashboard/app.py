@@ -104,7 +104,7 @@ nome_sel = st.sidebar.selectbox("Aluno (Nome Completo)", ["<selecione>"] + nomes
 st.subheader("Resumo Filtrado")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Registros", len(df))
-col2.metric("Alunos únicos (Nome)", df['Nome'].nunique())
+col2.metric("Alunos únicos (ID)", df['ID_Unico'].nunique())
 col3.metric("Escolas", df['Escola'].nunique())
 # Contar turmas baseado na opção de agregação escolhida
 turmas_count = df[coluna_turma].nunique()
