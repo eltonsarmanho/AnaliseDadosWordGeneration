@@ -65,17 +65,17 @@ st.sidebar.header("Filtros")
 prova_sel = st.sidebar.selectbox("Prova", list(PROVAS.keys()))
 df = PROVAS[prova_sel]
 
-# Escolas (se vazio, mantém todas)
-escolas = sorted(df['Escola'].dropna().unique())
-escola_sel = st.sidebar.multiselect("Escola(s)", escolas, default=[])
-if escola_sel:
-    df = df[df['Escola'].isin(escola_sel)]
-
-# Fases
+# Fases (filtram os dados antes de definir escolas disponíveis)
 fases = sorted(df['Fase'].dropna().unique())
 fases_sel = st.sidebar.multiselect("Fase(s)", fases, default=fases)
 if fases_sel:
     df = df[df['Fase'].isin(fases_sel)]
+
+# Escolas (lista já considera filtro de fase)
+escolas = sorted(df['Escola'].dropna().unique())
+escola_sel = st.sidebar.multiselect("Escola(s)", escolas, default=[])
+if escola_sel:
+    df = df[df['Escola'].isin(escola_sel)]
 
 # Turmas - Opção de agregação
 st.sidebar.markdown("---")
