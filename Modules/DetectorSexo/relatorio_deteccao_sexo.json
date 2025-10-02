@@ -1,0 +1,28 @@
+{
+  "TDE": {
+    "total_registros": 9408,
+    "nomes_unicos": 2588,
+    "masculino": 4818,
+    "feminino": 4529,
+    "indeterminado": 61,
+    "metodos": {
+      "gender_guesser": 577,
+      "regras": 103,
+      "ollama": 8642,
+      "indeterminado": 61
+    }
+  },
+  "Vocabulario": {
+    "total_registros": 8323,
+    "nomes_unicos": 2602,
+    "masculino": 4363,
+    "feminino": 3903,
+    "indeterminado": 57,
+    "metodos": {
+      "gender_guesser": 511,
+      "regras": 60,
+      "ollama": 7686,
+      "indeterminado": 57
+    }
+  }
+}
