@@ -33,10 +33,11 @@ sns.set_theme(style="whitegrid")
 # ======================
 BASE_DIR = pathlib.Path(__file__).parent.parent.parent.parent.resolve()  # Sair de TDE/Fase2/Modules/
 DATA_DIR = BASE_DIR / "Data"
+DASHBOARD_DIR = BASE_DIR / "Dashboard"
 FIG_DIR = DATA_DIR / "figures"
 
-# Arquivos de dados TDE
-CSV_TABELA_TDE = DATA_DIR / "tabela_bruta_fase2_TDE_wordgen.csv"  # Usar CSV como padrão
+# Arquivos de dados TDE - ALTERADO PARA TDE_longitudinal.csv
+CSV_TABELA_TDE = DASHBOARD_DIR / "TDE_longitudinal.csv"
 HTML_OUT = DATA_DIR / "relatorio_visual_TDE_fase2.html"
 MAPPING_FILE = DATA_DIR / "RespostaTED.json"
 
@@ -138,9 +139,11 @@ def _ensure_fig_dir():
 # ======================
 
 def obter_escolas_disponiveis_tde():
-    """Obtém a lista de escolas disponíveis nos dados TDE"""
+    """Obtém a lista de escolas disponíveis nos dados TDE da Fase 2"""
     try:
         df = pd.read_csv(str(CSV_TABELA_TDE))
+        # Filtrar apenas Fase 2
+        df = df[df['Fase'] == 2]
     except:
         # Fallback se não conseguir ler
         return ["Todas"]
@@ -149,11 +152,11 @@ def obter_escolas_disponiveis_tde():
     return ["Todas"] + escolas
 
 def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple[pd.DataFrame, Dict]:
-    """Carrega e prepara os dados TDE da tabela bruta."""
+    """Carrega e prepara os dados TDE da tabela longitudinal - Fase 2."""
     if csv_path is None:
         csv_path = str(CSV_TABELA_TDE)
     
-    print("📊 CARREGANDO DADOS TDE...")
+    print("📊 CARREGANDO DADOS TDE FASE 2...")
     
     # Carregar dados
     try:
@@ -170,20 +173,27 @@ def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple
     
     print(f"   Total de registros carregados: {len(df)}")
     
+    # FILTRAR APENAS FASE 2
+    df = df[df['Fase'] == 2].copy()
+    print(f"   Registros da Fase 2: {len(df)}")
+    
     # Aplicar filtro de escola se especificado
     if escola_filtro and escola_filtro != "Todas":
-        df_original = df.copy()
-        df = df[df['Escola'] == escola_filtro]
+        df = df[df['Escola'] == escola_filtro].copy()
         print(f"   Filtro escola '{escola_filtro}': {len(df)} registros")
     
+    # Calcular Delta_Score se não existir
+    if 'Delta_Score' not in df.columns:
+        df['Delta_Score'] = df['Score_Pos'] - df['Score_Pre']
+    
     # Verificar colunas essenciais
-    colunas_essenciais = ['Score_Pre', 'Score_Pos', 'Delta_Score', 'GrupoTDE', 'Escola']
+    colunas_essenciais = ['Score_Pre', 'Score_Pos', 'Escola', 'Turma']
     missing_cols = [col for col in colunas_essenciais if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Colunas essenciais ausentes: {missing_cols}")
     
     # Limpeza básica
-    df = df.dropna(subset=['Score_Pre', 'Score_Pos', 'Delta_Score'])
+    df = df.dropna(subset=['Score_Pre', 'Score_Pos'])
     
     # Criar novos grupos baseados no ano extraído da turma
     df['Ano'] = df['Turma'].str.extract(r'(\d+)(?:º|°|\s+(?:ano|ANO))', flags=re.IGNORECASE)[0]
@@ -194,10 +204,28 @@ def carregar_dados_tde(csv_path: str = None, escola_filtro: str = None) -> Tuple
         '9': '9º ano'
     })
     
+    # Criar GrupoTDE se não existir (para compatibilidade)
+    if 'GrupoTDE' not in df.columns:
+        df['GrupoTDE'] = df['GrupoTDE_Novo']
+    
     # Filtrar apenas registros com anos válidos
     df = df.dropna(subset=['GrupoTDE_Novo'])
     
     # Metadados
+    meta = {
+        "n_total": len(df),
+        "n_6ano": len(df[df['GrupoTDE_Novo'] == '6º ano']),
+        "n_7ano": len(df[df['GrupoTDE_Novo'] == '7º ano']),
+        "n_8ano": len(df[df['GrupoTDE_Novo'] == '8º ano']),
+        "n_9ano": len(df[df['GrupoTDE_Novo'] == '9º ano']),
+        "escolas": df['Escola'].unique().tolist(),
+        "escola_filtro": escola_filtro
+    }
+    
+    print(f"   Registros após limpeza: {len(df)}")
+    print(f"   Grupos: 6º={meta['n_6ano']}, 7º={meta['n_7ano']}, 8º={meta['n_8ano']}, 9º={meta['n_9ano']}")
+    
+    return df, meta
     meta = {
         "n_total": len(df),
         "n_6ano": len(df[df['GrupoTDE_Novo'] == '6º ano']),
@@ -279,32 +307,27 @@ def extrair_palavras_tde(df: pd.DataFrame) -> pd.DataFrame:
     """Extrai dados das palavras TDE para análise."""
     palavras_data = []
     
-    # Padrão das colunas: P{num}_{pre/pos}_{palavra}
+    # Padrão das colunas no TDE_longitudinal.csv: Q{num}_Pre e Q{num}_Pos
     colunas = df.columns.tolist()
     
-    # Extrair informações das palavras
+    # Extrair informações das questões (Q1 a Q40)
     for col in colunas:
-        if col.startswith('P') and '_Pre_' in col:
-            # Extrair número da questão e palavra
-            parts = col.split('_')
-            if len(parts) >= 3:
-                questao_num = parts[0]  # P01, P02, etc.
-                palavra = '_'.join(parts[2:])  # pode ter underscores na palavra
-                
-                # Colunas correspondentes
-                col_pre = f"{questao_num}_Pre_{palavra}"
-                col_pos = f"{questao_num}_Pos_{palavra}"
-                col_delta = f"{questao_num}_Delta_{palavra}"
-                
-                # Verificar se todas as colunas existem
-                if col_pre in colunas and col_pos in colunas and col_delta in colunas:
-                    palavras_data.append({
-                        'Questao': questao_num,
-                        'Palavra': palavra,
-                        'Col_Pre': col_pre,
-                        'Col_Pos': col_pos,
-                        'Col_Delta': col_delta
-                    })
+        if col.startswith('Q') and '_Pre' in col:
+            # Extrair número da questão
+            questao_num = col.replace('_Pre', '')
+            
+            # Colunas correspondentes
+            col_pre = f"{questao_num}_Pre"
+            col_pos = f"{questao_num}_Pos"
+            
+            # Verificar se ambas as colunas existem
+            if col_pre in colunas and col_pos in colunas:
+                palavras_data.append({
+                    'Questao': questao_num,
+                    'Palavra': f"Palavra {questao_num}",  # Nome genérico
+                    'Col_Pre': col_pre,
+                    'Col_Pos': col_pos
+                })
     
     return pd.DataFrame(palavras_data)
 
@@ -331,7 +354,6 @@ def analisar_palavras_tde(df: pd.DataFrame, grupo_filtro: str = None) -> pd.Data
         palavra = palavra_info['Palavra']
         col_pre = palavra_info['Col_Pre']
         col_pos = palavra_info['Col_Pos']
-        col_delta = palavra_info['Col_Delta']
         
         # Dados válidos (não nulos)
         mask_valido = df[col_pre].notna() & df[col_pos].notna()
