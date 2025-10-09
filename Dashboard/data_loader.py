@@ -26,6 +26,35 @@ def normalize_name(s: str) -> str:
     s = re.sub(r'\s+', ' ', s)
     return s
 
+def anonimizar_estudante(id_unico: str, nome_completo: str) -> str:
+    """
+    Cria identificador anonimizado para estudante seguindo LGPD.
+    
+    Formato: [PRIMEIRAS_6_LETRAS_ID] - [INICIAIS_NOME]
+    Exemplo: "56E9C8 - AAS" para ABIGAIL ALVES DOS SANTOS (ID: 56E9C824252F)
+    
+    Args:
+        id_unico: ID único do estudante (ex: 56E9C824252F)
+        nome_completo: Nome completo do estudante
+        
+    Returns:
+        String anonimizada no formato especificado
+    """
+    if pd.isna(id_unico) or pd.isna(nome_completo):
+        return "DESCONHECIDO"
+    
+    # Pegar primeiros 6 caracteres do ID
+    id_parcial = str(id_unico)[:6]
+    
+    # Criar iniciais do nome (primeira letra de cada palavra)
+    nome_normalizado = normalize_name(nome_completo)
+    palavras = nome_normalizado.split()
+    
+    # Pegar primeira letra de cada palavra (máximo 4 iniciais para não ficar muito longo)
+    iniciais = ''.join([p[0] for p in palavras if p])[:4]
+    
+    return f"{id_parcial} - {iniciais}"
+
 def extract_year(turma: str):
     if pd.isna(turma):
         return None
@@ -74,12 +103,26 @@ def get_datasets():
         tde['Ano'] = tde['Turma'].apply(extract_year)
     tde = create_coorte_origem(tde)
     
+    # Criar identificador anonimizado (LGPD)
+    if 'ID_Anonimizado' not in tde.columns:
+        tde['ID_Anonimizado'] = tde.apply(
+            lambda row: anonimizar_estudante(row['ID_Unico'], row['Nome']), 
+            axis=1
+        )
+    
     # Processamento Vocabulário
     if 'NomeNorm' not in vocab.columns:
         vocab['NomeNorm'] = vocab['Nome'].apply(normalize_name)
     if 'Ano' not in vocab.columns:
         vocab['Ano'] = vocab['Turma'].apply(extract_year)
     vocab = create_coorte_origem(vocab)
+    
+    # Criar identificador anonimizado (LGPD)
+    if 'ID_Anonimizado' not in vocab.columns:
+        vocab['ID_Anonimizado'] = vocab.apply(
+            lambda row: anonimizar_estudante(row['ID_Unico'], row['Nome']), 
+            axis=1
+        )
     
     return tde, vocab
 

@@ -96,9 +96,13 @@ turmas_sel = st.sidebar.multiselect(label_turmas, turmas_disponiveis)
 if turmas_sel:
     df = df[df[coluna_turma].isin(turmas_sel)]
 
-# Nome (para acompanhamento individual)
-nomes = sorted(df['Nome'].dropna().unique())
-nome_sel = st.sidebar.selectbox("Aluno (Nome Completo)", ["<selecione>"] + nomes)
+# Identificador anonimizado (para acompanhamento individual - LGPD)
+ids_anonimizados = sorted(df['ID_Anonimizado'].dropna().unique())
+id_anonimizado_sel = st.sidebar.selectbox(
+    "🔒 Aluno (ID Anonimizado)", 
+    ["<selecione>"] + ids_anonimizados,
+    help="Formato: [Primeiras letras do ID] - [Iniciais do Nome]"
+)
 
 # ================= OVERVIEW ==================
 st.subheader("Resumo Filtrado")
@@ -617,17 +621,18 @@ if not df.empty:
             
             if fig_escolas:
                 # Capturar cliques no gráfico
-                clicked_data = st.plotly_chart(fig_escolas, use_container_width=True, 
-                                             on_select="rerun", key="escola_chart")
+                event = st.plotly_chart(fig_escolas, use_container_width=True, 
+                                      on_select="rerun", key="escola_chart", selection_mode="points")
                 
                 # Processar seleção de escola - Redirecionar para escolha de análise
-                if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
-                    selected_point = clicked_data['selection']['points'][0]
-                    if 'customdata' in selected_point:
-                        escola_selecionada = selected_point['customdata'][0]
-                        st.session_state.selected_escola = escola_selecionada
-                        st.session_state.drill_level = 'escolha_analise'
-                        st.rerun()
+                if event and hasattr(event, 'selection') and hasattr(event.selection, 'points'):
+                    if event.selection.points:
+                        selected_point = event.selection.points[0]
+                        if hasattr(selected_point, 'customdata') and selected_point.customdata:
+                            escola_selecionada = selected_point.customdata[0]
+                            st.session_state.selected_escola = escola_selecionada
+                            st.session_state.drill_level = 'escolha_analise'
+                            st.rerun()
 
     elif st.session_state.drill_level == 'escolha_analise':
         # NÍVEL 2: ESCOLHA DE TIPO DE ANÁLISE
@@ -701,16 +706,17 @@ if not df.empty:
                 )
                 
                 if fig_coortes:
-                    clicked_data = st.plotly_chart(fig_coortes, use_container_width=True, 
-                                                 on_select="rerun", key="coorte_chart")
+                    event = st.plotly_chart(fig_coortes, use_container_width=True, 
+                                          on_select="rerun", key="coorte_chart", selection_mode="points")
                     
-                    if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
-                        selected_point = clicked_data['selection']['points'][0]
-                        if 'customdata' in selected_point:
-                            coorte_selecionada = selected_point['customdata'][0]
-                            st.session_state.selected_coorte = coorte_selecionada
-                            st.session_state.drill_level = 'alunos_coorte'
-                            st.rerun()
+                    if event and hasattr(event, 'selection') and hasattr(event.selection, 'points'):
+                        if event.selection.points:
+                            selected_point = event.selection.points[0]
+                            if hasattr(selected_point, 'customdata') and selected_point.customdata:
+                                coorte_selecionada = selected_point.customdata[0]
+                                st.session_state.selected_coorte = coorte_selecionada
+                                st.session_state.drill_level = 'alunos_coorte'
+                                st.rerun()
             else:
                 st.info("Sem dados suficientes de coortes para esta escola.")
         else:
@@ -770,26 +776,27 @@ if not df.empty:
                 )
                 
                 if fig_turmas:
-                    clicked_data = st.plotly_chart(fig_turmas, use_container_width=True, 
-                                                 on_select="rerun", key="turma_serie_chart")
+                    event = st.plotly_chart(fig_turmas, use_container_width=True, 
+                                          on_select="rerun", key="turma_serie_chart", selection_mode="points")
                     
-                    if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
-                        selected_point = clicked_data['selection']['points'][0]
-                        if 'customdata' in selected_point:
-                            custom = selected_point['customdata']
-                            if custom and isinstance(custom[0], (list, tuple, np.ndarray)):
-                                custom = custom[0]
-                            turma_selecionada = custom[0] if len(custom) > 0 else None
-                            fase_val = custom[4] if len(custom) > 4 else selected_point.get('x')
-                            try:
-                                fase_num = int(round(float(fase_val)))
-                            except (TypeError, ValueError):
-                                fase_num = fase_val
-                            fase_selecionada = str(fase_num) if fase_num is not None else None
-                            st.session_state.selected_turma = turma_selecionada
-                            st.session_state.selected_fase = fase_selecionada
-                            st.session_state.drill_level = 'alunos_turma'
-                            st.rerun()
+                    if event and hasattr(event, 'selection') and hasattr(event.selection, 'points'):
+                        if event.selection.points:
+                            selected_point = event.selection.points[0]
+                            if hasattr(selected_point, 'customdata') and selected_point.customdata:
+                                custom = selected_point.customdata
+                                if custom and isinstance(custom[0], (list, tuple, np.ndarray)):
+                                    custom = custom[0]
+                                turma_selecionada = custom[0] if len(custom) > 0 else None
+                                fase_val = custom[4] if len(custom) > 4 else getattr(selected_point, 'x', None)
+                                try:
+                                    fase_num = int(round(float(fase_val)))
+                                except (TypeError, ValueError):
+                                    fase_num = fase_val
+                                fase_selecionada = str(fase_num) if fase_num is not None else None
+                                st.session_state.selected_turma = turma_selecionada
+                                st.session_state.selected_fase = fase_selecionada
+                                st.session_state.drill_level = 'alunos_turma'
+                                st.rerun()
             else:
                 st.info("Sem dados suficientes de turmas para esta escola.")
         else:
@@ -974,16 +981,17 @@ if not df.empty:
                 )
                 
                 if fig_turmas:
-                    clicked_data = st.plotly_chart(fig_turmas, use_container_width=True, 
-                                                 on_select="rerun", key="turma_chart")
+                    event = st.plotly_chart(fig_turmas, use_container_width=True, 
+                                          on_select="rerun", key="turma_chart", selection_mode="points")
                     
-                    if clicked_data and 'selection' in clicked_data and clicked_data['selection']['points']:
-                        selected_point = clicked_data['selection']['points'][0]
-                        if 'customdata' in selected_point:
-                            turma_selecionada = selected_point['customdata'][0]
-                            st.session_state.selected_turma = turma_selecionada
-                            st.session_state.drill_level = 'aluno'
-                            st.rerun()
+                    if event and hasattr(event, 'selection') and hasattr(event.selection, 'points'):
+                        if event.selection.points:
+                            selected_point = event.selection.points[0]
+                            if hasattr(selected_point, 'customdata') and selected_point.customdata:
+                                turma_selecionada = selected_point.customdata[0]
+                                st.session_state.selected_turma = turma_selecionada
+                                st.session_state.drill_level = 'aluno'
+                                st.rerun()
             else:
                 st.info("Sem dados suficientes de turmas para esta escola.")
         else:
@@ -1203,8 +1211,8 @@ else:
 
 # ================= EVOLUÇÃO INDIVIDUAL ==================
 st.subheader("Evolução Individual (Pré vs Pós por Fase)")
-if nome_sel and nome_sel != "<selecione>":
-    df_ind = df[df['Nome'] == nome_sel].sort_values('Fase')
+if id_anonimizado_sel and id_anonimizado_sel != "<selecione>":
+    df_ind = df[df['ID_Anonimizado'] == id_anonimizado_sel].sort_values('Fase')
     if df_ind.empty:
         st.info("Aluno não encontrado com filtros atuais.")
     else:
@@ -1248,7 +1256,7 @@ if nome_sel and nome_sel != "<selecione>":
                                  .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}))
             
             fig_scores = px.line(long_scores, x='Fase', y='Score', color='Momento', markers=True,
-                               title=f'Evolução Pré vs Pós - {nome_sel}',
+                               title=f'Evolução Pré vs Pós - {id_anonimizado_sel}',
                                labels={'Momento': 'Teste'})
             
             # Configurar eixo X com ticks discretos
@@ -1268,7 +1276,7 @@ if nome_sel and nome_sel != "<selecione>":
             df_delta['Delta'] = df_delta['Score_Pos'] - df_delta['Score_Pre']
             
             fig_delta = px.line(df_delta, x='Fase', y='Delta', markers=True,
-                              title=f'Evolução Delta - {nome_sel}',
+                              title=f'Evolução Delta - {id_anonimizado_sel}',
                               labels={'Delta': 'Delta (Pós - Pré)'})
             
             # Configurar eixo X com ticks discretos e adicionar linha zero de referência
