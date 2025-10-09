@@ -204,18 +204,67 @@ if not df.empty:
         'Score_Pos': 'Pós-Teste'
     })
     
+    # Criar boxplot com média visível
     fig_fase = px.box(
         df_boxplot,
         x='Fase',
         y='Score',
         color='Momento',
-        title='Distribuição Pré-Teste vs Pós-Teste por Fase',
+        title='Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)',
         labels={'Score': 'Score', 'Momento': 'Teste'},
         points='outliers'  # Mostra apenas outliers como pontos
     )
+    
+    # Adicionar linhas tracejadas de média para cada grupo
+    # Calcular médias por Fase e Momento
+    medias = df_boxplot.groupby(['Fase', 'Momento'])['Score'].mean().reset_index()
+    medias = medias.rename(columns={'Score': 'Media'})
+    
+    # Cores para combinar com o boxplot (padrão plotly)
+    cores_momento = {
+        'Pré-Teste': '#636EFA',  # Azul
+        'Pós-Teste': '#EF553B'   # Vermelho/Laranja
+    }
+    
+    # Obter as fases únicas para definir a largura das linhas
+    fases = sorted(df_boxplot['Fase'].unique())
+    primeira_fase = fases[0] if len(fases) > 0 else None
+    
+    # Adicionar linhas tracejadas de média para cada fase e momento
+    for fase in fases:
+        for momento in ['Pré-Teste', 'Pós-Teste']:
+            media_valor = medias[(medias['Fase'] == fase) & (medias['Momento'] == momento)]['Media'].values
+            if len(media_valor) > 0:
+                media_valor = float(media_valor[0])
+                
+                # Calcular offset para posicionar as linhas lado a lado (como os boxplots)
+                # O offset varia dependendo se é Pré ou Pós-Teste
+                offset = -0.2 if momento == 'Pré-Teste' else 0.2
+                x_pos = fase + offset
+                
+                # Determinar se deve mostrar legenda (apenas para a primeira fase)
+                mostrar_legenda = bool(fase == primeira_fase)
+                
+                fig_fase.add_trace(
+                    go.Scatter(
+                        x=[x_pos - 0.15, x_pos + 0.15],  # Linha horizontal com largura de 0.3
+                        y=[media_valor, media_valor],
+                        mode='lines',
+                        line=dict(
+                            color=cores_momento.get(momento, '#000000'),
+                            width=2,
+                            dash='dash'
+                        ),
+                        name=f'Média {momento}' if mostrar_legenda else None,
+                        showlegend=mostrar_legenda,
+                        hovertemplate=f'<b>Média {momento}</b><br>Fase: {fase}<br>Média: {media_valor:.2f}<extra></extra>'
+                    )
+                )
+    
     fig_fase.update_layout(
-        legend_title_text='Teste',
-        showlegend=True
+        legend_title_text='Legenda',
+        showlegend=True,
+        hovermode='closest'
     )
     st.plotly_chart(fig_fase, use_container_width=True)
 
