@@ -3,7 +3,10 @@
 """
 GERADOR DE RELATÓRIOS VISUAIS POR FASE
 Gera relatórios visuais interativos para TDE e Vocabulário
-para cada fase (2, 3 e 4) usando os dados separados.
+para cada fase (2, 3 e 4) usando dados longitudinais consolidados.
+
+ATUALIZADO: Agora usa vocabulario_longitudinal.csv e TDE_longitudinal.csv
+com filtros por Fase.
 
 Autor: Sistema de Análise WordGen
 Data: 2024
@@ -50,111 +53,60 @@ def verificar_scripts_existem():
                 print(f"  ✅ {tipo.upper()} Fase {fase}: {script_path.name}")
             else:
                 scripts_faltantes.append((tipo, fase, script_path))
-                print(f"  ❌ {tipo.upper()} Fase {fase}: {script_path} (NÃO EXISTE)")
+                print(f"  ⚠️  {tipo.upper()} Fase {fase}: {script_path} (NÃO EXISTE)")
+    
+    if scripts_faltantes:
+        print(f"\n⚠️  ATENÇÃO: {len(scripts_faltantes)} scripts faltantes.")
+        print("   Os scripts devem ser criados manualmente com base nos scripts da Fase 2.")
+        print("   Todos os scripts agora usam arquivos longitudinais consolidados.")
     
     return scripts_existentes, scripts_faltantes
 
 def criar_script_relatorio_fase(tipo: str, fase: int, script_path: pathlib.Path):
-    """Cria um script de relatório adaptado para uma fase específica."""
-    print(f"  📝 Criando script {tipo.upper()} para Fase {fase}...")
+    """
+    FUNÇÃO DESCONTINUADA: Scripts agora devem ser criados manualmente.
     
-    # Usar o script da Fase 2 como template
-    script_template = RELATORIO_SCRIPTS[tipo][2]
+    Os scripts de relatório foram refatorados para usar arquivos longitudinais
+    (vocabulario_longitudinal.csv e TDE_longitudinal.csv) com filtros por Fase.
     
-    if not script_template.exists():
-        raise FileNotFoundError(f"Script template não encontrado: {script_template}")
-    
-    # Ler o template
-    with open(script_template, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Adaptações específicas por tipo e fase
-    if tipo == "vocabulario":
-        content = adaptar_script_vocabulario(content, fase)
-    else:  # tde
-        content = adaptar_script_tde(content, fase)
-    
-    # Criar diretórios se necessário
-    script_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Salvar script adaptado
-    with open(script_path, 'w', encoding='utf-8') as f:
-        f.write(content)
-    
-    # Tornar executável
-    os.chmod(script_path, 0o755)
-    
-    print(f"    ✅ Script criado: {script_path}")
+    Não é mais possível gerar scripts automaticamente por substituição de texto,
+    pois a estrutura de carregamento de dados foi completamente alterada.
+    """
+    print(f"  ⚠️  Criação automática de scripts descontinuada.")
+    print(f"     Por favor, crie manualmente o script para {tipo.upper()} Fase {fase}")
+    print(f"     baseando-se no script da Fase 2 como referência.")
+    print(f"     Mudanças necessárias:")
+    print(f"       - Usar {tipo}_longitudinal.csv")
+    print(f"       - Filtrar por Fase={fase}")
+    print(f"       - Adaptar colunas Q{{i}}_Pre e Q{{i}}_Pos")
+    raise NotImplementedError(
+        f"Script {tipo} Fase {fase} deve ser criado manualmente. "
+        f"Veja os scripts das Fases 2, 3 e 4 como referência."
+    )
 
 def adaptar_script_vocabulario(content: str, fase: int) -> str:
-    """Adapta o script de vocabulário para uma fase específica."""
+    """
+    FUNÇÃO DESCONTINUADA: Não é mais possível adaptar scripts automaticamente.
     
-    # Substituições de paths e configurações
-    adaptacoes = {
-        # Paths dos dados
-        f'"Fase 2/Pre/DadosVocabulario.csv"': f'"Fase {fase}/Pre/DadosVocabulario.csv"',
-        f'"Fase 2/Pos/DadosVocabulario.csv"': f'"Fase {fase}/Pos/DadosVocabulario.csv"',
-        f'"Fase 2/PalavrasEnsinadasVocabulario.json"': f'"Fase {fase}/PalavrasEnsinadasVocabulario.json"',
-        
-        # Arquivos de saída
-        f'"relatorio_visual_wordgen_fase2.html"': f'"relatorio_visual_wordgen_fase{fase}.html"',
-        f'relatorio_visual_wordgen_fase2.html': f'relatorio_visual_wordgen_fase{fase}.html',
-        f'relatorio_visual_wordgen_fase2_interativo.html': f'relatorio_visual_wordgen_fase{fase}_interativo.html',
-        
-        # Figuras
-        f'"fase2_': f'"fase{fase}_',
-        f'fase2_': f'fase{fase}_',
-        
-        # Títulos e textos
-        f'WordGen - Fase 2': f'WordGen - Fase {fase}',
-        f'WordGen Fase 2': f'WordGen Fase {fase}',
-        f'FASE 2': f'FASE {fase}',
-        f'Fase 2': f'Fase {fase}',
-        
-        # Comentários e documentação
-        f'RELATÓRIO VISUAL COMPLETO - VOCABULÁRIO WORDGEN FASE 2': f'RELATÓRIO VISUAL COMPLETO - VOCABULÁRIO WORDGEN FASE {fase}',
-    }
-    
-    # Aplicar adaptações
-    for original, substituicao in adaptacoes.items():
-        content = content.replace(original, substituicao)
-    
-    return content
+    Os scripts foram refatorados para usar formato longitudinal, o que requer
+    mudanças estruturais que não podem ser feitas por substituição de texto.
+    """
+    raise NotImplementedError(
+        "Adaptação automática de scripts descontinuada. "
+        "Scripts devem ser criados manualmente usando formato longitudinal."
+    )
 
 def adaptar_script_tde(content: str, fase: int) -> str:
-    """Adapta o script de TDE para uma fase específica."""
+    """
+    FUNÇÃO DESCONTINUADA: Não é mais possível adaptar scripts automaticamente.
     
-    # Substituições de paths e configurações
-    adaptacoes = {
-        # Paths dos dados
-        f'"Fase 2/Pre/DadosTDE.csv"': f'"Fase {fase}/Pre/DadosTDE.csv"',
-        f'"Fase 2/Pos/DadosTDE.csv"': f'"Fase {fase}/Pos/DadosTDE.csv"',
-        f'tabela_bruta_fase2_TDE_wordgen.csv': f'tabela_bruta_fase{fase}_TDE_wordgen.csv',
-        
-        # Arquivos de saída
-        f'"relatorio_visual_TDE_fase2.html"': f'"relatorio_visual_TDE_fase{fase}.html"',
-        f'relatorio_visual_TDE_fase2.html': f'relatorio_visual_TDE_fase{fase}.html',
-        f'relatorio_visual_TDE_fase2_interativo.html': f'relatorio_visual_TDE_fase{fase}_interativo.html',
-        
-        # Figuras
-        f'"fase2_': f'"fase{fase}_',
-        f'fase2_': f'fase{fase}_',
-        
-        # Títulos e textos
-        f'TDE WordGen - Fase 2': f'TDE WordGen - Fase {fase}',
-        f'TDE WordGen Fase 2': f'TDE WordGen Fase {fase}',
-        f'FASE 2': f'FASE {fase}',
-        f'Fase 2': f'Fase {fase}',
-        
-        # Comentários e documentação
-        f'RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE 2': f'RELATÓRIO VISUAL COMPLETO - TDE WORDGEN FASE {fase}',
-    }
-    
-    # Aplicar adaptações
-    for original, substituicao in adaptacoes.items():
-        content = content.replace(original, substituicao)
-    
-    return content
+    Os scripts foram refatorados para usar formato longitudinal, o que requer
+    mudanças estruturais que não podem ser feitas por substituição de texto.
+    """
+    raise NotImplementedError(
+        "Adaptação automática de scripts descontinuada. "
+        "Scripts devem ser criados manualmente usando formato longitudinal."
+    )
 
 def executar_relatorio(tipo: str, fase: int, script_path: pathlib.Path, interativo: bool = True) -> bool:
     """Executa um script de relatório e retorna True se bem-sucedido."""
@@ -210,21 +162,27 @@ def gerar_todos_relatorios(interativo: bool = True):
     # Verificar scripts existentes
     scripts_existentes, scripts_faltantes = verificar_scripts_existem()
     
-    # Criar scripts faltantes
+    # Avisar sobre scripts faltantes (não tenta mais criar automaticamente)
     if scripts_faltantes:
-        print(f"\n📝 Criando {len(scripts_faltantes)} scripts faltantes...")
+        print(f"\n⚠️  AVISO: {len(scripts_faltantes)} scripts faltantes detectados:")
         for tipo, fase, script_path in scripts_faltantes:
-            try:
-                criar_script_relatorio_fase(tipo, fase, script_path)
-                scripts_existentes[tipo][fase] = script_path
-            except Exception as e:
-                print(f"  ❌ Erro ao criar script {tipo} Fase {fase}: {e}")
+            print(f"     - {tipo.upper()} Fase {fase}: {script_path}")
+        print("\n   Esses scripts devem ser criados manualmente.")
+        print("   Continuando com os scripts disponíveis...\n")
     
     # Executar relatórios
     resultados = {}
     total_scripts = sum(len(fases) for fases in scripts_existentes.values())
     executados = 0
     sucesso = 0
+    
+    if total_scripts == 0:
+        print("\n❌ ERRO: Nenhum script de relatório disponível!")
+        print("   Por favor, verifique se os scripts existem em:")
+        print(f"   - {MODULES_DIR / 'Fase2'}")
+        print(f"   - {MODULES_DIR / 'Fase3'}")
+        print(f"   - {MODULES_DIR / 'Fase4'}")
+        return {}
     
     print(f"\n🚀 Executando {total_scripts} relatórios...")
     
@@ -246,7 +204,7 @@ def gerar_todos_relatorios(interativo: bool = True):
                 # Pequena pausa entre execuções
                 time.sleep(1)
             else:
-                resultados[tipo][fase] = "❌ Script não disponível"
+                resultados[tipo][fase] = "⚠️  Script não disponível"
     
     # Relatório final
     print("\n" + "=" * 60)
@@ -260,7 +218,7 @@ def gerar_todos_relatorios(interativo: bool = True):
             print(f"  Fase {fase}: {status}")
     
     print(f"\n📈 ESTATÍSTICAS:")
-    print(f"  Total de scripts: {total_scripts}")
+    print(f"  Total de scripts disponíveis: {total_scripts}")
     print(f"  Executados: {executados}")
     print(f"  Sucessos: {sucesso}")
     print(f"  Erros: {executados - sucesso}")
@@ -299,7 +257,8 @@ def main():
     
     # Configurar argumentos de linha de comando
     parser = argparse.ArgumentParser(
-        description='Gera relatórios visuais para todas as fases (2, 3, 4) do WordGen'
+        description='Gera relatórios visuais para todas as fases (2, 3, 4) do WordGen.\n'
+                    'NOTA: Scripts usam arquivos longitudinais consolidados.'
     )
     parser.add_argument('--padrao', action='store_true',
                        help='Gera relatórios no formato padrão (por padrão usa formato interativo)')
@@ -317,13 +276,23 @@ def main():
     print(f"📊 Diretório de dados: {DATA_DIR}")
     print(f"🔧 Diretório de módulos: {MODULES_DIR}")
     print(f"🎨 Modo: {'INTERATIVO' if interativo else 'PADRÃO'}")
+    print(f"📦 Fonte de dados: vocabulario_longitudinal.csv e TDE_longitudinal.csv")
     
     try:
-        # Verificar se dados estão disponíveis
-        for fase in [2, 3, 4]:
-            fase_dir = DATA_DIR / f"Fase {fase}"
-            if not fase_dir.exists():
-                raise FileNotFoundError(f"Diretório da Fase {fase} não encontrado: {fase_dir}")
+        # Verificar se arquivos longitudinais existem
+        dashboard_dir = BASE_DIR / "Dashboard"
+        vocab_longitudinal = dashboard_dir / "vocabulario_longitudinal.csv"
+        tde_longitudinal = dashboard_dir / "TDE_longitudinal.csv"
+        
+        if not vocab_longitudinal.exists():
+            print(f"\n⚠️  AVISO: Arquivo não encontrado: {vocab_longitudinal}")
+        else:
+            print(f"✅ Vocabulário longitudinal encontrado")
+            
+        if not tde_longitudinal.exists():
+            print(f"\n⚠️  AVISO: Arquivo não encontrado: {tde_longitudinal}")
+        else:
+            print(f"✅ TDE longitudinal encontrado")
         
         # Gerar relatórios
         resultados = gerar_todos_relatorios(interativo)
@@ -337,11 +306,16 @@ def main():
         print("  1. Abrir os relatórios HTML no navegador")
         print("  2. Verificar a qualidade dos gráficos e análises")
         print("  3. Ajustar configurações se necessário")
+        print("\n📌 NOTA IMPORTANTE:")
+        print("  Todos os relatórios agora usam dados longitudinais consolidados")
+        print("  com filtros por Fase (2, 3 ou 4).")
         
         return 0
         
     except Exception as e:
         print(f"\n❌ ERRO: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 if __name__ == "__main__":

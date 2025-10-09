@@ -1797,7 +1797,7 @@ if __name__ == "__main__":
         elif sys.argv[1] == "--interativo":
             print("🔄 Gerando relatório interativo...")
             html_content = gerar_html_relatorio_interativo()
-            arquivo_saida = "/home/nees/Documents/VSCodigo/AnaliseDadosWordGeneration/Data/relatorio_visual_wordgen_fase4_interativo.html"
+            arquivo_saida = DATA_DIR / "relatorio_visual_wordgen_fase4_interativo.html"
             
             with open(arquivo_saida, 'w', encoding='utf-8') as f:
                 f.write(html_content)
