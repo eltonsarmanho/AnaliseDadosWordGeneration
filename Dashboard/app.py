@@ -47,20 +47,19 @@ def load_data():
     
     return tde, vocab
 
-# ================= HEADER ====================
-st.title("📊 Dashboard Longitudinal - WordGen")
-st.markdown("""
-Este painel permite:
-- Filtrar por Escola / Turma / Fase / Prova
-- Acompanhar evolução individual (pré x pós) por fase
-""")
-
 # ================= LOAD DATA =================
 tde_df, vocab_df = load_data()
 
 PROVAS = {"TDE": tde_df, "VOCABULÁRIO": vocab_df}
 
 # ================= SIDEBAR ===================
+st.sidebar.title("📊 Dashboard Longitudinal - WordGen")
+st.sidebar.markdown("""
+**Este painel permite:**
+- Filtrar por Escola / Turma / Fase / Prova
+- Acompanhar evolução individual (pré x pós) por fase
+""")
+st.sidebar.markdown("---")
 st.sidebar.header("Filtros")
 prova_sel = st.sidebar.selectbox("Prova", list(PROVAS.keys()))
 df = PROVAS[prova_sel]
