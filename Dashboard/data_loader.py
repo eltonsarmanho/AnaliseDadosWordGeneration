@@ -68,28 +68,52 @@ def extract_year(turma: str):
     return None
 
 def create_coorte_origem(df):
-    """Cria coluna de Coorte_Origem baseada na primeira turma que cada aluno participou"""
+    """
+    Cria coluna de Coorte_Origem baseada na primeira fase em que cada aluno participou.
+    
+    Coortes representam o ponto de entrada do aluno no programa:
+    - Coorte 1: Alunos que começaram na Fase 2 (primeira fase de avaliação)
+    - Coorte 2: Alunos que começaram na Fase 3 (entraram mais tarde)
+    - Coorte 3: Alunos que começaram na Fase 4 (última fase de entrada)
+    
+    A coorte é determinada pela menor fase em que o ID_Unico aparece nos dados,
+    garantindo rastreamento longitudinal correto mesmo se o aluno mudar de turma.
+    """
     # Para cada ID_Unico, encontrar a menor fase (primeira participação)
     primeira_participacao = df.groupby('ID_Unico')['Fase'].min().reset_index()
     primeira_participacao = primeira_participacao.rename(columns={'Fase': 'Primeira_Fase'})
     
-    # Merge para trazer primeira fase para cada registro
-    df_temp = df.merge(primeira_participacao, on='ID_Unico', how='left')
+    # Mapear fase inicial para número de coorte
+    # Fase 2 → Coorte 1, Fase 3 → Coorte 2, Fase 4 → Coorte 3
+    def fase_para_coorte(fase):
+        if pd.isna(fase):
+            return None
+        fase_num = int(fase)
+        if fase_num == 2:
+            return 'Coorte 1'
+        elif fase_num == 3:
+            return 'Coorte 2'
+        elif fase_num == 4:
+            return 'Coorte 3'
+        else:
+            return f'Coorte {fase_num - 1}'  # Fallback genérico
     
-    # Para cada aluno, pegar a turma da primeira fase como coorte
-    coorte_map = {}
-    for _, row in df_temp.iterrows():
-        id_unico = row['ID_Unico']
-        if id_unico not in coorte_map:
-            # Buscar a turma da primeira fase deste aluno
-            primeira_turma = df_temp[
-                (df_temp['ID_Unico'] == id_unico) & 
-                (df_temp['Fase'] == row['Primeira_Fase'])
-            ]['Turma_Origem'].iloc[0]
-            coorte_map[id_unico] = primeira_turma
+    primeira_participacao['Coorte_Origem'] = primeira_participacao['Primeira_Fase'].apply(fase_para_coorte)
     
-    # Aplicar mapeamento
-    df['Coorte_Origem'] = df['ID_Unico'].map(coorte_map)
+    # Merge para trazer coorte para todos os registros do aluno
+    df = df.merge(primeira_participacao[['ID_Unico', 'Coorte_Origem']], on='ID_Unico', how='left')
+    
+    # Também criar coluna auxiliar com a turma original da primeira fase (útil para debug)
+    primeira_turma = df.merge(primeira_participacao[['ID_Unico', 'Primeira_Fase']], on='ID_Unico', how='left')
+    turma_origem_map = {}
+    for id_unico in primeira_turma['ID_Unico'].unique():
+        aluno_dados = primeira_turma[primeira_turma['ID_Unico'] == id_unico]
+        primeira_fase_aluno = aluno_dados['Primeira_Fase'].iloc[0]
+        turma_na_primeira_fase = aluno_dados[aluno_dados['Fase'] == primeira_fase_aluno]['Turma_Origem'].iloc[0] if 'Turma_Origem' in aluno_dados.columns else None
+        turma_origem_map[id_unico] = turma_na_primeira_fase
+    
+    df['Turma_Primeira_Fase'] = df['ID_Unico'].map(turma_origem_map)
+    
     return df
 
 def get_datasets():
