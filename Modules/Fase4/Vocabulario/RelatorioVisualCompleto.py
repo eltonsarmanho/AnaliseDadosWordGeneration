@@ -20,11 +20,11 @@ sns.set_theme(style="whitegrid")
 # ======================
 BASE_DIR = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
 DATA_DIR = BASE_DIR / "Data"
+DASHBOARD_DIR = BASE_DIR / "Dashboard"
 FIG_DIR = DATA_DIR / "figures"
 
-# Dados da Fase 4 - Usando CSV
-ARQUIVO_PRE = DATA_DIR / "Fase 4/Pre/DadosVocabulario.csv"
-ARQUIVO_POS = DATA_DIR / "Fase 4/Pos/DadosVocabulario.csv"
+# Dados da Fase 4 - Usando CSV longitudinal
+CSV_TABELA_VOCAB = DASHBOARD_DIR / "vocabulario_longitudinal.csv"
 ARQUIVO_RESPOSTAS = DATA_DIR / "RespostaVocabulario.json"
 OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase4.html"
 
@@ -49,10 +49,12 @@ plt.rcParams.update({
 # ======================
 
 def obter_escolas_disponiveis():
-    """Obtém a lista de escolas disponíveis nos dados"""
+    """Obtém a lista de escolas disponíveis nos dados da Fase 4"""
     try:
-        df_pre = pd.read_csv(ARQUIVO_PRE)
-        escolas = sorted(df_pre['ESCOLA'].dropna().unique().tolist())
+        df = pd.read_csv(CSV_TABELA_VOCAB)
+        # Filtrar apenas Fase 4
+        df = df[df['Fase'] == 4]
+        escolas = sorted(df['Escola'].dropna().unique().tolist())
         return ["Todas"] + escolas
     except Exception as e:
         print(f"Erro ao carregar escolas: {e}")
@@ -162,9 +164,8 @@ def carregar_mapeamento_palavras():
             dados_respostas = json.load(f)
         
         # Carregar palavras ensinadas
-        arquivo_palavras_ensinadas = DATA_DIR / "Fase 4/PalavrasEnsinadasVocabulario.json"
-        print("Carregando palavras ensinadas:....")
-        print(arquivo_palavras_ensinadas)
+        arquivo_palavras_ensinadas = DATA_DIR / "Fase 4" / "PalavrasEnsinadasVocabulario.json"
+        print(f"Carregando palavras ensinadas: {arquivo_palavras_ensinadas}")
         with open(arquivo_palavras_ensinadas, 'r', encoding='utf-8') as f:
             dados_ensinadas = json.load(f)
         
@@ -199,18 +200,21 @@ def fig_to_base64(fig):
 # ======================
 
 def carregar_e_preparar_dados(escola_filtro=None):
-    """Carrega e prepara os dados da Fase 4"""
-    print("1. Carregando dados...")
+    """Carrega e prepara os dados da Fase 4 - Formato longitudinal"""
+    print("1. Carregando dados da Fase 4...")
     
-    # Carregar dados
-    df_pre = pd.read_csv(ARQUIVO_PRE)
-    df_pos = pd.read_csv(ARQUIVO_POS)
+    # Carregar dados longitudinais
+    df = pd.read_csv(CSV_TABELA_VOCAB)
+    
+    # Filtrar apenas Fase 4
+    df = df[df['Fase'] == 4].copy()
+    print(f"   Registros da Fase 4: {len(df)}")
     
     # Filtrar por escola se especificado
     if escola_filtro and escola_filtro != "Todas":
         print(f"   Filtrando por escola: {escola_filtro}")
-        df_pre = df_pre[df_pre['ESCOLA'] == escola_filtro].copy()
-        df_pos = df_pos[df_pos['ESCOLA'] == escola_filtro].copy()
+        df = df[df['Escola'] == escola_filtro].copy()
+        print(f"   Registros após filtro: {len(df)}")
     
     # Carregar mapeamento de palavras
     mapeamento_palavras = carregar_mapeamento_palavras()
@@ -218,59 +222,61 @@ def carregar_e_preparar_dados(escola_filtro=None):
     # Colunas de questões
     colunas_q = [f'Q{i}' for i in range(1, 51)]
     
+    # Separar colunas _Pre e _Pos
+    colunas_q_pre = [f'{col}_Pre' for col in colunas_q]
+    colunas_q_pos = [f'{col}_Pos' for col in colunas_q]
+    
     # Aplicar conversão de valores
-    for col in colunas_q:
-        if col in df_pre.columns:
-            df_pre[col] = df_pre[col].apply(converter_valor_questao)
-        if col in df_pos.columns:
-            df_pos[col] = df_pos[col].apply(converter_valor_questao)
+    for col in colunas_q_pre + colunas_q_pos:
+        if col in df.columns:
+            df[col] = df[col].apply(converter_valor_questao)
     
-    # Adicionar grupos etários
-    df_pre['GrupoEtario'] = df_pre['Turma'].apply(classificar_grupo_etario)
-    df_pos['GrupoEtario'] = df_pos['Turma'].apply(classificar_grupo_etario)
-    
-    # Garantir ID_Unico se não existir (mas já temos nos dados consolidados)
-    if 'ID_Unico' not in df_pre.columns:
-        df_pre['ID_Unico'] = df_pre['Nome'].astype(str) + "_" + df_pre['Turma'].astype(str)
-    if 'ID_Unico' not in df_pos.columns:
-        df_pos['ID_Unico'] = df_pos['Nome'].astype(str) + "_" + df_pos['Turma'].astype(str)
+    # Adicionar grupos etários usando a coluna Turma
+    df['GrupoEtario'] = df['Turma'].apply(classificar_grupo_etario)
     
     print("2. Limpando dados...")
     
-    # Filtrar apenas estudantes que participaram de ambos os testes
-    ids_pre = set(df_pre['ID_Unico'])
-    ids_pos = set(df_pos['ID_Unico'])
-    ids_comuns = ids_pre.intersection(ids_pos)
-    
-    df_pre_filtrado = df_pre[df_pre['ID_Unico'].isin(ids_comuns)].copy()
-    df_pos_filtrado = df_pos[df_pos['ID_Unico'].isin(ids_comuns)].copy()
-    
     # Função para verificar questões válidas
-    def tem_questoes_validas(row):
+    def tem_questoes_validas_pre(row):
         valores_validos = 0
-        for col in colunas_q:
+        for col in colunas_q_pre:
             if col in row.index and not pd.isna(row[col]):
                 valores_validos += 1
-        return valores_validos >= 25  # Pelo menos 25% das questões
+        return valores_validos >= 25  # Pelo menos 50% das questões
     
-    # Aplicar filtro
-    mask_pre = df_pre_filtrado.apply(tem_questoes_validas, axis=1)
-    mask_pos = df_pos_filtrado.apply(tem_questoes_validas, axis=1)
+    def tem_questoes_validas_pos(row):
+        valores_validos = 0
+        for col in colunas_q_pos:
+            if col in row.index and not pd.isna(row[col]):
+                valores_validos += 1
+        return valores_validos >= 25  # Pelo menos 50% das questões
     
-    df_pre_filtrado = df_pre_filtrado[mask_pre]
-    df_pos_filtrado = df_pos_filtrado[mask_pos]
+    # Aplicar filtros
+    mask_pre = df.apply(tem_questoes_validas_pre, axis=1)
+    mask_pos = df.apply(tem_questoes_validas_pos, axis=1)
     
-    # Filtrar novamente por IDs comuns após limpeza
-    ids_pre_limpo = set(df_pre_filtrado['ID_Unico'])
-    ids_pos_limpo = set(df_pos_filtrado['ID_Unico'])
-    ids_finais = ids_pre_limpo.intersection(ids_pos_limpo)
+    df_final = df[mask_pre & mask_pos].copy()
     
-    df_pre_final = df_pre_filtrado[df_pre_filtrado['ID_Unico'].isin(ids_finais)]
-    df_pos_final = df_pos_filtrado[df_pos_filtrado['ID_Unico'].isin(ids_finais)]
+    print(f"   Dados limpos: {len(df_final)} estudantes")
     
-    print(f"   Dados limpos: {len(df_pre_final)} estudantes")
+    # Reconstruir df_pre_final e df_pos_final para compatibilidade com código existente
+    df_pre_final = df_final[['ID_Unico', 'Nome', 'Escola', 'Turma', 'GrupoEtario'] + 
+                             [col for col in colunas_q_pre if col in df_final.columns]].copy()
+    df_pos_final = df_final[['ID_Unico', 'Nome', 'Escola', 'Turma', 'GrupoEtario'] + 
+                             [col for col in colunas_q_pos if col in df_final.columns]].copy()
     
-    return df_pre_final, df_pos_final, colunas_q, mapeamento_palavras
+    # Renomear colunas para manter compatibilidade com o código existente
+    # Q1_Pre -> Q1, Q1_Pos -> Q1
+    rename_dict_pre = {f'{col}_Pre': col for col in colunas_q if f'{col}_Pre' in df_pre_final.columns}
+    rename_dict_pos = {f'{col}_Pos': col for col in colunas_q if f'{col}_Pos' in df_pos_final.columns}
+    
+    df_pre_final = df_pre_final.rename(columns=rename_dict_pre)
+    df_pos_final = df_pos_final.rename(columns=rename_dict_pos)
+    
+    # Retornar apenas as colunas Q{i} (sem _Pre/_Pos)
+    colunas_q_simples = [col for col in colunas_q if col in df_pre_final.columns]
+    
+    return df_pre_final, df_pos_final, colunas_q_simples, mapeamento_palavras
 
 def calcular_scores(df_pre_final, df_pos_final, colunas_q):
     """Calcula scores por estudante"""
