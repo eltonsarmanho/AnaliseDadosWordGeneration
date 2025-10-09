@@ -103,18 +103,7 @@ id_anonimizado_sel = st.sidebar.selectbox(
     help="Formato: [Primeiras letras do ID] - [Iniciais do Nome]"
 )
 
-# ================= OVERVIEW ==================
-st.subheader("Resumo Filtrado")
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Registros", len(df))
-col2.metric("Alunos únicos (ID)", df['ID_Unico'].nunique())
-col3.metric("Escolas", df['Escola'].nunique())
-# Contar turmas baseado na opção de agregação escolhida
-turmas_count = df[coluna_turma].nunique()
-turma_label = "Turmas (Agregadas)" if agregar_turmas else "Turmas (Separadas)"
-col4.metric(turma_label, turmas_count)
-
-# ================= EFFECT SIZE (COHEN'S D) ==================
+# ================= FUNÇÕES DE CÁLCULO DO TAMANHO DO EFEITO ==================
 def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
     """Calcula d de Cohen para duas medidas (pré e pós) tratadas como grupos independentes.
     Retorna np.nan se não houver dados suficientes ou variância nula.
@@ -153,6 +142,167 @@ def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
     # Vocabulário
     return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
 
+# ================= FUNÇÕES DE CÁLCULO ==================
+def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
+    """Calcula d de Cohen para duas medidas (pré e pós) tratadas como grupos independentes.
+    Retorna np.nan se não houver dados suficientes ou variância nula.
+    """
+    if df_in is None or df_in.empty:
+        return float('nan')
+    pre = df_in[col_pre].dropna()
+    pos = df_in[col_pos].dropna()
+    n_pre, n_pos = len(pre), len(pos)
+    if n_pre < 2 or n_pos < 2:
+        return float('nan')
+    m_pre, m_pos = pre.mean(), pos.mean()
+    sd_pre, sd_pos = pre.std(ddof=1), pos.std(ddof=1)
+    if (sd_pre == 0 and sd_pos == 0):
+        return float('nan')
+    pooled = math.sqrt(((n_pre - 1) * sd_pre**2 + (n_pos - 1) * sd_pos**2) / (n_pre + n_pos - 2)) if (n_pre + n_pos - 2) > 0 else float('nan')
+    if pooled == 0 or np.isnan(pooled):
+        return float('nan')
+    return (m_pos - m_pre) / pooled
+
+def classificar_geral(d: float) -> str:
+    if np.isnan(d):
+        return 'Sem dados'
+    ad = abs(d)
+    if ad < 0.2: return 'Trivial'
+    if ad < 0.5: return 'Pequeno'
+    if ad < 0.8: return 'Médio'
+    return 'Grande'
+
+def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
+    if np.isnan(d):
+        return ('Sem dados', False)
+    if prova == 'TDE':
+        return ('Bom resultado' if d >= 0.40 else 'Ponto de atenção', d >= 0.40)
+    # Vocabulário
+    return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
+
+# ================= FUNÇÕES PARA CRIAR CARDS PERSONALIZADOS ==================
+def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(255, 255, 255)):
+    """Cria um card métrico personalizado com ícone FontAwesome"""
+    lnk = '<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.1/css/all.css" crossorigin="anonymous">'
+    
+    htmlstr = f"""<p style='background-color: rgb({cor_box[0]}, {cor_box[1]}, {cor_box[2]}, 0.85); 
+                            color: rgb({cor_fonte[0]}, {cor_fonte[1]}, {cor_fonte[2]}, 0.95); 
+                            font-size: 18px; 
+                            font-weight: 600;
+                            border-radius: 10px; 
+                            padding: 20px 15px; 
+                            text-align: center;
+                            line-height: 1.4;
+                            margin: 0;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                            <i class='{icone} fa-lg' style='margin-right: 10px;'></i> {valor}
+                            <br><span style='font-size: 11px; 
+                            font-weight: 300;
+                            opacity: 0.9;
+                            margin-top: 8px;
+                            display: block;'>{titulo}</span></p>"""
+    
+    return lnk + htmlstr
+
+# ================= OVERVIEW ==================
+st.subheader("Resumo Filtrado")
+
+# Primeira linha: métricas básicas
+col1, col2, col3, col_turma, col_cohen= st.columns(5)
+
+with col1:
+    st.markdown(
+        criar_metric_card(
+            valor=len(df),
+            titulo="Registros",
+            icone="fas fa-database",
+            cor_box=(52, 152, 219),  # Azul
+            cor_fonte=(255, 255, 255)
+        ),
+        unsafe_allow_html=True
+    )
+
+with col2:
+    st.markdown(
+        criar_metric_card(
+            valor=df['ID_Unico'].nunique(),
+            titulo="Alunos Únicos",
+            icone="fas fa-users",
+            cor_box=(46, 204, 113),  # Verde
+            cor_fonte=(255, 255, 255)
+        ),
+        unsafe_allow_html=True
+    )
+
+with col3:
+    st.markdown(
+        criar_metric_card(
+            valor=df['Escola'].nunique(),
+            titulo="Escolas",
+            icone="fas fa-school",
+            cor_box=(155, 89, 182),  # Roxo
+            cor_fonte=(255, 255, 255)
+        ),
+        unsafe_allow_html=True
+    )
+
+# Segunda linha: Turmas + Card do Tamanho do Efeito
+#col_turma, col_cohen = st.columns([1, 2])
+
+with col_turma:
+    # Contar turmas baseado na opção de agregação escolhida
+    turmas_count = df[coluna_turma].nunique()
+    turma_label = "Turmas Agregadas" if agregar_turmas else "Turmas Separadas"
+    
+    st.markdown(
+        criar_metric_card(
+            valor=turmas_count,
+            titulo=turma_label,
+            icone="fas fa-chalkboard-teacher",
+            cor_box=(230, 126, 34),  # Laranja
+            cor_fonte=(255, 255, 255)
+        ),
+        unsafe_allow_html=True
+    )
+
+with col_cohen:
+    # ================= TAMANHO DO EFEITO (COHEN'S D) - CARD SIMPLES ==================
+    # Calcular d de Cohen
+    d_val = calcular_d_cohen(df)
+    prova_norm = 'TDE' if prova_sel.upper().startswith('TDE') else 'VOCAB'
+    cls_espec, ok_flag = benchmark_especifico(d_val, prova_norm if prova_norm=='TDE' else 'VOCAB')
+    geral_cls = classificar_geral(d_val)
+
+    # Determinar cores e ícone baseado no resultado
+    if ok_flag:
+        cor_box = (40, 167, 69)  # Verde
+        cor_fonte = (255, 255, 255)
+        icone = "fas fa-check-circle"
+    elif not np.isnan(d_val):
+        cor_box = (255, 193, 7)  # Amarelo/Âmbar
+        cor_fonte = (0, 0, 0)
+        icone = "fas fa-exclamation-triangle"
+    else:
+        cor_box = (108, 117, 125)  # Cinza
+        cor_fonte = (255, 255, 255)
+        icone = "fas fa-info-circle"
+
+    val_str = '—' if np.isnan(d_val) else f"{d_val:.3f}"
+    
+    # Criar card seguindo o mesmo padrão dos outros
+    st.markdown(
+        criar_metric_card(
+            valor=val_str,
+            titulo="Tamanho do Efeito",
+            icone=icone,
+            cor_box=cor_box,
+            cor_fonte=cor_fonte
+        ),
+        unsafe_allow_html=True
+    )
+
+
+
 def filtrar_dataset(base: pd.DataFrame) -> pd.DataFrame:
     df_f = base.copy()
     if escola_sel:
@@ -163,30 +313,7 @@ def filtrar_dataset(base: pd.DataFrame) -> pd.DataFrame:
         df_f = df_f[df_f['Turma'].isin(turmas_sel)]
     return df_f
 
-with st.expander('Tamanho do Efeito (d de Cohen)', expanded=True):
-    # Usa o dataset filtrado atual (df) conforme PROVA selecionada
-    d_val = calcular_d_cohen(df)
-    prova_norm = 'TDE' if prova_sel.upper().startswith('TDE') else 'VOCAB'
-    cls_espec, ok_flag = benchmark_especifico(d_val, prova_norm if prova_norm=='TDE' else 'VOCAB')
-    geral_cls = classificar_geral(d_val)
 
-    def card_unico(color_bg: str, titulo: str, valor: float, cls: str, geral: str, ok: bool):
-        val_str = '—' if np.isnan(valor) else f"{valor:.2f}"
-        icon = '✅' if ok else ('⚠️' if not np.isnan(valor) else '')
-        html = f"""
-        <div style='background:{color_bg};padding:14px 18px;border-radius:10px;margin-bottom:6px;'>
-          <span style='font-weight:650;font-size:15px;'>{titulo}</span><br>
-          <span style='font-size:30px;font-weight:700;'>{val_str}</span> {icon}<br>
-          <span style='font-size:13px;'>Benchmark: {cls} • Geral: {geral}</span>
-        </div>
-        """
-        st.markdown(html, unsafe_allow_html=True)
-
-    cor = '#1b7837' if ok_flag else '#fdb863'
-    titulo_card = f"{prova_sel} - d de Cohen"
-    card_unico(cor, titulo_card, d_val, cls_espec, geral_cls, ok_flag)
-
-    st.caption('Critérios: TDE ≥ 0.40 (Hattie, 2009); Vocabulário ≥ 0.35 (Marulis & Neuman, 2010); Geral (Cohen, 1988): 0.2 pequeno, 0.5 médio, 0.8 grande. Valores negativos indicam queda.')
 
 # Distribuição de scores por fase usando boxplot
 if not df.empty:
@@ -963,12 +1090,56 @@ if not df.empty:
                 
                 st.plotly_chart(fig_barras, use_container_width=True)
                 
-                # Estatísticas resumidas
+                # Estatísticas resumidas com cards personalizados
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Total de Alunos", len(agrup_aluno_turma))
-                col2.metric("Delta Médio", f"{agrup_aluno_turma['Delta'].mean():.2f}")
-                col3.metric("Melhor Delta", f"{agrup_aluno_turma['Delta'].max():.2f}")
-                col4.metric("Pior Delta", f"{agrup_aluno_turma['Delta'].min():.2f}")
+                
+                with col1:
+                    st.markdown(
+                        criar_metric_card(
+                            valor=len(agrup_aluno_turma),
+                            titulo="Total de Alunos",
+                            icone="fas fa-user-graduate",
+                            cor_box=(52, 152, 219),
+                            cor_fonte=(255, 255, 255)
+                        ),
+                        unsafe_allow_html=True
+                    )
+                
+                with col2:
+                    st.markdown(
+                        criar_metric_card(
+                            valor=f"{agrup_aluno_turma['Delta'].mean():.2f}",
+                            titulo="Delta Médio",
+                            icone="fas fa-chart-bar",
+                            cor_box=(155, 89, 182),
+                            cor_fonte=(255, 255, 255)
+                        ),
+                        unsafe_allow_html=True
+                    )
+                
+                with col3:
+                    st.markdown(
+                        criar_metric_card(
+                            valor=f"{agrup_aluno_turma['Delta'].max():.2f}",
+                            titulo="Melhor Delta",
+                            icone="fas fa-arrow-up",
+                            cor_box=(46, 204, 113),
+                            cor_fonte=(255, 255, 255)
+                        ),
+                        unsafe_allow_html=True
+                    )
+                
+                with col4:
+                    st.markdown(
+                        criar_metric_card(
+                            valor=f"{agrup_aluno_turma['Delta'].min():.2f}",
+                            titulo="Pior Delta",
+                            icone="fas fa-arrow-down",
+                            cor_box=(231, 76, 60),
+                            cor_fonte=(255, 255, 255)
+                        ),
+                        unsafe_allow_html=True
+                    )
                 
             else:
                 st.info("Sem dados suficientes de alunos para esta turma.")
