@@ -554,8 +554,10 @@ if not df.empty:
         )
         
         st.plotly_chart(fig_fase, use_container_width=True)
+    
 
     # ---------------- EVOLUÇÃO COMPARATIVA HIERÁRQUICA (COORDENADAS PARALELAS) ----------------
+    st.markdown("---")
     st.markdown("### Evolução Comparativa Hierárquica")
     st.caption("Visualize trajetórias longitudinais através das fases. Cada linha representa uma entidade (Escola/Turma/Aluno) evoluindo ao longo do tempo.")
 
@@ -612,6 +614,10 @@ if not df.empty:
 
     # Preparar dados base usando a prova selecionada na SIDEBAR
     df_drill_base = df.copy()  # Usa o df já filtrado pela sidebar (prova, fases, escolas, turmas)
+    metric_options = {}
+    metric_default_label = None
+    metrica_col = None
+    metrica_axis_title = None
     
     # Filtrar por coorte se selecionado (e se a coluna existir)
     if coorte_drill != 'Todas':
@@ -672,12 +678,44 @@ if not df.empty:
     if colunas_validas:
         if 'Score_Pos' in df_drill_base.columns and 'Score_Pre' in df_drill_base.columns:
             df_drill_base['Delta'] = df_drill_base['Score_Pos'] - df_drill_base['Score_Pre']
-            metrica_col = 'Delta'
+            metric_options = {
+                'Delta (Pós - Pré)': 'Delta',
+                'Score Pré (Pré-Teste)': 'Score_Pre',
+                'Score Pós (Pós-Teste)': 'Score_Pos'
+            }
+            metric_default_label = 'Delta (Pós - Pré)'
         elif 'pontuacao_total' in df_drill_base.columns:
-            metrica_col = 'pontuacao_total'
+            metric_options = {'Pontuação Total': 'pontuacao_total'}
+            metric_default_label = 'Pontuação Total'
         else:
             st.error("❌ Colunas de pontuação não encontradas")
             colunas_validas = False
+
+    if colunas_validas and metric_options:
+        metric_labels = list(metric_options.keys())
+        if metric_default_label is None or metric_default_label not in metric_labels:
+            metric_default_label = metric_labels[0]
+        if 'metric_parallel_selector' not in st.session_state:
+            st.session_state.metric_parallel_selector = metric_default_label
+        elif st.session_state.metric_parallel_selector not in metric_labels:
+            st.session_state.metric_parallel_selector = metric_default_label
+        default_index = metric_labels.index(st.session_state.metric_parallel_selector)
+        metrica_label = st.selectbox(
+            "📐 Métrica Longitudinal:",
+            options=metric_labels,
+            index=default_index,
+            key='metric_parallel_selector',
+            help="Escolha a métrica usada nas trajetórias (Diferença Pós-Pré ou valores absolutos)."
+        )
+        metrica_col = metric_options[metrica_label]
+        metrica_axis_title = metrica_label
+
+    if metrica_axis_title is None and metrica_col is not None:
+        metrica_axis_title = metrica_col
+
+    if colunas_validas and metrica_col is None:
+        st.error("❌ Nenhuma métrica disponível para esta visualização.")
+        colunas_validas = False
 
     if not colunas_validas:
         st.info("⚠️ A visualização não está disponível para esta configuração de dados.")
@@ -685,7 +723,7 @@ if not df.empty:
         coorte_texto = coorte_drill if coorte_drill != 'Todas' else 'filtros selecionados'
         st.warning(f"⚠️ Nenhum dado disponível para {prova_sel} com {coorte_texto}.")
     else:
-        st.markdown("---")
+        
         
         # Criar visualização de coordenadas paralelas usando Altair
         try:
@@ -767,7 +805,7 @@ if not df.empty:
                 st.warning("⚠️ Nenhum dado disponível com os filtros selecionados.")
             else:
                 # Criar gráfico de coordenadas paralelas com Altair
-                st.markdown(f"#### 📊 Trajetórias de {label_entidade}s ao Longo das Fases")
+                st.markdown(f"#### 📊 Trajetórias de {label_entidade}s ao Longo das Fases ({metrica_axis_title})")
                 
                 # Pivot para formato wide (necessário para parallel coordinates)
                 df_wide = df_viz.pivot(index='Entidade', columns='Fase', values='Valor').reset_index()
@@ -791,13 +829,13 @@ if not df.empty:
                         opacity=0.6
                     ).encode(
                         x=alt.X('Fase:O', axis=alt.Axis(title='Fase', labelAngle=0)),
-                        y=alt.Y('Valor:Q', axis=alt.Axis(title=f'{metrica_col}')),
+                        y=alt.Y('Valor:Q', axis=alt.Axis(title=metrica_axis_title)),
                         color=alt.Color('Entidade:N', legend=None if len(df_plot['Entidade'].unique()) > 15 else alt.Legend(title=label_entidade)),
                         detail='Entidade:N',
                         tooltip=[
                             alt.Tooltip('Entidade:N', title=label_entidade),
                             alt.Tooltip('Fase:O', title='Fase'),
-                            alt.Tooltip('Valor:Q', title=metrica_col, format='.2f')
+                            alt.Tooltip('Valor:Q', title=metrica_axis_title, format='.2f')
                         ],
                         opacity=alt.condition(brush, alt.value(0.8), alt.value(0.2))
                     ).properties(
@@ -885,7 +923,7 @@ if not df.empty:
                         st.markdown(
                             criar_metric_card(
                                 valor=f"{media_geral:.2f}",
-                                titulo=f"{metrica_col} Médio",
+                                titulo=f"{metrica_axis_title} Médio",
                                 icone="fas fa-chart-line",
                                 cor_box=(46, 204, 113),
                                 cor_fonte=(255, 255, 255)
@@ -940,10 +978,13 @@ if not df.empty:
             # Fallback para Plotly se Altair não estiver disponível
             if nivel_viz == 'Escolas':
                 col_agrupamento = col_escola
+                label_entidade = 'Escola'
             elif nivel_viz == 'Turmas':
                 col_agrupamento = col_turma
+                label_entidade = 'Turma'
             else:
                 col_agrupamento = col_aluno
+                label_entidade = 'Aluno'
             
             df_viz = df_drill_base.groupby([col_agrupamento, col_fase])[metrica_col].mean().reset_index()
             
@@ -953,7 +994,12 @@ if not df.empty:
                 y=metrica_col,
                 color=col_agrupamento,
                 markers=True,
-                title=f'Evolução - {nivel_viz}'
+                title=f'Evolução - {nivel_viz}',
+                labels={
+                    col_fase: 'Fase',
+                    metrica_col: metrica_axis_title,
+                    col_agrupamento: label_entidade
+                }
             )
             
             fig.update_layout(height=500)
