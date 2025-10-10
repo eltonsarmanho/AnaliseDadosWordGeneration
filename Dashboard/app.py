@@ -125,14 +125,19 @@ def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: s
         return float('nan')
     return (m_pos - m_pre) / pooled
 
+
 def classificar_geral(d: float) -> str:
     if np.isnan(d):
         return 'Sem dados'
     ad = abs(d)
-    if ad < 0.2: return 'Trivial'
-    if ad < 0.5: return 'Pequeno'
-    if ad < 0.8: return 'Médio'
+    if ad < 0.2:
+        return 'Trivial'
+    if ad < 0.5:
+        return 'Pequeno'
+    if ad < 0.8:
+        return 'Médio'
     return 'Grande'
+
 
 def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
     if np.isnan(d):
@@ -142,49 +147,11 @@ def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
     # Vocabulário
     return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
 
-# ================= FUNÇÕES DE CÁLCULO ==================
-def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
-    """Calcula d de Cohen para duas medidas (pré e pós) tratadas como grupos independentes.
-    Retorna np.nan se não houver dados suficientes ou variância nula.
-    """
-    if df_in is None or df_in.empty:
-        return float('nan')
-    pre = df_in[col_pre].dropna()
-    pos = df_in[col_pos].dropna()
-    n_pre, n_pos = len(pre), len(pos)
-    if n_pre < 2 or n_pos < 2:
-        return float('nan')
-    m_pre, m_pos = pre.mean(), pos.mean()
-    sd_pre, sd_pos = pre.std(ddof=1), pos.std(ddof=1)
-    if (sd_pre == 0 and sd_pos == 0):
-        return float('nan')
-    pooled = math.sqrt(((n_pre - 1) * sd_pre**2 + (n_pos - 1) * sd_pos**2) / (n_pre + n_pos - 2)) if (n_pre + n_pos - 2) > 0 else float('nan')
-    if pooled == 0 or np.isnan(pooled):
-        return float('nan')
-    return (m_pos - m_pre) / pooled
 
-def classificar_geral(d: float) -> str:
-    if np.isnan(d):
-        return 'Sem dados'
-    ad = abs(d)
-    if ad < 0.2: return 'Trivial'
-    if ad < 0.5: return 'Pequeno'
-    if ad < 0.8: return 'Médio'
-    return 'Grande'
-
-def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
-    if np.isnan(d):
-        return ('Sem dados', False)
-    if prova == 'TDE':
-        return ('Bom resultado' if d >= 0.40 else 'Ponto de atenção', d >= 0.40)
-    # Vocabulário
-    return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
-
-# ================= FUNÇÕES PARA CRIAR CARDS PERSONALIZADOS ==================
 def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(255, 255, 255)):
-    """Cria um card métrico personalizado com ícone FontAwesome"""
+    """Cria um card métrico personalizado com ícone FontAwesome."""
     lnk = '<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.1/css/all.css" crossorigin="anonymous">'
-    
+
     htmlstr = f"""<p style='background-color: rgb({cor_box[0]}, {cor_box[1]}, {cor_box[2]}, 0.85); 
                             color: rgb({cor_fonte[0]}, {cor_fonte[1]}, {cor_fonte[2]}, 0.95); 
                             font-size: 18px; 
@@ -201,13 +168,8 @@ def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(25
                             opacity: 0.9;
                             margin-top: 8px;
                             display: block;'>{titulo}</span></p>"""
-    
+
     return lnk + htmlstr
-
-# ================= OVERVIEW ==================
-st.subheader("Resumo Filtrado")
-
-# Primeira linha: métricas básicas
 col1, col2, col3, col_turma, col_cohen= st.columns(5)
 
 with col1:
@@ -320,16 +282,42 @@ st.markdown("<br><br>", unsafe_allow_html=True)
 # NOTA: O gráfico já reflete todos os filtros aplicados (escola, turmas, fases) 
 # através da variável 'df' que foi filtrada anteriormente
 if not df.empty:
+    # Controle de visualização por turmas (apenas se turmas foram selecionadas)
+    visualizar_por_turmas = False
+    if turmas_sel and len(turmas_sel) > 0:
+        col_viz1, col_viz2 = st.columns([3, 1])
+        with col_viz1:
+            st.markdown("#### 📊 Distribuição de Scores por Fase")
+        with col_viz2:
+            visualizar_por_turmas = st.checkbox(
+                "📋 Separar por Turma", 
+                value=False,
+                help="Ative para visualizar cada turma separadamente no gráfico"
+            )
+    else:
+        st.markdown("#### 📊 Distribuição de Scores por Fase")
+    
     try:
         import altair as alt
         
         # Transformar dados para formato longo para o boxplot
-        df_boxplot = df.melt(
-            id_vars=['Fase'], 
-            value_vars=['Score_Pre', 'Score_Pos'],
-            var_name='Momento', 
-            value_name='Score'
-        )
+        if visualizar_por_turmas:
+            # Modo: Separar por turma - incluir coluna de turma no melt
+            df_boxplot = df.melt(
+                id_vars=['Fase', coluna_turma], 
+                value_vars=['Score_Pre', 'Score_Pos'],
+                var_name='Momento', 
+                value_name='Score'
+            )
+        else:
+            # Modo: Agregado - não incluir turma
+            df_boxplot = df.melt(
+                id_vars=['Fase'], 
+                value_vars=['Score_Pre', 'Score_Pos'],
+                var_name='Momento', 
+                value_name='Score'
+            )
+        
         # Renomear para nomes mais amigáveis
         df_boxplot['Momento'] = df_boxplot['Momento'].replace({
             'Score_Pre': 'Pré-Teste',
@@ -339,89 +327,198 @@ if not df.empty:
         # Garantir que Fase seja tratada como string para evitar valores intermediários
         df_boxplot['Fase_str'] = df_boxplot['Fase'].astype(int).astype(str)
         
-        # Calcular médias por Fase e Momento
-        medias = df_boxplot.groupby(['Fase', 'Fase_str', 'Momento'])['Score'].mean().reset_index()
+        # Calcular médias por Fase e Momento (e Turma se separado)
+        if visualizar_por_turmas:
+            medias = df_boxplot.groupby(['Fase', 'Fase_str', coluna_turma, 'Momento'])['Score'].mean().reset_index()
+        else:
+            medias = df_boxplot.groupby(['Fase', 'Fase_str', 'Momento'])['Score'].mean().reset_index()
         medias = medias.rename(columns={'Score': 'Media'})
         
         # Criar boxplot base
-        boxplot = alt.Chart(df_boxplot).mark_boxplot(
-            size=50,
-            opacity=0.7
-        ).encode(
-            x=alt.X('Fase_str:N', 
-                   title='Fase',
-                   axis=alt.Axis(labelAngle=0)),
-            y=alt.Y('Score:Q', 
-                   title='Score'),
-            color=alt.Color('Momento:N',
-                          scale=alt.Scale(
-                              domain=['Pré-Teste', 'Pós-Teste'],
-                              range=['#636EFA', '#EF553B']
-                          ),
-                          legend=alt.Legend(title='Teste')),
-            xOffset='Momento:N'
-        ).properties(
-            width=700,
-            height=400,
-            title='Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)'
-        )
-        
-        # Adicionar linhas de média
-        linhas_media = alt.Chart(medias).mark_rule(
-            strokeDash=[5, 5],
-            strokeWidth=2
-        ).encode(
-            x=alt.X('Fase_str:N'),
-            y=alt.Y('Media:Q'),
-            color=alt.Color('Momento:N',
-                          scale=alt.Scale(
-                              domain=['Pré-Teste', 'Pós-Teste'],
-                              range=['#636EFA', '#EF553B']
-                          ),
-                          legend=None),
-            xOffset='Momento:N',
-            tooltip=[
-                alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                alt.Tooltip('Momento:N', title='Teste'),
-                alt.Tooltip('Media:Q', title='Média', format='.2f')
-            ]
-        )
-        
-        # Adicionar pontos nas médias para melhor visualização
-        pontos_media = alt.Chart(medias).mark_point(
-            size=100,
-            filled=True,
-            opacity=0.8
-        ).encode(
-            x=alt.X('Fase_str:N'),
-            y=alt.Y('Media:Q'),
-            color=alt.Color('Momento:N',
-                          scale=alt.Scale(
-                              domain=['Pré-Teste', 'Pós-Teste'],
-                              range=['#636EFA', '#EF553B']
-                          ),
-                          legend=None),
-            xOffset='Momento:N',
-            tooltip=[
-                alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                alt.Tooltip('Momento:N', title='Teste'),
-                alt.Tooltip('Media:Q', title='Média', format='.2f')
-            ]
-        )
+        if visualizar_por_turmas:
+            # Boxplot separado por turma: camadas combinadas antes de facetar
+            color_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=['#636EFA', '#EF553B'])
+            offset_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=[-40, 40])
+            base_chart = alt.Chart(df_boxplot)
+
+            turmas_no_grafico = df_boxplot[coluna_turma].dropna().unique()
+            num_facetas = len(turmas_no_grafico) if len(turmas_no_grafico) > 0 else 1
+            if num_facetas <= 2:
+                facet_width = 320
+                facet_spacing = 80
+                facet_columns = num_facetas
+            elif num_facetas == 3:
+                facet_width = 260
+                facet_spacing = 60
+                facet_columns = 3
+            elif num_facetas <= 4:
+                facet_width = 230
+                facet_spacing = 50
+                facet_columns = 4
+            else:
+                facet_width = 200
+                facet_spacing = 40
+                facet_columns = 4
+
+            boxplot_layer = base_chart.mark_boxplot(
+                size=30,
+                opacity=0.7
+            ).encode(
+                x=alt.X('Fase_str:N', title='Fase', axis=alt.Axis(labelAngle=0)),
+                y=alt.Y('Score:Q', title='Score'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+            )
+
+            linhas_media_layer = base_chart.transform_aggregate(
+                Media='mean(Score)',
+                groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
+            ).mark_rule(
+                strokeDash=[5, 5],
+                strokeWidth=2
+            ).encode(
+                x=alt.X('Fase_str:N'),
+                y=alt.Y('Media:Q'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                tooltip=[
+                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                    alt.Tooltip(f'{coluna_turma}:N', title='Turma'),
+                    alt.Tooltip('Momento:N', title='Teste'),
+                    alt.Tooltip('Media:Q', title='Média', format='.2f')
+                ]
+            )
+
+            pontos_media_layer = base_chart.transform_aggregate(
+                Media='mean(Score)',
+                groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
+            ).mark_point(
+                size=80,
+                filled=True,
+                opacity=0.8
+            ).encode(
+                x=alt.X('Fase_str:N'),
+                y=alt.Y('Media:Q'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                tooltip=[
+                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                    alt.Tooltip(f'{coluna_turma}:N', title='Turma'),
+                    alt.Tooltip('Momento:N', title='Teste'),
+                    alt.Tooltip('Media:Q', title='Média', format='.2f')
+                ]
+            )
+
+            combined = alt.layer(boxplot_layer, linhas_media_layer, pontos_media_layer).properties(
+                width=facet_width,
+                height=420
+            )
+            boxplot = combined.facet(
+                facet=alt.Facet(f'{coluna_turma}:N', title='Turma', header=alt.Header(labelAngle=0, labelFontSize=12)),
+                columns=facet_columns
+            )
+
+            linhas_media = None
+            pontos_media = None
+
+            titulo = f'Distribuição Pré-Teste vs Pós-Teste por Fase - Comparativo por Turma ({len(turmas_sel)} turma(s))'
+            
+        else:
+            # Boxplot agregado (comportamento original)
+            color_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=['#636EFA', '#EF553B'])
+            offset_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=[-40, 40])
+            boxplot = alt.Chart(df_boxplot).mark_boxplot(
+                size=36,
+                opacity=0.7
+            ).encode(
+                x=alt.X('Fase_str:N', 
+                       title='Fase',
+                       axis=alt.Axis(labelAngle=0)),
+                y=alt.Y('Score:Q', 
+                       title='Score'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+            ).properties(
+                width=700,
+                height=400
+            )
+            
+            # Linhas de média agregadas
+            linhas_media = alt.Chart(medias).mark_rule(
+                strokeDash=[5, 5],
+                strokeWidth=2
+            ).encode(
+                x=alt.X('Fase_str:N'),
+                y=alt.Y('Media:Q'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                tooltip=[
+                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                    alt.Tooltip('Momento:N', title='Teste'),
+                    alt.Tooltip('Media:Q', title='Média', format='.2f')
+                ]
+            )
+            
+            # Pontos nas médias
+            pontos_media = alt.Chart(medias).mark_point(
+                size=100,
+                filled=True,
+                opacity=0.8
+            ).encode(
+                x=alt.X('Fase_str:N'),
+                y=alt.Y('Media:Q'),
+                color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                tooltip=[
+                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                    alt.Tooltip('Momento:N', title='Teste'),
+                    alt.Tooltip('Media:Q', title='Média', format='.2f')
+                ]
+            )
+            
+            if turmas_sel and len(turmas_sel) > 0:
+                titulo = f'Distribuição Pré-Teste vs Pós-Teste por Fase - Visão Agregada ({len(turmas_sel)} turma(s))'
+            else:
+                titulo = 'Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)'
         
         # Combinar todas as camadas
-        chart_final = (boxplot + linhas_media + pontos_media).configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        ).configure_title(
-            fontSize=16,
-            anchor='start'
-        ).configure_legend(
-            titleFontSize=13,
-            labelFontSize=12
-        )
+        # Quando visualizar_por_turmas=True, as camadas já estão combinadas no objeto boxplot
+        if visualizar_por_turmas:
+            chart_final = boxplot.properties(
+                title=titulo
+            ).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(
+                fontSize=16,
+                anchor='start'
+            ).configure_legend(
+                titleFontSize=13,
+                labelFontSize=12
+            ).configure_view(
+                strokeWidth=0
+            ).configure_facet(
+                spacing=facet_spacing
+            )
+        else:
+            chart_final = (boxplot + linhas_media + pontos_media).properties(
+                title=titulo
+            ).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14
+            ).configure_title(
+                fontSize=16,
+                anchor='start'
+            ).configure_legend(
+                titleFontSize=13,
+                labelFontSize=12
+            )
         
         st.altair_chart(chart_final, use_container_width=True)
+        
+        # Informação adicional sobre a visualização
+        if visualizar_por_turmas and turmas_sel:
+            st.caption(f"📊 Mostrando comparação detalhada entre {len(turmas_sel)} turma(s) selecionada(s). Desmarque a opção acima para ver a visão agregada.")
         
     except ImportError:
         st.warning("⚠️ Biblioteca Altair não encontrada. Usando Plotly como fallback...")
