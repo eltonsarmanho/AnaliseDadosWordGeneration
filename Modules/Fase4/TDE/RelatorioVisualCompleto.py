@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PipelineDataTDE import carregar_mapeamento_tde
 
 # Configurações matplotlib para compatibilidade
 plt.switch_backend("Agg")
@@ -296,6 +297,9 @@ def calcular_indicadores_tde(df: pd.DataFrame, grupo_filtro: str = None) -> Dict
 
 def extrair_palavras_tde(df: pd.DataFrame) -> pd.DataFrame:
     """Extrai dados das questões TDE para análise (formato longitudinal)."""
+    # Carregar mapeamento real das palavras
+    mapeamento_tde = carregar_mapeamento_tde()
+    
     palavras_data = []
     
     # Padrão das colunas no CSV longitudinal: Q{num}_Pre, Q{num}_Pos
@@ -311,9 +315,13 @@ def extrair_palavras_tde(df: pd.DataFrame) -> pd.DataFrame:
         
         # Verificar se a coluna _Pos correspondente existe
         if col_pos in colunas:
+            # Converter Q1 -> P1 para buscar no mapeamento
+            p_key = questao_num.replace('Q', 'P')
+            palavra_real = mapeamento_tde.get(p_key, f"Palavra {questao_num}")
+            
             palavras_data.append({
                 'Questao': questao_num,
-                'Palavra': questao_num,  # Usar o número da questão como identificador
+                'Palavra': palavra_real,  # Palavra real do mapeamento
                 'Col_Pre': col_pre,
                 'Col_Pos': col_pos,
                 'Col_Delta': None  # Será calculado dinamicamente
