@@ -313,86 +313,150 @@ def filtrar_dataset(base: pd.DataFrame) -> pd.DataFrame:
         df_f = df_f[df_f['Turma'].isin(turmas_sel)]
     return df_f
 
+# Espaçamento vertical
+st.markdown("<br><br>", unsafe_allow_html=True)
 
-
-# Distribuição de scores por fase usando boxplot
+# Distribuição de scores por fase usando boxplot com Altair
+# NOTA: O gráfico já reflete todos os filtros aplicados (escola, turmas, fases) 
+# através da variável 'df' que foi filtrada anteriormente
 if not df.empty:
-    # Transformar dados para formato longo para o boxplot
-    df_boxplot = df.melt(
-        id_vars=['Fase'], 
-        value_vars=['Score_Pre', 'Score_Pos'],
-        var_name='Momento', 
-        value_name='Score'
-    )
-    # Renomear para nomes mais amigáveis
-    df_boxplot['Momento'] = df_boxplot['Momento'].replace({
-        'Score_Pre': 'Pré-Teste',
-        'Score_Pos': 'Pós-Teste'
-    })
-    
-    # Criar boxplot com média visível
-    fig_fase = px.box(
-        df_boxplot,
-        x='Fase',
-        y='Score',
-        color='Momento',
-        title='Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)',
-        labels={'Score': 'Score', 'Momento': 'Teste'},
-        points='outliers'  # Mostra apenas outliers como pontos
-    )
-    
-    # Adicionar linhas tracejadas de média para cada grupo
-    # Calcular médias por Fase e Momento
-    medias = df_boxplot.groupby(['Fase', 'Momento'])['Score'].mean().reset_index()
-    medias = medias.rename(columns={'Score': 'Media'})
-    
-    # Cores para combinar com o boxplot (padrão plotly)
-    cores_momento = {
-        'Pré-Teste': '#636EFA',  # Azul
-        'Pós-Teste': '#EF553B'   # Vermelho/Laranja
-    }
-    
-    # Obter as fases únicas para definir a largura das linhas
-    fases = sorted(df_boxplot['Fase'].unique())
-    primeira_fase = fases[0] if len(fases) > 0 else None
-    
-    # Adicionar linhas tracejadas de média para cada fase e momento
-    for fase in fases:
-        for momento in ['Pré-Teste', 'Pós-Teste']:
-            media_valor = medias[(medias['Fase'] == fase) & (medias['Momento'] == momento)]['Media'].values
-            if len(media_valor) > 0:
-                media_valor = float(media_valor[0])
-                
-                # Calcular offset para posicionar as linhas lado a lado (como os boxplots)
-                # O offset varia dependendo se é Pré ou Pós-Teste
-                offset = -0.2 if momento == 'Pré-Teste' else 0.2
-                x_pos = fase + offset
-                
-                # Determinar se deve mostrar legenda (apenas para a primeira fase)
-                mostrar_legenda = bool(fase == primeira_fase)
-                
-                fig_fase.add_trace(
-                    go.Scatter(
-                        x=[x_pos - 0.15, x_pos + 0.15],  # Linha horizontal com largura de 0.3
-                        y=[media_valor, media_valor],
-                        mode='lines',
-                        line=dict(
-                            color=cores_momento.get(momento, '#000000'),
-                            width=2,
-                            dash='dash'
-                        ),
-                        name=f'Média {momento}' if mostrar_legenda else None,
-                        showlegend=mostrar_legenda,
-                        hovertemplate=f'<b>Média {momento}</b><br>Fase: {fase}<br>Média: {media_valor:.2f}<extra></extra>'
-                    )
-                )
-    
-    fig_fase.update_layout(
-        legend_title_text='Legenda',
-        showlegend=True,
-        hovermode='closest'
-    )
-    st.plotly_chart(fig_fase, use_container_width=True)
+    try:
+        import altair as alt
+        
+        # Transformar dados para formato longo para o boxplot
+        df_boxplot = df.melt(
+            id_vars=['Fase'], 
+            value_vars=['Score_Pre', 'Score_Pos'],
+            var_name='Momento', 
+            value_name='Score'
+        )
+        # Renomear para nomes mais amigáveis
+        df_boxplot['Momento'] = df_boxplot['Momento'].replace({
+            'Score_Pre': 'Pré-Teste',
+            'Score_Pos': 'Pós-Teste'
+        })
+        
+        # Garantir que Fase seja tratada como string para evitar valores intermediários
+        df_boxplot['Fase_str'] = df_boxplot['Fase'].astype(int).astype(str)
+        
+        # Calcular médias por Fase e Momento
+        medias = df_boxplot.groupby(['Fase', 'Fase_str', 'Momento'])['Score'].mean().reset_index()
+        medias = medias.rename(columns={'Score': 'Media'})
+        
+        # Criar boxplot base
+        boxplot = alt.Chart(df_boxplot).mark_boxplot(
+            size=50,
+            opacity=0.7
+        ).encode(
+            x=alt.X('Fase_str:N', 
+                   title='Fase',
+                   axis=alt.Axis(labelAngle=0)),
+            y=alt.Y('Score:Q', 
+                   title='Score'),
+            color=alt.Color('Momento:N',
+                          scale=alt.Scale(
+                              domain=['Pré-Teste', 'Pós-Teste'],
+                              range=['#636EFA', '#EF553B']
+                          ),
+                          legend=alt.Legend(title='Teste')),
+            xOffset='Momento:N'
+        ).properties(
+            width=700,
+            height=400,
+            title='Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)'
+        )
+        
+        # Adicionar linhas de média
+        linhas_media = alt.Chart(medias).mark_rule(
+            strokeDash=[5, 5],
+            strokeWidth=2
+        ).encode(
+            x=alt.X('Fase_str:N'),
+            y=alt.Y('Media:Q'),
+            color=alt.Color('Momento:N',
+                          scale=alt.Scale(
+                              domain=['Pré-Teste', 'Pós-Teste'],
+                              range=['#636EFA', '#EF553B']
+                          ),
+                          legend=None),
+            xOffset='Momento:N',
+            tooltip=[
+                alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                alt.Tooltip('Momento:N', title='Teste'),
+                alt.Tooltip('Media:Q', title='Média', format='.2f')
+            ]
+        )
+        
+        # Adicionar pontos nas médias para melhor visualização
+        pontos_media = alt.Chart(medias).mark_point(
+            size=100,
+            filled=True,
+            opacity=0.8
+        ).encode(
+            x=alt.X('Fase_str:N'),
+            y=alt.Y('Media:Q'),
+            color=alt.Color('Momento:N',
+                          scale=alt.Scale(
+                              domain=['Pré-Teste', 'Pós-Teste'],
+                              range=['#636EFA', '#EF553B']
+                          ),
+                          legend=None),
+            xOffset='Momento:N',
+            tooltip=[
+                alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                alt.Tooltip('Momento:N', title='Teste'),
+                alt.Tooltip('Media:Q', title='Média', format='.2f')
+            ]
+        )
+        
+        # Combinar todas as camadas
+        chart_final = (boxplot + linhas_media + pontos_media).configure_axis(
+            labelFontSize=12,
+            titleFontSize=14
+        ).configure_title(
+            fontSize=16,
+            anchor='start'
+        ).configure_legend(
+            titleFontSize=13,
+            labelFontSize=12
+        )
+        
+        st.altair_chart(chart_final, use_container_width=True)
+        
+    except ImportError:
+        st.warning("⚠️ Biblioteca Altair não encontrada. Usando Plotly como fallback...")
+        
+        # Fallback para Plotly
+        df_boxplot = df.melt(
+            id_vars=['Fase'], 
+            value_vars=['Score_Pre', 'Score_Pos'],
+            var_name='Momento', 
+            value_name='Score'
+        )
+        df_boxplot['Momento'] = df_boxplot['Momento'].replace({
+            'Score_Pre': 'Pré-Teste',
+            'Score_Pos': 'Pós-Teste'
+        })
+        
+        fig_fase = px.box(
+            df_boxplot,
+            x='Fase',
+            y='Score',
+            color='Momento',
+            title='Distribuição Pré-Teste vs Pós-Teste por Fase',
+            labels={'Score': 'Score', 'Momento': 'Teste'},
+            points='outliers'
+        )
+        
+        fases_disponiveis = sorted(df_boxplot['Fase'].unique())
+        fig_fase.update_xaxes(
+            tickmode='array',
+            tickvals=fases_disponiveis,
+            ticktext=[str(int(fase)) for fase in fases_disponiveis],
+            title='Fase'
+        )
+        
+        st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO COMPARATIVA HIERÁRQUICA (COORDENADAS PARALELAS) ----------------
     st.markdown("### Evolução Comparativa Hierárquica")
