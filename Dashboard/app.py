@@ -395,7 +395,7 @@ if not df.empty:
     st.plotly_chart(fig_fase, use_container_width=True)
 
     # ---------------- EVOLUÇÃO COMPARATIVA HIERÁRQUICA (COORDENADAS PARALELAS) ----------------
-    st.markdown("### Evolução Comparativa Hierárquica - Coordenadas Paralelas")
+    st.markdown("### Evolução Comparativa Hierárquica")
     st.caption("Visualize trajetórias longitudinais através das fases. Cada linha representa uma entidade (Escola/Turma/Aluno) evoluindo ao longo do tempo.")
 
     # Inicializar estados
