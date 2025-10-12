@@ -370,25 +370,6 @@ if not df.empty:
                 xOffset=alt.XOffset('Momento:N', scale=offset_scale)
             )
 
-            linhas_media_layer = base_chart.transform_aggregate(
-                Media='mean(Score)',
-                groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
-            ).mark_rule(
-                strokeDash=[5, 5],
-                strokeWidth=2
-            ).encode(
-                x=alt.X('Fase_str:N'),
-                y=alt.Y('Media:Q'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=None),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
-                tooltip=[
-                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                    alt.Tooltip(f'{coluna_turma}:N', title='Turma'),
-                    alt.Tooltip('Momento:N', title='Teste'),
-                    alt.Tooltip('Media:Q', title='Média', format='.2f')
-                ]
-            )
-
             pontos_media_layer = base_chart.transform_aggregate(
                 Media='mean(Score)',
                 groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
@@ -409,7 +390,7 @@ if not df.empty:
                 ]
             )
 
-            combined = alt.layer(boxplot_layer, linhas_media_layer, pontos_media_layer).properties(
+            combined = alt.layer(boxplot_layer, pontos_media_layer).properties(
                 width=facet_width,
                 height=420
             )
@@ -417,9 +398,6 @@ if not df.empty:
                 facet=alt.Facet(f'{coluna_turma}:N', title='Turma', header=alt.Header(labelAngle=0, labelFontSize=12)),
                 columns=facet_columns
             )
-
-            linhas_media = None
-            pontos_media = None
 
             titulo = f'Distribuição Pré-Teste vs Pós-Teste por Fase - Comparativo por Turma ({len(turmas_sel)} turma(s))'
             
@@ -441,22 +419,6 @@ if not df.empty:
             ).properties(
                 width=700,
                 height=400
-            )
-            
-            # Linhas de média agregadas
-            linhas_media = alt.Chart(medias).mark_rule(
-                strokeDash=[5, 5],
-                strokeWidth=2
-            ).encode(
-                x=alt.X('Fase_str:N'),
-                y=alt.Y('Media:Q'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=None),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
-                tooltip=[
-                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                    alt.Tooltip('Momento:N', title='Teste'),
-                    alt.Tooltip('Media:Q', title='Média', format='.2f')
-                ]
             )
             
             # Pontos nas médias
@@ -501,7 +463,7 @@ if not df.empty:
                 spacing=facet_spacing
             )
         else:
-            chart_final = (boxplot + linhas_media + pontos_media).properties(
+            chart_final = (boxplot + pontos_media).properties(
                 title=titulo
             ).configure_axis(
                 labelFontSize=12,
