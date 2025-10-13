@@ -140,8 +140,8 @@ st.markdown("---")
 
 # ========== FILTROS NO TOPO (TOP BAR) ==========
 with st.expander("🔍 **FILTROS DE ANÁLISE**", expanded=True):
-    # LINHA ÚNICA - Filtros principais mais compactos
-    col_f1, col_f2, col_f3, col_f4 = st.columns([1, 1.2, 1.5, 2])
+    # LINHA ÚNICA - Filtros principais (Prova reduzida em 50%, Turma reduzida em 20%)
+    col_f1, col_f2, col_f3, col_f4 = st.columns([0.5, 1, 1.5, 1.6])
     
     with col_f1:
         prova_sel = st.selectbox("📝 Prova", list(PROVAS.keys()))
@@ -165,7 +165,7 @@ with st.expander("🔍 **FILTROS DE ANÁLISE**", expanded=True):
             st.session_state.agregar_turmas = False
         
         # Sub-colunas: checkbox ao lado do multiselect
-        sub_col1, sub_col2 = st.columns([3, 1])
+        sub_col1, sub_col2 = st.columns([3, 1.9])
         
         # IMPORTANTE: Processar checkbox PRIMEIRO em sub_col2
         with sub_col2:
@@ -173,7 +173,7 @@ with st.expander("🔍 **FILTROS DE ANÁLISE**", expanded=True):
             st.write("")  # Espaço para alinhar verticalmente
             # Captura o novo valor do checkbox
             novo_agregar = st.checkbox(
-                "🔄 Agregar turmas", 
+                "🔄 Agregar Turmas", 
                 value=st.session_state.agregar_turmas, 
                 key="agregar_checkbox"
             )
@@ -1280,15 +1280,29 @@ with st.expander("👨‍🎓 **EVOLUÇÃO INDIVIDUAL**", expanded=False):
     # Filtro de aluno baseado nos filtros principais (Prova, Fases, Escolas)
     st.markdown("**Selecione um aluno para análise individual:**")
     
-    # Filtrar IDs disponíveis com base nos filtros atuais
-    ids_disponiveis = sorted(df['ID_Anonimizado'].dropna().unique())
-    
-    if ids_disponiveis:
-        id_anonimizado_sel = st.selectbox(
+    # Criar dicionário com IDs e suas fases participadas
+    if not df.empty:
+        aluno_fases = df.groupby('ID_Anonimizado')['Fase'].apply(
+            lambda x: ', '.join(sorted([str(int(f)) for f in x.dropna().unique()]))
+        ).to_dict()
+        
+        # Criar lista de opções formatadas: "ID - Fases: X, Y, Z"
+        opcoes_alunos = ["<selecione>"] + [
+            f"{id_aluno} - Fases: {fases}" 
+            for id_aluno, fases in sorted(aluno_fases.items())
+        ]
+        
+        aluno_selecionado = st.selectbox(
             "🔒 Aluno para Análise Individual",
-            ["<selecione>"] + ids_disponiveis,
+            opcoes_alunos,
             key="aluno_individual_evolucao"
         )
+        
+        # Extrair apenas o ID do aluno da seleção
+        if aluno_selecionado != "<selecione>":
+            id_anonimizado_sel = aluno_selecionado.split(" - Fases:")[0]
+        else:
+            id_anonimizado_sel = "<selecione>"
     else:
         st.warning("⚠️ Nenhum aluno encontrado com os filtros selecionados")
         id_anonimizado_sel = "<selecione>"
