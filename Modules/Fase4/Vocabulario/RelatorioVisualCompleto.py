@@ -3,6 +3,7 @@ import io
 import base64
 import pathlib
 import json
+import unicodedata
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
 
@@ -25,7 +26,7 @@ FIG_DIR = DATA_DIR / "figures"
 
 # Dados da Fase 4 - Usando CSV longitudinal
 CSV_TABELA_VOCAB = DASHBOARD_DIR / "vocabulario_longitudinal.csv"
-ARQUIVO_RESPOSTAS = DATA_DIR / "RespostaVocabulario.json"
+ARQUIVO_RESPOSTAS = DATA_DIR / "Fase 4/RespostaVocabulario.json"
 OUTPUT_HTML = DATA_DIR / "relatorio_visual_wordgen_fase4.html"
 
 # Figuras
@@ -47,6 +48,58 @@ plt.rcParams.update({
 # ======================
 # Funções de utilidade
 # ======================
+
+def normalizar_palavra(palavra: str) -> str:
+    """Normaliza palavra removendo acentos, convertendo para minúsculas e removendo pontuação final."""
+    if not palavra:
+        return ""
+    
+    # Remover espaços extras
+    palavra = palavra.strip()
+    
+    # Normalização NFD para separar caracteres base de diacríticos
+    palavra_nfd = unicodedata.normalize('NFD', palavra)
+    
+    # Remover diacríticos (acentos)
+    palavra_sem_acentos = ''.join(
+        char for char in palavra_nfd
+        if unicodedata.category(char) != 'Mn'
+    )
+    
+    # Converter para minúsculas
+    palavra_lower = palavra_sem_acentos.lower()
+    
+    # Remover pontuação final comum
+    palavra_limpa = palavra_lower.rstrip('.,;:!?')
+    
+    return palavra_limpa
+
+
+def palavra_ensinada_match(palavra_teste: str, palavras_ensinadas: set) -> bool:
+    """Verifica se palavra do teste corresponde a alguma palavra ensinada.
+    
+    Usa correspondência exata normalizada e correspondência de raiz com no mínimo 6 caracteres.
+    """
+    if not palavra_teste or not palavras_ensinadas:
+        return False
+    
+    palavra_teste_norm = normalizar_palavra(palavra_teste)
+    
+    # Verificar correspondência exata normalizada
+    for palavra_ensinada in palavras_ensinadas:
+        palavra_ensinada_norm = normalizar_palavra(palavra_ensinada)
+        
+        # Correspondência exata
+        if palavra_teste_norm == palavra_ensinada_norm:
+            return True
+        
+        # Correspondência de raiz (primeiras 6 letras) - mais rigoroso
+        if len(palavra_teste_norm) >= 6 and len(palavra_ensinada_norm) >= 6:
+            if palavra_teste_norm[:6] == palavra_ensinada_norm[:6]:
+                return True
+    
+    return False
+
 
 def obter_escolas_disponiveis():
     """Obtém a lista de escolas disponíveis nos dados da Fase 4"""
@@ -169,13 +222,15 @@ def carregar_mapeamento_palavras():
         with open(arquivo_palavras_ensinadas, 'r', encoding='utf-8') as f:
             dados_ensinadas = json.load(f)
         
-        palavras_ensinadas = set(dados_ensinadas.get("Palavras Ensinadas", []))
+        # Tentar ambas as chaves possíveis
+        palavras_ensinadas = set(dados_ensinadas.get("palavras_ensinadas", dados_ensinadas.get("Palavras Ensinadas", [])))
         
         mapeamento = {}
         for item in dados_respostas:
             for questao, info in item.items():
                 palavra = info['Palavra Trabalhada']
-                foi_ensinada = palavra in palavras_ensinadas
+                # Usar matching inteligente com normalização
+                foi_ensinada = palavra_ensinada_match(palavra, palavras_ensinadas)
                 mapeamento[questao] = {
                     'palavra': palavra,
                     'ensinada': foi_ensinada
@@ -508,7 +563,7 @@ def plot_grupos_barras(scores_df):
     # 2. Boxplot de deltas
     ax = axes[0, 1]
     deltas_data = [scores_df[scores_df['GrupoEtario'] == grupo]['Delta'] for grupo in grupos]
-    bp = ax.boxplot(deltas_data, tick_labels=grupos, patch_artist=True)
+    bp = ax.boxplot(deltas_data, labels=grupos, patch_artist=True)
     
     for patch, cor in zip(bp['boxes'], cores):
         patch.set_facecolor(cor)
