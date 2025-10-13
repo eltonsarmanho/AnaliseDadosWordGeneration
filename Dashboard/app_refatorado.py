@@ -71,6 +71,68 @@ def load_data():
     
     return tde, vocab
 
+@st.cache_data(show_spinner=False)
+def carregar_palavras_ensinadas():
+    """Carrega as palavras ensinadas de todas as fases."""
+    import json
+    import os
+    
+    palavras_por_fase = {}
+    base_path = os.path.join(os.path.dirname(__file__), '..', 'Data')
+    
+    for fase in [2, 3, 4]:
+        arquivo_path = os.path.join(base_path, f'Fase {fase}', 'PalavrasEnsinadasVocabulario.json')
+        try:
+            if os.path.exists(arquivo_path):
+                with open(arquivo_path, 'r', encoding='utf-8') as f:
+                    dados = json.load(f)
+                    # Tenta ambas as chaves possíveis
+                    palavras = dados.get('palavras_ensinadas', dados.get('Palavras Ensinadas', []))
+                    palavras_por_fase[fase] = set(palavras)
+        except Exception as e:
+            st.warning(f"Erro ao carregar palavras ensinadas da Fase {fase}: {e}")
+            palavras_por_fase[fase] = set()
+    
+    return palavras_por_fase
+
+def normalizar_palavra(palavra: str) -> str:
+    """Normaliza palavra para comparação (remove acentos, lowercase, etc)."""
+    if not palavra:
+        return ""
+    # Remove acentos
+    palavra_norm = unicodedata.normalize('NFD', str(palavra))
+    palavra_norm = ''.join(char for char in palavra_norm if unicodedata.category(char) != 'Mn')
+    # Lowercase e strip
+    palavra_norm = palavra_norm.lower().strip()
+    # Remove pontuação no final
+    palavra_norm = palavra_norm.rstrip('.,;:!?')
+    return palavra_norm
+
+def palavra_ensinada_match(palavra_teste: str, palavras_ensinadas: set) -> bool:
+    """Verifica se palavra do teste corresponde a alguma palavra ensinada.
+    
+    Usa correspondência exata normalizada e correspondência de raiz com no mínimo 6 caracteres.
+    """
+    if not palavra_teste or not palavras_ensinadas:
+        return False
+    
+    palavra_teste_norm = normalizar_palavra(palavra_teste)
+    
+    # Verificar correspondência exata normalizada
+    for palavra_ensinada in palavras_ensinadas:
+        palavra_ensinada_norm = normalizar_palavra(palavra_ensinada)
+        
+        # Correspondência exata
+        if palavra_teste_norm == palavra_ensinada_norm:
+            return True
+        
+        # Correspondência de raiz (primeiras 6 letras) - mais rigoroso
+        if len(palavra_teste_norm) >= 6 and len(palavra_ensinada_norm) >= 6:
+            if palavra_teste_norm[:6] == palavra_ensinada_norm[:6]:
+                return True
+    
+    return False
+
 def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
     """Calcula d de Cohen."""
     if df_in is None or df_in.empty:
@@ -559,22 +621,39 @@ if not df.empty:
             questao_cols = [col for col in df.columns if col.startswith('Q') and ('_Pre' in col or '_Pos' in col)]
             
             if questao_cols:
-                # Carregar mapeamento de questões para palavras
+                # Carregar mapeamento de questões para palavras POR FASE
                 import json
                 import os
                 
                 mapeamento_palavras = {}
-                try:
-                    path_respostas = os.path.join(os.path.dirname(__file__), '..', 'Data', 'RespostaVocabulario.json')
-                    with open(path_respostas, 'r', encoding='utf-8') as f:
-                        respostas = json.load(f)
-                        for item in respostas:
-                            for q_key, q_data in item.items():
-                                if 'Palavra Trabalhada' in q_data:
-                                    mapeamento_palavras[q_key] = q_data['Palavra Trabalhada']
-                except Exception as e:
-                    # Se não conseguir carregar, usa Q1, Q2, etc.
-                    pass
+                # Tentar carregar RespostaVocabulario.json de cada fase selecionada
+                for fase in fases_sel:
+                    try:
+                        # Primeiro tenta o arquivo específico da fase
+                        path_fase = os.path.join(os.path.dirname(__file__), '..', 'Data', f'Fase {int(fase)}', 'RespostaVocabulario.json')
+                        if os.path.exists(path_fase):
+                            with open(path_fase, 'r', encoding='utf-8') as f:
+                                respostas = json.load(f)
+                                for item in respostas:
+                                    for q_key, q_data in item.items():
+                                        if 'Palavra Trabalhada' in q_data:
+                                            mapeamento_palavras[q_key] = q_data['Palavra Trabalhada']
+                    except Exception as e:
+                        pass
+                
+                # Se não encontrou nada, tenta o arquivo geral
+                if not mapeamento_palavras:
+                    try:
+                        path_respostas = os.path.join(os.path.dirname(__file__), '..', 'Data', 'RespostaVocabulario.json')
+                        if os.path.exists(path_respostas):
+                            with open(path_respostas, 'r', encoding='utf-8') as f:
+                                respostas = json.load(f)
+                                for item in respostas:
+                                    for q_key, q_data in item.items():
+                                        if 'Palavra Trabalhada' in q_data:
+                                            mapeamento_palavras[q_key] = q_data['Palavra Trabalhada']
+                    except Exception as e:
+                        pass
                 
                 questoes_nums = set()
                 for col in questao_cols:
@@ -608,7 +687,16 @@ if not df.empty:
                     df_analise = pd.DataFrame(analise_questoes)
                     df_analise_sorted = df_analise.sort_values('Δ', ascending=False)
                     
-                    # Tabela compacta
+                    # Carregar palavras ensinadas se for Vocabulário
+                    palavras_ensinadas_todas = set()
+                    if prova_sel.upper().startswith('VOCABUL'):
+                        palavras_por_fase = carregar_palavras_ensinadas()
+                        # Juntar palavras de todas as fases selecionadas
+                        for fase in fases_sel:
+                            if fase in palavras_por_fase:
+                                palavras_ensinadas_todas.update(palavras_por_fase[fase])
+                    
+                    # Tabela compacta com destaque para palavras ensinadas
                     def style_variacao(val):
                         if pd.isna(val):
                             return ''
@@ -619,7 +707,14 @@ if not df.empty:
                         else:
                             return 'background-color: #f1f3f4; color: #495057; font-weight: bold'
                     
+                    def style_palavra_ensinada(row):
+                        """Destaca palavras ensinadas com fundo amarelo usando matching inteligente."""
+                        if prova_sel.upper().startswith('VOCABUL') and palavra_ensinada_match(row['Palavra'], palavras_ensinadas_todas):
+                            return ['background-color: #fff3cd; font-weight: bold'] * len(row)
+                        return [''] * len(row)
+                    
                     styled_analise = (df_analise_sorted.style
+                                     .apply(style_palavra_ensinada, axis=1)
                                      .map(style_variacao, subset=['Δ'])
                                      .format({
                                          '% Pré': '{:.1f}%',
@@ -628,6 +723,32 @@ if not df.empty:
                                      }))
                     
                     st.caption("**Tabela de Evolução por Palavra**")
+                    if prova_sel.upper().startswith('VOCABUL') and palavras_ensinadas_todas:
+                        # Contar quantas palavras do teste correspondem às ensinadas
+                        palavras_teste = df_analise_sorted['Palavra'].tolist()
+                        palavras_matched = [p for p in palavras_teste if palavra_ensinada_match(p, palavras_ensinadas_todas)]
+                        
+                        # 🔍 DEBUG MODE: Mostrar análise detalhada
+                        DEBUG_MODE = True
+                        if DEBUG_MODE:
+                            st.info("**🔍 DEBUG MODE - Análise de Correspondências**")
+                            col_d1, col_d2 = st.columns(2)
+                            with col_d1:
+                                st.write(f"**Palavras Detectadas ({len(palavras_matched)}):**")
+                                st.write(", ".join(sorted(palavras_matched)))
+                            with col_d2:
+                                st.write(f"**Palavras Ensinadas ({len(palavras_ensinadas_todas)}):**")
+                                st.write(", ".join(sorted(palavras_ensinadas_todas)))
+                        
+                        st.caption(f"🟡 *Palavras destacadas em amarelo foram ensinadas no WordGen ({len(palavras_matched)} de {len(palavras_teste)} palavras do teste)*")
+                        
+                        # Debug: mostrar algumas correspondências (apenas em desenvolvimento)
+                        if st.session_state.get('show_debug', False):
+                            with st.expander("🔍 Debug - Correspondências encontradas"):
+                                st.write(f"**Palavras ensinadas carregadas:** {len(palavras_ensinadas_todas)}")
+                                st.write(f"**Fases selecionadas:** {fases_sel}")
+                                st.write(f"**Palavras matched:** {palavras_matched}")
+                    
                     st.dataframe(styled_analise, use_container_width=True, height=420)
                     
                     # ========== TOP 5 PALAVRAS ==========
