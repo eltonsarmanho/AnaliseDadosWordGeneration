@@ -7,8 +7,35 @@ from data_loader import get_datasets
 import unicodedata, re, math
 import numpy as np
 
-st.set_page_config(page_title="Dashboard Longitudinal WordGen", layout="wide")
+st.set_page_config(
+    page_title="Dashboard Longitudinal WordGen", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
+# ========== ESTILOS CSS CUSTOMIZADOS ==========
+st.markdown("""
+<style>
+    /* Ajustar alinhamento vertical do checkbox */
+    div[data-testid="stCheckbox"] {
+        padding-top: 1.5rem;
+        margin-bottom: 0;
+    }
+    
+    /* Melhorar espaçamento do label do checkbox */
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    /* Reduzir espaçamento entre elementos no expander */
+    div[data-testid="stExpander"] div[data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ========== FUNÇÕES AUXILIARES ==========
 def normalizar_turma(turma_original: str) -> str:
     """Normaliza valores de turma para formato padrão (5° Ano, 6° Ano, etc.)"""
     if pd.isna(turma_original):
@@ -16,7 +43,6 @@ def normalizar_turma(turma_original: str) -> str:
     
     turma_str = str(turma_original).upper().strip()
     
-    # Mapeamento de padrões para anos padronizados
     if any(x in turma_str for x in ['5', 'QUINTO']):
         return '5° Ano'
     elif any(x in turma_str for x in ['6', 'SEXTO']):
@@ -28,15 +54,13 @@ def normalizar_turma(turma_original: str) -> str:
     elif any(x in turma_str for x in ['9', 'NONO']):
         return '9° Ano'
     else:
-        # Se não conseguir identificar, mantém original
         return turma_original
 
 @st.cache_data(show_spinner=False)
 def load_data():
-    """Carrega e normaliza os datasets principais (TDE e Vocabulário)."""
+    """Carrega e normaliza os datasets principais."""
     tde, vocab = get_datasets()
     
-    # Preservar turmas originais antes da normalização para contagem correta
     if 'Turma' in tde.columns:
         tde['Turma_Original'] = tde['Turma'].copy()
         tde['Turma'] = tde['Turma'].apply(normalizar_turma)
@@ -47,68 +71,70 @@ def load_data():
     
     return tde, vocab
 
-# ================= LOAD DATA =================
-tde_df, vocab_df = load_data()
+@st.cache_data(show_spinner=False)
+def carregar_palavras_ensinadas():
+    """Carrega as palavras ensinadas de todas as fases."""
+    import json
+    import os
+    
+    palavras_por_fase = {}
+    base_path = os.path.join(os.path.dirname(__file__), '..', 'Data')
+    
+    for fase in [2, 3, 4]:
+        arquivo_path = os.path.join(base_path, f'Fase {fase}', 'PalavrasEnsinadasVocabulario.json')
+        try:
+            if os.path.exists(arquivo_path):
+                with open(arquivo_path, 'r', encoding='utf-8') as f:
+                    dados = json.load(f)
+                    # Tenta ambas as chaves possíveis
+                    palavras = dados.get('palavras_ensinadas', dados.get('Palavras Ensinadas', []))
+                    palavras_por_fase[fase] = set(palavras)
+        except Exception as e:
+            st.warning(f"Erro ao carregar palavras ensinadas da Fase {fase}: {e}")
+            palavras_por_fase[fase] = set()
+    
+    return palavras_por_fase
 
-PROVAS = {"TDE": tde_df, "VOCABULÁRIO": vocab_df}
+def normalizar_palavra(palavra: str) -> str:
+    """Normaliza palavra para comparação (remove acentos, lowercase, etc)."""
+    if not palavra:
+        return ""
+    # Remove acentos
+    palavra_norm = unicodedata.normalize('NFD', str(palavra))
+    palavra_norm = ''.join(char for char in palavra_norm if unicodedata.category(char) != 'Mn')
+    # Lowercase e strip
+    palavra_norm = palavra_norm.lower().strip()
+    # Remove pontuação no final
+    palavra_norm = palavra_norm.rstrip('.,;:!?')
+    return palavra_norm
 
-# ================= SIDEBAR ===================
-st.sidebar.title("📊 Dashboard Longitudinal - WordGen")
-st.sidebar.markdown("""
-**Este painel permite:**
-- Filtrar por Escola / Turma / Fase / Prova
-- Acompanhar evolução individual (pré x pós) por fase
-""")
-st.sidebar.markdown("---")
-st.sidebar.header("Filtros")
-prova_sel = st.sidebar.selectbox("Prova", list(PROVAS.keys()))
-df = PROVAS[prova_sel]
-
-# Fases (filtram os dados antes de definir escolas disponíveis)
-fases = sorted(df['Fase'].dropna().unique())
-fases_sel = st.sidebar.multiselect("Fase(s)", fases, default=fases)
-if fases_sel:
-    df = df[df['Fase'].isin(fases_sel)]
-
-# Escolas (lista já considera filtro de fase)
-escolas = sorted(df['Escola'].dropna().unique())
-escola_sel = st.sidebar.multiselect("Escola(s)", escolas, default=[])
-if escola_sel:
-    df = df[df['Escola'].isin(escola_sel)]
-
-# Turmas - Opção de agregação
-st.sidebar.markdown("---")
-agregar_turmas = st.sidebar.checkbox("🔄 Agregar turmas por ano", value=False, 
-                                    help="Ative para agrupar turmas do mesmo ano (ex: 7° A, 7° B → 7° Ano)")
-
-# Determinar que coluna de turma usar baseado na opção de agregação
-if agregar_turmas:
-    coluna_turma = 'Turma'  # Usa turmas normalizadas/agregadas
-    turmas_disponiveis = sorted(df['Turma'].dropna().unique())
-    label_turmas = "Turma(s) - Agregadas"
-else:
-    coluna_turma = 'Turma_Original'  # Usa turmas originais/separadas
-    turmas_disponiveis = sorted(df['Turma_Original'].dropna().unique())
-    label_turmas = "Turma(s) - Separadas"
-
-turmas_sel = st.sidebar.multiselect(label_turmas, turmas_disponiveis)
-if turmas_sel:
-    df = df[df[coluna_turma].isin(turmas_sel)]
-
-# Identificador anonimizado (para acompanhamento individual - LGPD)
-ids_anonimizados = sorted(df['ID_Anonimizado'].dropna().unique())
-id_anonimizado_sel = st.sidebar.selectbox(
-    "🔒 Aluno (ID Anonimizado)", 
-    ["<selecione>"] + ids_anonimizados,
-    help="Formato: [Primeiras letras do ID] - [Iniciais do Nome]"
-)
-
-# ================= FUNÇÕES DE CÁLCULO DO TAMANHO DO EFEITO ==================
-def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
-    """Calcula d de Cohen para duas medidas (pré e pós) tratadas como grupos independentes.
-    Retorna np.nan se não houver dados suficientes ou variância nula.
-    Obs: Para medidas pareadas poderia-se usar d_av ou dz; aqui segue especificação do usuário.
+def palavra_ensinada_match(palavra_teste: str, palavras_ensinadas: set) -> bool:
+    """Verifica se palavra do teste corresponde a alguma palavra ensinada.
+    
+    Usa correspondência exata normalizada e correspondência de raiz com no mínimo 6 caracteres.
     """
+    if not palavra_teste or not palavras_ensinadas:
+        return False
+    
+    palavra_teste_norm = normalizar_palavra(palavra_teste)
+    
+    # Verificar correspondência exata normalizada
+    for palavra_ensinada in palavras_ensinadas:
+        palavra_ensinada_norm = normalizar_palavra(palavra_ensinada)
+        
+        # Correspondência exata
+        if palavra_teste_norm == palavra_ensinada_norm:
+            return True
+        
+        # Correspondência de raiz (primeiras 6 letras) - mais rigoroso
+        if len(palavra_teste_norm) >= 6 and len(palavra_ensinada_norm) >= 6:
+            if palavra_teste_norm[:6] == palavra_ensinada_norm[:6]:
+                return True
+    
+    return False
+
+def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: str = 'Score_Pos') -> float:
+    """Calcula d de Cohen."""
     if df_in is None or df_in.empty:
         return float('nan')
     pre = df_in[col_pre].dropna()
@@ -125,7 +151,6 @@ def calcular_d_cohen(df_in: pd.DataFrame, col_pre: str = 'Score_Pre', col_pos: s
         return float('nan')
     return (m_pos - m_pre) / pooled
 
-
 def classificar_geral(d: float) -> str:
     if np.isnan(d):
         return 'Sem dados'
@@ -138,20 +163,16 @@ def classificar_geral(d: float) -> str:
         return 'Médio'
     return 'Grande'
 
-
 def benchmark_especifico(d: float, prova: str) -> tuple[str, bool]:
     if np.isnan(d):
         return ('Sem dados', False)
     if prova == 'TDE':
         return ('Bom resultado' if d >= 0.40 else 'Ponto de atenção', d >= 0.40)
-    # Vocabulário
     return ('Impacto significativo' if d >= 0.35 else 'Ponto de atenção', d >= 0.35)
 
-
 def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(255, 255, 255)):
-    """Cria um card métrico personalizado com ícone FontAwesome."""
+    """Cria um card métrico personalizado."""
     lnk = '<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.1/css/all.css" crossorigin="anonymous">'
-
     htmlstr = f"""<p style='background-color: rgb({cor_box[0]}, {cor_box[1]}, {cor_box[2]}, 0.85); 
                             color: rgb({cor_fonte[0]}, {cor_fonte[1]}, {cor_fonte[2]}, 0.95); 
                             font-size: 18px; 
@@ -168,361 +189,828 @@ def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(25
                             opacity: 0.9;
                             margin-top: 8px;
                             display: block;'>{titulo}</span></p>"""
-
     return lnk + htmlstr
-col1, col2, col3, col_turma, col_cohen= st.columns(5)
+
+# ========== LOAD DATA ==========
+tde_df, vocab_df = load_data()
+PROVAS = {"TDE": tde_df, "VOCABULÁRIO": vocab_df}
+
+# ========== HEADER ==========
+st.title("📊 Dashboard Longitudinal - WordGen")
+st.markdown("**Análise Comparativa de Desempenho: Pré-Teste vs Pós-Teste**")
+st.markdown("---")
+
+# ========== FILTROS NO TOPO (TOP BAR) ==========
+with st.expander("🔍 **FILTROS DE ANÁLISE**", expanded=True):
+    # LINHA ÚNICA - Filtros principais (Prova reduzida em 50%, Turma reduzida em 20%)
+    col_f1, col_f2, col_f3, col_f4 = st.columns([0.5, 1, 1.5, 1.6])
+    
+    with col_f1:
+        prova_sel = st.selectbox("📝 Prova", list(PROVAS.keys()))
+        df = PROVAS[prova_sel]
+    
+    with col_f2:
+        fases = sorted(df['Fase'].dropna().unique())
+        fases_sel = st.multiselect("📅 Fase(s)", fases, default=fases)
+        if fases_sel:
+            df = df[df['Fase'].isin(fases_sel)]
+    
+    with col_f3:
+        escolas = sorted(df['Escola'].dropna().unique())
+        escola_sel = st.multiselect("🏫 Escola(s)", escolas, default=[])
+        if escola_sel:
+            df = df[df['Escola'].isin(escola_sel)]
+    
+    with col_f4:
+        # Inicializar session_state ANTES de tudo
+        if 'agregar_turmas' not in st.session_state:
+            st.session_state.agregar_turmas = False
+        
+        # Sub-colunas: checkbox ao lado do multiselect
+        sub_col1, sub_col2 = st.columns([3, 1.9])
+        
+        # IMPORTANTE: Processar checkbox PRIMEIRO em sub_col2
+        with sub_col2:
+            # Checkbox ao lado (com padding para alinhar)
+            st.write("")  # Espaço para alinhar verticalmente
+            # Captura o novo valor do checkbox
+            novo_agregar = st.checkbox(
+                "🔄 Agregar Turmas", 
+                value=st.session_state.agregar_turmas, 
+                key="agregar_checkbox"
+            )
+            # Atualiza session_state IMEDIATAMENTE
+            if novo_agregar != st.session_state.agregar_turmas:
+                st.session_state.agregar_turmas = novo_agregar
+                st.rerun()  # Força rerun para atualizar o multiselect
+        
+        # Agora usa o valor atualizado do session_state
+        agregar_turmas = st.session_state.agregar_turmas
+        
+        with sub_col1:
+            # Multiselect de turmas (muda conforme checkbox)
+            if agregar_turmas:
+                coluna_turma = 'Turma'
+                turmas_disponiveis = sorted(df['Turma'].dropna().unique())
+                label_turmas = "🎓 Turma(s) - Agregadas"
+            else:
+                coluna_turma = 'Turma_Original'
+                turmas_disponiveis = sorted(df['Turma_Original'].dropna().unique())
+                label_turmas = "🎓 Turma(s) - Separadas"
+            
+            turmas_sel = st.multiselect(label_turmas, turmas_disponiveis, key="turmas_multiselect")
+            if turmas_sel:
+                df = df[df[coluna_turma].isin(turmas_sel)]
+
+st.markdown("---")
+
+# ========== MÉTRICAS PRINCIPAIS ==========
+st.subheader("📈 Resumo Estatístico")
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
-    st.markdown(
-        criar_metric_card(
-            valor=len(df),
-            titulo="Registros",
-            icone="fas fa-database",
-            cor_box=(52, 152, 219),  # Azul
-            cor_fonte=(255, 255, 255)
-        ),
-        unsafe_allow_html=True
-    )
+    st.markdown(criar_metric_card(
+        len(df), "Registros", "fas fa-database",
+        (52, 152, 219), (255, 255, 255)
+    ), unsafe_allow_html=True)
 
 with col2:
-    st.markdown(
-        criar_metric_card(
-            valor=df['ID_Unico'].nunique(),
-            titulo="Alunos Únicos",
-            icone="fas fa-users",
-            cor_box=(46, 204, 113),  # Verde
-            cor_fonte=(255, 255, 255)
-        ),
-        unsafe_allow_html=True
-    )
+    st.markdown(criar_metric_card(
+        df['ID_Unico'].nunique(), "Alunos Únicos", "fas fa-users",
+        (46, 204, 113), (255, 255, 255)
+    ), unsafe_allow_html=True)
 
 with col3:
-    st.markdown(
-        criar_metric_card(
-            valor=df['Escola'].nunique(),
-            titulo="Escolas",
-            icone="fas fa-school",
-            cor_box=(155, 89, 182),  # Roxo
-            cor_fonte=(255, 255, 255)
-        ),
-        unsafe_allow_html=True
-    )
+    st.markdown(criar_metric_card(
+        df['Escola'].nunique(), "Escolas", "fas fa-school",
+        (155, 89, 182), (255, 255, 255)
+    ), unsafe_allow_html=True)
 
-# Segunda linha: Turmas + Card do Tamanho do Efeito
-#col_turma, col_cohen = st.columns([1, 2])
-
-with col_turma:
-    # Contar turmas baseado na opção de agregação escolhida
+with col4:
     turmas_count = df[coluna_turma].nunique()
-    turma_label = "Turmas Agregadas" if agregar_turmas else "Turmas Separadas"
-    
-    st.markdown(
-        criar_metric_card(
-            valor=turmas_count,
-            titulo=turma_label,
-            icone="fas fa-chalkboard-teacher",
-            cor_box=(230, 126, 34),  # Laranja
-            cor_fonte=(255, 255, 255)
-        ),
-        unsafe_allow_html=True
-    )
+    turma_label = "Turmas Agregadas" if agregar_turmas else "Turmas"
+    st.markdown(criar_metric_card(
+        turmas_count, turma_label, "fas fa-chalkboard-teacher",
+        (230, 126, 34), (255, 255, 255)
+    ), unsafe_allow_html=True)
 
-with col_cohen:
-    # ================= TAMANHO DO EFEITO (COHEN'S D) - CARD SIMPLES ==================
-    # Calcular d de Cohen
+with col5:
     d_val = calcular_d_cohen(df)
     prova_norm = 'TDE' if prova_sel.upper().startswith('TDE') else 'VOCAB'
-    cls_espec, ok_flag = benchmark_especifico(d_val, prova_norm if prova_norm=='TDE' else 'VOCAB')
-    geral_cls = classificar_geral(d_val)
-
-    # Determinar cores e ícone baseado no resultado
+    cls_espec, ok_flag = benchmark_especifico(d_val, prova_norm)
+    
     if ok_flag:
-        cor_box = (40, 167, 69)  # Verde
-        cor_fonte = (255, 255, 255)
-        icone = "fas fa-check-circle"
+        cor_box, cor_fonte, icone = (40, 167, 69), (255, 255, 255), "fas fa-check-circle"
     elif not np.isnan(d_val):
-        cor_box = (255, 193, 7)  # Amarelo/Âmbar
-        cor_fonte = (0, 0, 0)
-        icone = "fas fa-exclamation-triangle"
+        cor_box, cor_fonte, icone = (255, 193, 7), (0, 0, 0), "fas fa-exclamation-triangle"
     else:
-        cor_box = (108, 117, 125)  # Cinza
-        cor_fonte = (255, 255, 255)
-        icone = "fas fa-info-circle"
-
+        cor_box, cor_fonte, icone = (108, 117, 125), (255, 255, 255), "fas fa-info-circle"
+    
     val_str = '—' if np.isnan(d_val) else f"{d_val:.3f}"
-    
-    # Criar card seguindo o mesmo padrão dos outros
-    st.markdown(
-        criar_metric_card(
-            valor=val_str,
-            titulo="Tamanho do Efeito",
-            icone=icone,
-            cor_box=cor_box,
-            cor_fonte=cor_fonte
-        ),
-        unsafe_allow_html=True
-    )
+    st.markdown(criar_metric_card(
+        val_str, "Tamanho do Efeito", icone,
+        cor_box, cor_fonte
+    ), unsafe_allow_html=True)
 
+st.markdown("---")
 
-
-def filtrar_dataset(base: pd.DataFrame) -> pd.DataFrame:
-    df_f = base.copy()
-    if escola_sel:
-        df_f = df_f[df_f['Escola'].isin(escola_sel)]
-    if fases_sel:
-        df_f = df_f[df_f['Fase'].isin(fases_sel)]
-    if turmas_sel:
-        df_f = df_f[df_f['Turma'].isin(turmas_sel)]
-    return df_f
-
-# Espaçamento vertical
-st.markdown("<br><br>", unsafe_allow_html=True)
-
-# Distribuição de scores por fase usando boxplot com Altair
-# NOTA: O gráfico já reflete todos os filtros aplicados (escola, turmas, fases) 
-# através da variável 'df' que foi filtrada anteriormente
+# ========== ANÁLISES PRINCIPAIS (LADO A LADO) ==========
 if not df.empty:
-    # Controle de visualização por turmas (apenas se turmas foram selecionadas)
-    visualizar_por_turmas = False
-    if turmas_sel and len(turmas_sel) > 0:
-        col_viz1, col_viz2 = st.columns([3, 1])
-        with col_viz1:
-            st.markdown("#### 📊 Distribuição de Scores por Fase")
-        with col_viz2:
-            visualizar_por_turmas = st.checkbox(
-                "📋 Separar por Turma", 
-                value=False,
-                help="Ative para visualizar cada turma separadamente no gráfico"
-            )
-    else:
-        st.markdown("#### 📊 Distribuição de Scores por Fase")
+    col_box, col_gran = st.columns([1.3, 1], gap="large")
     
-    try:
-        import altair as alt
-        
-        # Transformar dados para formato longo para o boxplot
-        if visualizar_por_turmas:
-            # Modo: Separar por turma - incluir coluna de turma no melt
-            df_boxplot = df.melt(
-                id_vars=['Fase', coluna_turma], 
-                value_vars=['Score_Pre', 'Score_Pos'],
-                var_name='Momento', 
-                value_name='Score'
-            )
-        else:
-            # Modo: Agregado - não incluir turma
-            df_boxplot = df.melt(
-                id_vars=['Fase'], 
-                value_vars=['Score_Pre', 'Score_Pos'],
-                var_name='Momento', 
-                value_name='Score'
-            )
-        
-        # Renomear para nomes mais amigáveis
-        df_boxplot['Momento'] = df_boxplot['Momento'].replace({
-            'Score_Pre': 'Pré-Teste',
-            'Score_Pos': 'Pós-Teste'
-        })
-        
-        # Garantir que Fase seja tratada como string para evitar valores intermediários
-        df_boxplot['Fase_str'] = df_boxplot['Fase'].astype(int).astype(str)
-        
-        # Calcular médias por Fase e Momento (e Turma se separado)
-        if visualizar_por_turmas:
-            medias = df_boxplot.groupby(['Fase', 'Fase_str', coluna_turma, 'Momento'])['Score'].mean().reset_index()
-        else:
-            medias = df_boxplot.groupby(['Fase', 'Fase_str', 'Momento'])['Score'].mean().reset_index()
-        medias = medias.rename(columns={'Score': 'Media'})
-        
-        # Criar boxplot base
-        if visualizar_por_turmas:
-            # Boxplot separado por turma: camadas combinadas antes de facetar
-            color_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=['#636EFA', '#EF553B'])
-            offset_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=[-40, 40])
-            base_chart = alt.Chart(df_boxplot)
-
-            turmas_no_grafico = df_boxplot[coluna_turma].dropna().unique()
-            num_facetas = len(turmas_no_grafico) if len(turmas_no_grafico) > 0 else 1
-            if num_facetas <= 2:
-                facet_width = 320
-                facet_spacing = 80
-                facet_columns = num_facetas
-            elif num_facetas == 3:
-                facet_width = 260
-                facet_spacing = 60
-                facet_columns = 3
-            elif num_facetas <= 4:
-                facet_width = 230
-                facet_spacing = 50
-                facet_columns = 4
-            else:
-                facet_width = 200
-                facet_spacing = 40
-                facet_columns = 4
-
-            boxplot_layer = base_chart.mark_boxplot(
-                size=30,
-                opacity=0.7
-            ).encode(
-                x=alt.X('Fase_str:N', title='Fase', axis=alt.Axis(labelAngle=0)),
-                y=alt.Y('Score:Q', title='Score'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale)
-            )
-
-            pontos_media_layer = base_chart.transform_aggregate(
-                Media='mean(Score)',
-                groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
-            ).mark_point(
-                size=80,
-                filled=True,
-                opacity=0.8
-            ).encode(
-                x=alt.X('Fase_str:N'),
-                y=alt.Y('Media:Q'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=None),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
-                tooltip=[
-                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                    alt.Tooltip(f'{coluna_turma}:N', title='Turma'),
-                    alt.Tooltip('Momento:N', title='Teste'),
-                    alt.Tooltip('Media:Q', title='Média', format='.2f')
-                ]
-            )
-
-            combined = alt.layer(boxplot_layer, pontos_media_layer).properties(
-                width=facet_width,
-                height=420
-            )
-            boxplot = combined.facet(
-                facet=alt.Facet(f'{coluna_turma}:N', title='Turma', header=alt.Header(labelAngle=0, labelFontSize=12)),
-                columns=facet_columns
-            )
-
-            titulo = f'Distribuição Pré-Teste vs Pós-Teste por Fase - Comparativo por Turma ({len(turmas_sel)} turma(s))'
+    # ========== COLUNA 1: BOXPLOT ==========
+    with col_box:
+        with st.container(border=True, height=750):
+            st.markdown("### 📊 Distribuição de Scores por Fase")
             
-        else:
-            # Boxplot agregado (comportamento original)
-            color_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=['#636EFA', '#EF553B'])
-            offset_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=[-40, 40])
-            boxplot = alt.Chart(df_boxplot).mark_boxplot(
-                size=36,
-                opacity=0.7
-            ).encode(
-                x=alt.X('Fase_str:N', 
-                       title='Fase',
-                       axis=alt.Axis(labelAngle=0)),
-                y=alt.Y('Score:Q', 
-                       title='Score'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale)
-            ).properties(
-                width=700,
-                height=400
-            )
-            
-            # Pontos nas médias
-            pontos_media = alt.Chart(medias).mark_point(
-                size=100,
-                filled=True,
-                opacity=0.8
-            ).encode(
-                x=alt.X('Fase_str:N'),
-                y=alt.Y('Media:Q'),
-                color=alt.Color('Momento:N', scale=color_scale, legend=None),
-                xOffset=alt.XOffset('Momento:N', scale=offset_scale),
-                tooltip=[
-                    alt.Tooltip('Fase:Q', title='Fase', format='d'),
-                    alt.Tooltip('Momento:N', title='Teste'),
-                    alt.Tooltip('Media:Q', title='Média', format='.2f')
-                ]
-            )
-            
+            # Controle de visualização por turmas
+            visualizar_por_turmas = False
             if turmas_sel and len(turmas_sel) > 0:
-                titulo = f'Distribuição Pré-Teste vs Pós-Teste por Fase - Visão Agregada ({len(turmas_sel)} turma(s))'
-            else:
-                titulo = 'Distribuição Pré-Teste vs Pós-Teste por Fase (com Média)'
-        
-        # Combinar todas as camadas
-        # Quando visualizar_por_turmas=True, as camadas já estão combinadas no objeto boxplot
-        if visualizar_por_turmas:
-            chart_final = boxplot.properties(
-                title=titulo
-            ).configure_axis(
-                labelFontSize=12,
-                titleFontSize=14
-            ).configure_title(
-                fontSize=16,
-                anchor='start'
-            ).configure_legend(
-                titleFontSize=13,
-                labelFontSize=12
-            ).configure_view(
-                strokeWidth=0
-            ).configure_facet(
-                spacing=facet_spacing
-            )
-        else:
-            chart_final = (boxplot + pontos_media).properties(
-                title=titulo
-            ).configure_axis(
-                labelFontSize=12,
-                titleFontSize=14
-            ).configure_title(
-                fontSize=16,
-                anchor='start'
-            ).configure_legend(
-                titleFontSize=13,
-                labelFontSize=12
-            )
-        
-        st.altair_chart(chart_final, use_container_width=True)
-        
-        # Informação adicional sobre a visualização
-        if visualizar_por_turmas and turmas_sel:
-            st.caption(f"📊 Mostrando comparação detalhada entre {len(turmas_sel)} turma(s) selecionada(s). Desmarque a opção acima para ver a visão agregada.")
-        
-    except ImportError:
-        st.warning("⚠️ Biblioteca Altair não encontrada. Usando Plotly como fallback...")
-        
-        # Fallback para Plotly
-        df_boxplot = df.melt(
-            id_vars=['Fase'], 
-            value_vars=['Score_Pre', 'Score_Pos'],
-            var_name='Momento', 
-            value_name='Score'
-        )
-        df_boxplot['Momento'] = df_boxplot['Momento'].replace({
-            'Score_Pre': 'Pré-Teste',
-            'Score_Pos': 'Pós-Teste'
-        })
-        
-        fig_fase = px.box(
-            df_boxplot,
-            x='Fase',
-            y='Score',
-            color='Momento',
-            title='Distribuição Pré-Teste vs Pós-Teste por Fase',
-            labels={'Score': 'Score', 'Momento': 'Teste'},
-            points='outliers'
-        )
-        
-        fases_disponiveis = sorted(df_boxplot['Fase'].unique())
-        fig_fase.update_xaxes(
-            tickmode='array',
-            tickvals=fases_disponiveis,
-            ticktext=[str(int(fase)) for fase in fases_disponiveis],
-            title='Fase'
-        )
-        
-        st.plotly_chart(fig_fase, use_container_width=True)
+                visualizar_por_turmas = st.checkbox(
+                    "📋 Separar por Turma", 
+                    value=False,
+                    help="Ative para visualizar cada turma separadamente no gráfico"
+                )
+            
+            try:
+                import altair as alt
+                
+                # Transformar dados para formato longo
+                if visualizar_por_turmas:
+                    df_boxplot = df.melt(
+                        id_vars=['Fase', coluna_turma], 
+                        value_vars=['Score_Pre', 'Score_Pos'],
+                        var_name='Momento', 
+                        value_name='Score'
+                    )
+                else:
+                    df_boxplot = df.melt(
+                        id_vars=['Fase'], 
+                        value_vars=['Score_Pre', 'Score_Pos'],
+                        var_name='Momento', 
+                        value_name='Score'
+                    )
+                
+                df_boxplot['Momento'] = df_boxplot['Momento'].replace({
+                    'Score_Pre': 'Pré-Teste',
+                    'Score_Pos': 'Pós-Teste'
+                })
+                
+                df_boxplot['Fase_str'] = df_boxplot['Fase'].astype(int).astype(str)
+                
+                # Calcular médias
+                if visualizar_por_turmas:
+                    medias = df_boxplot.groupby(['Fase', 'Fase_str', coluna_turma, 'Momento'])['Score'].mean().reset_index()
+                else:
+                    medias = df_boxplot.groupby(['Fase', 'Fase_str', 'Momento'])['Score'].mean().reset_index()
+                medias = medias.rename(columns={'Score': 'Media'})
+                
+                # Criar boxplot
+                color_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=['#636EFA', '#EF553B'])
+                offset_scale = alt.Scale(domain=['Pré-Teste', 'Pós-Teste'], range=[-40, 40])
+                
+                if visualizar_por_turmas:
+                    base_chart = alt.Chart(df_boxplot)
+                    
+                    turmas_no_grafico = df_boxplot[coluna_turma].dropna().unique()
+                    num_facetas = len(turmas_no_grafico) if len(turmas_no_grafico) > 0 else 1
+                    
+                    if num_facetas <= 2:
+                        facet_width = 320
+                        facet_spacing = 80
+                        facet_columns = num_facetas
+                    elif num_facetas == 3:
+                        facet_width = 260
+                        facet_spacing = 60
+                        facet_columns = 3
+                    else:
+                        facet_width = 230
+                        facet_spacing = 50
+                        facet_columns = min(num_facetas, 4)
+                    
+                    boxplot_layer = base_chart.mark_boxplot(
+                        size=30,
+                        opacity=0.7
+                    ).encode(
+                        x=alt.X('Fase_str:N', title='Fase', axis=alt.Axis(labelAngle=0)),
+                        y=alt.Y('Score:Q', title='Score'),
+                        color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+                    )
+                    
+                    pontos_media_layer = base_chart.transform_aggregate(
+                        Media='mean(Score)',
+                        groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
+                    ).mark_point(
+                        size=80,
+                        filled=True,
+                        opacity=0.8
+                    ).encode(
+                        x=alt.X('Fase_str:N'),
+                        y=alt.Y('Media:Q'),
+                        color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                        tooltip=[
+                            alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                            alt.Tooltip(f'{coluna_turma}:N', title='Turma'),
+                            alt.Tooltip('Momento:N', title='Teste'),
+                            alt.Tooltip('Media:Q', title='Média', format='.2f')
+                        ]
+                    )
+                    
+                    combined = alt.layer(boxplot_layer, pontos_media_layer).properties(
+                        width=facet_width,
+                        height=380
+                    )
+                    
+                    boxplot = combined.facet(
+                        facet=alt.Facet(f'{coluna_turma}:N', title='Turma', 
+                                       header=alt.Header(labelAngle=0, labelFontSize=12)),
+                        columns=facet_columns
+                    )
+                    
+                    chart_final = boxplot.properties(
+                        title=f'Comparativo por Turma ({len(turmas_sel)} turma(s))'
+                    ).configure_axis(
+                        labelFontSize=11,
+                        titleFontSize=13
+                    ).configure_title(
+                        fontSize=14,
+                        anchor='start'
+                    ).configure_legend(
+                        titleFontSize=12,
+                        labelFontSize=11
+                    ).configure_view(
+                        strokeWidth=0
+                    ).configure_facet(
+                        spacing=facet_spacing
+                    )
+                    
+                else:
+                    boxplot = alt.Chart(df_boxplot).mark_boxplot(
+                        size=36,
+                        opacity=0.7
+                    ).encode(
+                        x=alt.X('Fase_str:N', 
+                               title='Fase',
+                               axis=alt.Axis(labelAngle=0)),
+                        y=alt.Y('Score:Q', 
+                               title='Score'),
+                        color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Teste')),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+                    ).properties(
+                        width=600,
+                        height=380
+                    )
+                    
+                    pontos_media = alt.Chart(medias).mark_point(
+                        size=100,
+                        filled=True,
+                        opacity=0.8
+                    ).encode(
+                        x=alt.X('Fase_str:N'),
+                        y=alt.Y('Media:Q'),
+                        color=alt.Color('Momento:N', scale=color_scale, legend=None),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                        tooltip=[
+                            alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                            alt.Tooltip('Momento:N', title='Teste'),
+                            alt.Tooltip('Media:Q', title='Média', format='.2f')
+                        ]
+                    )
+                    
+                    titulo = 'Distribuição Pré-Teste vs Pós-Teste por Fase'
+                    
+                    chart_final = (boxplot + pontos_media).properties(
+                        title=titulo
+                    ).configure_axis(
+                        labelFontSize=12,
+                        titleFontSize=14
+                    ).configure_title(
+                        fontSize=15,
+                        anchor='start'
+                    ).configure_legend(
+                        titleFontSize=13,
+                        labelFontSize=12
+                    )
+                
+                st.altair_chart(chart_final, use_container_width=True)
+                
+                if visualizar_por_turmas and turmas_sel:
+                    st.caption(f"📊 Comparação entre {len(turmas_sel)} turma(s)")
+                
+                # ========== GRÁFICO DE DELTA MÉDIO POR FASE ==========
+                st.markdown("---")
+                st.markdown("#### 📊 Ganho Médio por Fase")
+                st.caption("Diferença entre Pós-Teste e Pré-Teste (Delta = Pós - Pré)")
+                
+                # Calcular delta médio por fase
+                df_delta_fase = df.groupby('Fase', as_index=False).apply(
+                    lambda x: pd.Series({
+                        'Delta_Medio': x['Score_Pos'].mean() - x['Score_Pre'].mean(),
+                        'N_Alunos': len(x)
+                    }), include_groups=False
+                ).reset_index(drop=True)
+                
+                df_delta_fase['Fase_str'] = df_delta_fase['Fase'].astype(int).astype(str)
+                df_delta_fase['Cor'] = df_delta_fase['Delta_Medio'].apply(
+                    lambda x: '#28a745' if x > 0 else '#dc3545' if x < 0 else '#6c757d'
+                )
+                
+                # Criar gráfico de barras com Altair
+                bar_delta = alt.Chart(df_delta_fase).mark_bar(
+                    cornerRadiusTopLeft=4,
+                    cornerRadiusTopRight=4,
+                    opacity=0.85
+                ).encode(
+                    x=alt.X('Fase_str:N', 
+                           title='Fase',
+                           axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y('Delta_Medio:Q', 
+                           title='Ganho Médio (Pós - Pré)',
+                           scale=alt.Scale(domain=[
+                               min(0, df_delta_fase['Delta_Medio'].min() - 1),
+                               df_delta_fase['Delta_Medio'].max() + 1
+                           ])),
+                    color=alt.Color('Cor:N', scale=None, legend=None),
+                    tooltip=[
+                        alt.Tooltip('Fase:Q', title='Fase', format='d'),
+                        alt.Tooltip('Delta_Medio:Q', title='Ganho Médio', format='.2f'),
+                        alt.Tooltip('N_Alunos:Q', title='Nº Alunos', format='d')
+                    ]
+                ).properties(
+                    width=600,
+                    height=180
+                )
+                
+                # Adicionar linha de referência no zero
+                rule_zero = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
+                    strokeDash=[5, 5],
+                    color='gray',
+                    strokeWidth=1.5
+                ).encode(
+                    y='y:Q'
+                )
+                
+                # Adicionar rótulos de valores nas barras
+                text_delta = alt.Chart(df_delta_fase).mark_text(
+                    align='center',
+                    baseline='bottom',
+                    dy=-5,
+                    fontSize=12,
+                    fontWeight='bold'
+                ).encode(
+                    x=alt.X('Fase_str:N'),
+                    y=alt.Y('Delta_Medio:Q'),
+                    text=alt.Text('Delta_Medio:Q', format='.2f'),
+                    color=alt.value('black')
+                )
+                
+                chart_delta_final = (bar_delta + rule_zero + text_delta).configure_axis(
+                    labelFontSize=11,
+                    titleFontSize=12
+                ).configure_view(
+                    strokeWidth=0
+                )
+                
+                st.altair_chart(chart_delta_final, use_container_width=True)
+                
+                # Informação adicional
+                melhor_fase = df_delta_fase.loc[df_delta_fase['Delta_Medio'].idxmax()]
+                st.caption(f"🏆 **Maior ganho:** Fase {int(melhor_fase['Fase'])} com +{melhor_fase['Delta_Medio']:.2f} pontos ({int(melhor_fase['N_Alunos'])} alunos)")
+                
+            except ImportError:
+                st.warning("⚠️ Altair não disponível. Usando Plotly...")
+                
+                df_boxplot = df.melt(
+                    id_vars=['Fase'], 
+                    value_vars=['Score_Pre', 'Score_Pos'],
+                    var_name='Momento', 
+                    value_name='Score'
+                )
+                df_boxplot['Momento'] = df_boxplot['Momento'].replace({
+                    'Score_Pre': 'Pré-Teste',
+                    'Score_Pos': 'Pós-Teste'
+                })
+                
+                fig_fase = px.box(
+                    df_boxplot,
+                    x='Fase',
+                    y='Score',
+                    color='Momento',
+                    title='Distribuição Pré-Teste vs Pós-Teste por Fase',
+                    labels={'Score': 'Score', 'Momento': 'Teste'},
+                    points='outliers'
+                )
+                
+                fases_disponiveis = sorted(df_boxplot['Fase'].unique())
+                fig_fase.update_xaxes(
+                    tickmode='array',
+                    tickvals=fases_disponiveis,
+                    ticktext=[str(int(fase)) for fase in fases_disponiveis],
+                    title='Fase'
+                )
+                
+                st.plotly_chart(fig_fase, use_container_width=True)
     
+    # ========== COLUNA 2: ANÁLISE GRANULAR ==========
+    with col_gran:
+        with st.container(border=True, height=750):
+            st.markdown("### 🔍 Análise por Questão")
+            
+            questao_cols = [col for col in df.columns if col.startswith('Q') and ('_Pre' in col or '_Pos' in col)]
+            
+            if questao_cols:
+                # Carregar mapeamento de questões para palavras POR FASE
+                import json
+                import os
+                
+                mapeamento_palavras = {}
+                # Tentar carregar RespostaVocabulario.json de cada fase selecionada
+                for fase in fases_sel:
+                    try:
+                        # Primeiro tenta o arquivo específico da fase
+                        path_fase = os.path.join(os.path.dirname(__file__), '..', 'Data', f'Fase {int(fase)}', 'RespostaVocabulario.json')
+                        if os.path.exists(path_fase):
+                            with open(path_fase, 'r', encoding='utf-8') as f:
+                                respostas = json.load(f)
+                                for item in respostas:
+                                    for q_key, q_data in item.items():
+                                        if 'Palavra Trabalhada' in q_data:
+                                            mapeamento_palavras[q_key] = q_data['Palavra Trabalhada']
+                    except Exception as e:
+                        pass
+                
+                # Se não encontrou nada, tenta o arquivo geral
+                if not mapeamento_palavras:
+                    try:
+                        path_respostas = os.path.join(os.path.dirname(__file__), '..', 'Data', 'RespostaVocabulario.json')
+                        if os.path.exists(path_respostas):
+                            with open(path_respostas, 'r', encoding='utf-8') as f:
+                                respostas = json.load(f)
+                                for item in respostas:
+                                    for q_key, q_data in item.items():
+                                        if 'Palavra Trabalhada' in q_data:
+                                            mapeamento_palavras[q_key] = q_data['Palavra Trabalhada']
+                    except Exception as e:
+                        pass
+                
+                questoes_nums = set()
+                for col in questao_cols:
+                    if '_Pre' in col:
+                        q_num = col.split('_Pre')[0]
+                        questoes_nums.add(q_num)
+                
+                questoes_nums = sorted(list(questoes_nums), key=lambda x: int(x[1:]))
+                
+                analise_questoes = []
+                for q_num in questoes_nums:
+                    col_pre = f"{q_num}_Pre"
+                    col_pos = f"{q_num}_Pos"
+                    
+                    if col_pre in df.columns and col_pos in df.columns:
+                        pct_pre = (df[col_pre].sum() / df[col_pre].count()) * 100 if df[col_pre].count() > 0 else 0
+                        pct_pos = (df[col_pos].sum() / df[col_pos].count()) * 100 if df[col_pos].count() > 0 else 0
+                        variacao = pct_pos - pct_pre
+                        
+                        # Usar palavra se disponível, senão usar Q1, Q2, etc.
+                        palavra = mapeamento_palavras.get(q_num, q_num)
+                        
+                        analise_questoes.append({
+                            'Palavra': palavra,
+                            '% Pré': pct_pre,
+                            '% Pós': pct_pos,
+                            'Δ': variacao
+                        })
+                
+                if analise_questoes:
+                    df_analise = pd.DataFrame(analise_questoes)
+                    df_analise_sorted = df_analise.sort_values('Δ', ascending=False)
+                    
+                    # Carregar palavras ensinadas se for Vocabulário
+                    palavras_ensinadas_todas = set()
+                    if prova_sel.upper().startswith('VOCABUL'):
+                        palavras_por_fase = carregar_palavras_ensinadas()
+                        # Juntar palavras de todas as fases selecionadas
+                        for fase in fases_sel:
+                            if fase in palavras_por_fase:
+                                palavras_ensinadas_todas.update(palavras_por_fase[fase])
+                    
+                    # Tabela compacta com destaque para palavras ensinadas
+                    def style_variacao(val):
+                        if pd.isna(val):
+                            return ''
+                        elif val > 0:
+                            return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold'
+                        elif val < 0:
+                            return 'background-color: #fdf2f2; color: #721c24; font-weight: bold'
+                        else:
+                            return 'background-color: #f1f3f4; color: #495057; font-weight: bold'
+                    
+                    def style_palavra_ensinada(row):
+                        """Destaca palavras ensinadas com fundo amarelo usando matching inteligente."""
+                        if prova_sel.upper().startswith('VOCABUL') and palavra_ensinada_match(row['Palavra'], palavras_ensinadas_todas):
+                            return ['background-color: #fff3cd; font-weight: bold'] * len(row)
+                        return [''] * len(row)
+                    
+                    styled_analise = (df_analise_sorted.style
+                                     .apply(style_palavra_ensinada, axis=1)
+                                     .map(style_variacao, subset=['Δ'])
+                                     .format({
+                                         '% Pré': '{:.1f}%',
+                                         '% Pós': '{:.1f}%',
+                                         'Δ': '{:+.1f}%'
+                                     }))
+                    
+                    st.caption("**Tabela de Evolução por Palavra**")
+                    if prova_sel.upper().startswith('VOCABUL') and palavras_ensinadas_todas:
+                        # Contar quantas palavras do teste correspondem às ensinadas
+                        palavras_teste = df_analise_sorted['Palavra'].tolist()
+                        palavras_matched = [p for p in palavras_teste if palavra_ensinada_match(p, palavras_ensinadas_todas)]
+                        
+                        st.caption(f"🟡 *Palavras destacadas em amarelo foram ensinadas no WordGen ({len(palavras_matched)} de {len(palavras_teste)} palavras do teste)*")
+                        
+                        # Debug: mostrar algumas correspondências (apenas em desenvolvimento)
+                        if st.session_state.get('show_debug', False):
+                            with st.expander("🔍 Debug - Correspondências encontradas"):
+                                st.write(f"**Palavras ensinadas carregadas:** {len(palavras_ensinadas_todas)}")
+                                st.write(f"**Fases selecionadas:** {fases_sel}")
+                                st.write(f"**Palavras matched:** {palavras_matched}")
+                    
+                    st.dataframe(styled_analise, use_container_width=True, height=420)
+                    
+                    # ========== TOP 5 PALAVRAS ==========
+                    st.markdown("---")
+                    st.caption("**🏆 Destaques de Aprendizagem**")
+                    
+                    # TOP 5 Maior Ganho
+                    top_5_ganho = df_analise_sorted.head(5)
+                    # TOP 5 Menor Ganho (ou maior declínio)
+                    top_5_declinio = df_analise_sorted.tail(5).sort_values('Δ', ascending=True)
+                    
+                    col_top, col_bottom = st.columns(2)
+                    
+                    with col_top:
+                        st.markdown("**🟢 Maior Progresso**")
+                        for idx, row in top_5_ganho.iterrows():
+                            delta_val = row['Δ']
+                            # Usar diferentes tons de verde baseado no valor
+                            if delta_val > 20:
+                                cor_fundo = "#d4edda"
+                                cor_texto = "#155724"
+                            elif delta_val > 10:
+                                cor_fundo = "#e8f5e8"
+                                cor_texto = "#2d5016"
+                            else:
+                                cor_fundo = "#f1f8f1"
+                                cor_texto = "#3d6b21"
+                            
+                            st.markdown(f"""
+                            <div style='background-color: {cor_fundo}; 
+                                        padding: 8px 12px; 
+                                        border-radius: 6px; 
+                                        margin-bottom: 6px;
+                                        border-left: 4px solid #28a745;'>
+                                <span style='color: {cor_texto}; font-weight: 600; font-size: 13px;'>{row['Palavra']}</span>
+                                <span style='float: right; color: {cor_texto}; font-weight: bold; font-size: 13px;'>+{delta_val:.1f}%</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    with col_bottom:
+                        st.markdown("**🔴 Atenção Necessária**")
+                        for idx, row in top_5_declinio.iterrows():
+                            delta_val = row['Δ']
+                            # Usar diferentes tons de vermelho/amarelo baseado no valor
+                            if delta_val < 0:
+                                cor_fundo = "#f8d7da"
+                                cor_texto = "#721c24"
+                                borda_cor = "#dc3545"
+                            elif delta_val < 5:
+                                cor_fundo = "#fff3cd"
+                                cor_texto = "#856404"
+                                borda_cor = "#ffc107"
+                            else:
+                                cor_fundo = "#fff9e6"
+                                cor_texto = "#997404"
+                                borda_cor = "#ffeb3b"
+                            
+                            simbolo = "" if delta_val < 0 else "+"
+                            st.markdown(f"""
+                            <div style='background-color: {cor_fundo}; 
+                                        padding: 8px 12px; 
+                                        border-radius: 6px; 
+                                        margin-bottom: 6px;
+                                        border-left: 4px solid {borda_cor};'>
+                                <span style='color: {cor_texto}; font-weight: 600; font-size: 13px;'>{row['Palavra']}</span>
+                                <span style='float: right; color: {cor_texto}; font-weight: bold; font-size: 13px;'>{simbolo}{delta_val:.1f}%</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                else:
+                    st.info("Sem questões válidas")
+            else:
+                st.info("Dataset não contém questões individuais")
 
-    # ---------------- EVOLUÇÃO COMPARATIVA HIERÁRQUICA (COORDENADAS PARALELAS) ----------------
-    st.markdown("---")
-    st.markdown("### Evolução Comparativa Hierárquica")
-    st.caption("Visualize trajetórias longitudinais através das fases. Cada linha representa uma entidade (Escola/Turma/Aluno) evoluindo ao longo do tempo.")
+st.markdown("---")
 
+# ========== DISTRIBUIÇÃO DE GANHOS INDIVIDUAIS (EXPANDER) ==========
+with st.expander("📊 **DISTRIBUIÇÃO DE GANHOS INDIVIDUAIS**", expanded=False):
+    st.caption("Análise da variabilidade dos ganhos (Pós - Pré) entre todos os alunos")
+    
+    if not df.empty and 'Score_Pre' in df.columns and 'Score_Pos' in df.columns:
+        # Calcular delta para cada aluno
+        df_with_delta = df.copy()
+        df_with_delta['Delta'] = df_with_delta['Score_Pos'] - df_with_delta['Score_Pre']
+        
+        # Remover valores nulos
+        df_with_delta = df_with_delta.dropna(subset=['Delta'])
+        
+        if len(df_with_delta) > 0:
+            try:
+                import altair as alt
+                
+                # Estatísticas descritivas
+                media_delta = df_with_delta['Delta'].mean()
+                mediana_delta = df_with_delta['Delta'].median()
+                std_delta = df_with_delta['Delta'].std()
+                min_delta = df_with_delta['Delta'].min()
+                max_delta = df_with_delta['Delta'].max()
+                
+                # Contar alunos por categoria
+                melhoraram = len(df_with_delta[df_with_delta['Delta'] > 0])
+                mantiveram = len(df_with_delta[df_with_delta['Delta'] == 0])
+                pioraram = len(df_with_delta[df_with_delta['Delta'] < 0])
+                total_alunos = len(df_with_delta)
+                
+                # Cards de estatísticas
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                
+                with col_stat1:
+                    st.metric(
+                        label="📈 Melhoraram",
+                        value=f"{melhoraram}",
+                        delta=f"{(melhoraram/total_alunos*100):.1f}%",
+                        delta_color="normal"
+                    )
+                
+                with col_stat2:
+                    st.metric(
+                        label="➡️ Mantiveram",
+                        value=f"{mantiveram}",
+                        delta=f"{(mantiveram/total_alunos*100):.1f}%",
+                        delta_color="off"
+                    )
+                
+                with col_stat3:
+                    st.metric(
+                        label="📉 Pioraram",
+                        value=f"{pioraram}",
+                        delta=f"{(pioraram/total_alunos*100):.1f}%",
+                        delta_color="inverse"
+                    )
+                
+                with col_stat4:
+                    st.metric(
+                        label="📊 Ganho Médio",
+                        value=f"{media_delta:.2f}",
+                        delta=f"±{std_delta:.2f}",
+                        delta_color="off"
+                    )
+                
+                st.markdown("---")
+                
+                # Criar histograma com Altair
+                st.markdown("#### 📊 Distribuição dos Ganhos")
+                
+                # Adicionar coluna de cor baseada no Delta
+                df_with_delta['Cor'] = df_with_delta['Delta'].apply(
+                    lambda x: 'Positivo' if x > 0 else ('Negativo' if x < 0 else 'Zero')
+                )
+                
+                # Histograma de barras
+                hist = alt.Chart(df_with_delta).mark_bar(
+                    opacity=0.75,
+                    binSpacing=1,
+                    cornerRadiusTopLeft=3,
+                    cornerRadiusTopRight=3
+                ).encode(
+                    x=alt.X('Delta:Q', 
+                           bin=alt.Bin(maxbins=30), 
+                           title='Ganho (Pós - Pré)',
+                           axis=alt.Axis(labelFontSize=11, titleFontSize=12)),
+                    y=alt.Y('count()', 
+                           title='Número de Alunos',
+                           axis=alt.Axis(labelFontSize=11, titleFontSize=12)),
+                    color=alt.Color('Cor:N',
+                        scale=alt.Scale(
+                            domain=['Positivo', 'Zero', 'Negativo'],
+                            range=['#28a745', '#6c757d', '#dc3545']
+                        ),
+                        legend=None
+                    ),
+                    tooltip=[
+                        alt.Tooltip('count()', title='Nº Alunos'),
+                        alt.Tooltip('Delta:Q', title='Ganho', format='.1f', bin=True)
+                    ]
+                ).properties(
+                    width=700,
+                    height=350
+                )
+                
+                # Linha vertical da média
+                rule_media = alt.Chart(pd.DataFrame({'x': [media_delta]})).mark_rule(
+                    color='red',
+                    strokeWidth=3,
+                    strokeDash=[5, 5]
+                ).encode(
+                    x='x:Q',
+                    size=alt.value(2)
+                )
+                
+                # Texto da média
+                text_media = alt.Chart(pd.DataFrame({
+                    'x': [media_delta],
+                    'y': [0],
+                    'label': [f'Média: {media_delta:.2f}']
+                })).mark_text(
+                    align='left',
+                    dx=5,
+                    dy=-10,
+                    fontSize=12,
+                    fontWeight='bold',
+                    color='red'
+                ).encode(
+                    x='x:Q',
+                    y=alt.Y('y:Q', scale=alt.Scale(domain=[0, 1])),
+                    text='label:N'
+                )
+                
+                # Linha vertical da mediana
+                rule_mediana = alt.Chart(pd.DataFrame({'x': [mediana_delta]})).mark_rule(
+                    color='blue',
+                    strokeWidth=2,
+                    strokeDash=[3, 3]
+                ).encode(
+                    x='x:Q'
+                )
+                
+                # Combinar todas as camadas
+                chart_final = (hist + rule_media + rule_mediana).configure_axis(
+                    labelFontSize=11,
+                    titleFontSize=12
+                ).configure_view(
+                    strokeWidth=0
+                )
+                
+                st.altair_chart(chart_final, use_container_width=True)
+                
+                # Insights adicionais
+                st.markdown("#### 💡 Insights da Distribuição")
+                
+                col_insight1, col_insight2 = st.columns(2)
+                
+                with col_insight1:
+                    st.info(f"""
+                    **📊 Estatísticas Descritivas:**
+                    - **Média:** {media_delta:.2f} pontos
+                    - **Mediana:** {mediana_delta:.2f} pontos
+                    - **Desvio Padrão:** ±{std_delta:.2f} pontos
+                    - **Amplitude:** {min_delta:.2f} a {max_delta:.2f} pontos
+                    """)
+                
+                with col_insight2:
+                    # Calcular percentis
+                    p25 = df_with_delta['Delta'].quantile(0.25)
+                    p75 = df_with_delta['Delta'].quantile(0.75)
+                    
+                    # Identificar outliers (usando regra IQR)
+                    iqr = p75 - p25
+                    outliers_baixo = len(df_with_delta[df_with_delta['Delta'] < (p25 - 1.5 * iqr)])
+                    outliers_alto = len(df_with_delta[df_with_delta['Delta'] > (p75 + 1.5 * iqr)])
+                    
+                    st.success(f"""
+                    **🎯 Análise de Performance:**
+                    - **Taxa de Sucesso:** {(melhoraram/total_alunos*100):.1f}% melhoraram
+                    - **25º Percentil (Q1):** {p25:.2f} pontos
+                    - **75º Percentil (Q3):** {p75:.2f} pontos
+                    - **Outliers:** {outliers_baixo} baixo | {outliers_alto} alto
+                    """)
+                
+                st.caption(f"📊 Análise baseada em {total_alunos} aluno(s) com dados completos de Pré e Pós-Teste")
+                
+            except ImportError:
+                st.error("❌ Biblioteca Altair não disponível")
+        else:
+            st.warning("⚠️ Não há dados suficientes para análise de distribuição")
+    else:
+        st.info("💡 Dados de Score_Pre e Score_Pos necessários para esta visualização")
+
+st.markdown("---")
+
+# ========== EVOLUÇÃO HIERÁRQUICA (EXPANDER) ==========
+with st.expander("🌐 **EVOLUÇÃO COMPARATIVA HIERÁRQUICA**", expanded=False):
+    st.caption("Trajetórias longitudinais por Escola, Turma ou Aluno")
+    
     # Inicializar estados
     if 'nivel_visualizacao' not in st.session_state:
         st.session_state.nivel_visualizacao = 'Escolas'
@@ -530,60 +1018,39 @@ if not df.empty:
         st.session_state.escolas_filtradas = []
     if 'turmas_filtradas' not in st.session_state:
         st.session_state.turmas_filtradas = []
-
-    # Informativo sobre Coortes
-    with st.expander("ℹ️ O que são Coortes?", expanded=False):
-        st.markdown("""
-        **Coortes representam grupos de alunos baseados na fase em que iniciaram o programa WordGen:**
-        
-        - **Coorte 1**: Alunos que **começaram na Fase 2** (primeira fase de avaliação)
-        - **Coorte 2**: Alunos que **começaram na Fase 3** (entraram mais tarde no programa)
-        - **Coorte 3**: Alunos que **começaram na Fase 4** (última fase de entrada)
-        
-        💡 **Por que separar por coorte?**  
-        Cada coorte teve **diferentes tempos de exposição** ao programa WordGen e representa **momentos distintos** 
-        de entrada no estudo longitudinal. Analisar por coorte permite:
-        
-        - Comparar alunos que iniciaram em **fases equivalentes**
-        - Controlar o **efeito do tempo de programa** nas análises
-        - Entender diferenças entre grupos que **entraram em momentos diferentes**
-        
-        📊 **Exemplo prático**:
-        - Coorte 1 tem dados em Fases 2, 3 e 4 (trajetória completa)
-        - Coorte 2 tem dados em Fases 3 e 4 (trajetória parcial)
-        - Coorte 3 tem dados apenas na Fase 4 (snapshot inicial)
-        
-        🔍 **Dica**: Selecione "Todas" para visão geral ou uma coorte específica para análise focada.
-        """)
-
-    # Seletores de contexto (REDUZIDO - removido Tipo de Análise)
+    
+    # Informativo sobre Coortes (como info box ao invés de expander)
+    st.info("""
+    **ℹ️ O que são Coortes?**
+    
+    Coortes representam grupos de alunos baseados na fase em que iniciaram o programa:
+    
+    • **Coorte 1**: Alunos que começaram na Fase 2  
+    • **Coorte 2**: Alunos que começaram na Fase 3  
+    • **Coorte 3**: Alunos que começaram na Fase 4
+    """)
+    
+    # Seletores
     col_sel1, col_sel2 = st.columns(2)
     with col_sel1:
         coorte_drill = st.selectbox(
             "🎓 Filtrar por Coorte:",
             options=['Todas', 'Coorte 1', 'Coorte 2', 'Coorte 3'],
-            key='drill_coorte_selector',
-            help="Coorte 1: iniciaram na Fase 2 | Coorte 2: iniciaram na Fase 3 | Coorte 3: iniciaram na Fase 4"
+            key='drill_coorte_selector'
         )
     with col_sel2:
         nivel_viz = st.selectbox(
             "🔍 Nível de Visualização:",
             options=['Escolas', 'Turmas', 'Alunos'],
-            key='nivel_visualizacao_selector',
-            help="Escolha o nível de agregação dos dados"
+            key='nivel_visualizacao_selector'
         )
         st.session_state.nivel_visualizacao = nivel_viz
-
-    # Preparar dados base usando a prova selecionada na SIDEBAR
-    df_drill_base = df.copy()  # Usa o df já filtrado pela sidebar (prova, fases, escolas, turmas)
-    metric_options = {}
-    metric_default_label = None
-    metrica_col = None
-    metrica_axis_title = None
     
-    # Filtrar por coorte se selecionado (e se a coluna existir)
+    # Preparar dados
+    df_drill_base = df.copy()
+    
+    # Filtrar por coorte
     if coorte_drill != 'Todas':
-        # Verificar quais colunas de coorte existem (prioridade: anonimizado > origem > padrão)
         if 'coorte_anonimizado' in df_drill_base.columns:
             col_coorte = 'coorte_anonimizado'
         elif 'Coorte_Origem' in df_drill_base.columns:
@@ -591,7 +1058,6 @@ if not df.empty:
         elif 'Coorte' in df_drill_base.columns:
             col_coorte = 'Coorte'
         else:
-            st.warning(f"⚠️ Coluna de coorte não encontrada. Colunas disponíveis: {list(df_drill_base.columns)}")
             col_coorte = None
         
         if col_coorte:
@@ -610,9 +1076,9 @@ if not df.empty:
     
     if colunas_validas:
         if 'turma_anonimizado' in df_drill_base.columns:
-            col_turma = 'turma_anonimizado'
+            col_turma_h = 'turma_anonimizado'
         elif 'Turma' in df_drill_base.columns:
-            col_turma = 'Turma'
+            col_turma_h = 'Turma'
         else:
             st.error("❌ Coluna de turma não encontrada")
             colunas_validas = False
@@ -642,8 +1108,8 @@ if not df.empty:
             df_drill_base['Delta'] = df_drill_base['Score_Pos'] - df_drill_base['Score_Pre']
             metric_options = {
                 'Delta (Pós - Pré)': 'Delta',
-                'Score Pré (Pré-Teste)': 'Score_Pre',
-                'Score Pós (Pós-Teste)': 'Score_Pos'
+                'Score Pré': 'Score_Pre',
+                'Score Pós': 'Score_Pos'
             }
             metric_default_label = 'Delta (Pós - Pré)'
         elif 'pontuacao_total' in df_drill_base.columns:
@@ -652,7 +1118,7 @@ if not df.empty:
         else:
             st.error("❌ Colunas de pontuação não encontradas")
             colunas_validas = False
-
+    
     if colunas_validas and metric_options:
         metric_labels = list(metric_options.keys())
         if metric_default_label is None or metric_default_label not in metric_labels:
@@ -662,47 +1128,35 @@ if not df.empty:
         elif st.session_state.metric_parallel_selector not in metric_labels:
             st.session_state.metric_parallel_selector = metric_default_label
         default_index = metric_labels.index(st.session_state.metric_parallel_selector)
+        
         metrica_label = st.selectbox(
             "📐 Métrica Longitudinal:",
             options=metric_labels,
             index=default_index,
-            key='metric_parallel_selector',
-            help="Escolha a métrica usada nas trajetórias (Diferença Pós-Pré ou valores absolutos)."
+            key='metric_parallel_selector'
         )
         metrica_col = metric_options[metrica_label]
         metrica_axis_title = metrica_label
-
-    if metrica_axis_title is None and metrica_col is not None:
-        metrica_axis_title = metrica_col
-
-    if colunas_validas and metrica_col is None:
-        st.error("❌ Nenhuma métrica disponível para esta visualização.")
-        colunas_validas = False
-
+    
     if not colunas_validas:
-        st.info("⚠️ A visualização não está disponível para esta configuração de dados.")
+        st.info("⚠️ Visualização não disponível para esta configuração")
     elif df_drill_base.empty:
-        coorte_texto = coorte_drill if coorte_drill != 'Todas' else 'filtros selecionados'
-        st.warning(f"⚠️ Nenhum dado disponível para {prova_sel} com {coorte_texto}.")
+        st.warning(f"⚠️ Nenhum dado disponível para {prova_sel}")
     else:
-        
-        
-        # Criar visualização de coordenadas paralelas usando Altair
         try:
             import altair as alt
             
-            # Preparar dados baseado no nível de visualização
+            # Preparar dados
             if nivel_viz == 'Escolas':
                 col_agrupamento = col_escola
                 label_entidade = 'Escola'
             elif nivel_viz == 'Turmas':
-                col_agrupamento = col_turma
+                col_agrupamento = col_turma_h
                 label_entidade = 'Turma'
-            else:  # Alunos
+            else:
                 col_agrupamento = col_aluno
                 label_entidade = 'Aluno'
             
-            # Agregar dados por entidade e fase
             df_viz = df_drill_base.groupby([col_agrupamento, col_fase])[metrica_col].mean().reset_index()
             df_viz = df_viz.rename(columns={col_agrupamento: 'Entidade', col_fase: 'Fase', metrica_col: 'Valor'})
             
@@ -712,44 +1166,47 @@ if not df.empty:
             
             with col_filtro1:
                 todas_escolas = sorted(df_drill_base[col_escola].dropna().unique())
+                # Filtrar defaults que ainda existem nas opções
+                defaults_validos_escolas = [e for e in st.session_state.escolas_filtradas if e in todas_escolas]
                 escolas_selecionadas = st.multiselect(
                     "🏫 Filtrar Escolas:",
                     options=todas_escolas,
-                    default=st.session_state.escolas_filtradas if st.session_state.escolas_filtradas else [],
+                    default=defaults_validos_escolas,
                     key='filtro_escolas_parallel'
                 )
                 st.session_state.escolas_filtradas = escolas_selecionadas
             
-            # Aplicar filtro de escolas
             df_drill_filtrado = df_drill_base.copy()
             if escolas_selecionadas:
                 df_drill_filtrado = df_drill_filtrado[df_drill_filtrado[col_escola].isin(escolas_selecionadas)]
             
             with col_filtro2:
-                turmas_selecionadas = []  # Inicializar para evitar erro no caption posterior
+                turmas_selecionadas = []
                 if nivel_viz in ['Turmas', 'Alunos']:
-                    todas_turmas = sorted(df_drill_filtrado[col_turma].dropna().unique())
+                    todas_turmas = sorted(df_drill_filtrado[col_turma_h].dropna().unique())
+                    # Filtrar defaults que ainda existem nas opções
+                    defaults_validos = [t for t in st.session_state.turmas_filtradas if t in todas_turmas]
                     turmas_selecionadas = st.multiselect(
                         "🎓 Filtrar Turmas:",
                         options=todas_turmas,
-                        default=st.session_state.turmas_filtradas if st.session_state.turmas_filtradas else [],
+                        default=defaults_validos,
                         key='filtro_turmas_parallel',
                         disabled=not escolas_selecionadas
                     )
                     st.session_state.turmas_filtradas = turmas_selecionadas
                     
                     if turmas_selecionadas:
-                        df_drill_filtrado = df_drill_filtrado[df_drill_filtrado[col_turma].isin(turmas_selecionadas)]
+                        df_drill_filtrado = df_drill_filtrado[df_drill_filtrado[col_turma_h].isin(turmas_selecionadas)]
                 else:
                     st.info("👈 Disponível ao visualizar Turmas ou Alunos")
             
             with col_filtro3:
-                alunos_selecionados = []  # Inicializar para evitar erro no caption posterior
+                alunos_selecionados = []
                 if nivel_viz == 'Alunos':
                     todos_alunos = sorted(df_drill_filtrado[col_aluno].dropna().unique())
                     alunos_selecionados = st.multiselect(
                         "👨‍🎓 Filtrar Alunos:",
-                        options=todos_alunos[:50],  # Limitar a 50 para performance
+                        options=todos_alunos[:50],
                         key='filtro_alunos_parallel',
                         disabled=not turmas_selecionadas
                     )
@@ -759,30 +1216,24 @@ if not df.empty:
                 else:
                     st.info("👈 Disponível ao visualizar Alunos")
             
-            # Reagregar dados após filtros
+            # Reagregar
             df_viz = df_drill_filtrado.groupby([col_agrupamento, col_fase])[metrica_col].mean().reset_index()
             df_viz = df_viz.rename(columns={col_agrupamento: 'Entidade', col_fase: 'Fase', metrica_col: 'Valor'})
             
             if df_viz.empty:
-                st.warning("⚠️ Nenhum dado disponível com os filtros selecionados.")
+                st.warning("⚠️ Nenhum dado com os filtros selecionados")
             else:
-                # Criar gráfico de coordenadas paralelas com Altair
-                st.markdown(f"#### 📊 Trajetórias de {label_entidade}s ao Longo das Fases ({metrica_axis_title})")
+                st.markdown(f"#### 📊 Trajetórias de {label_entidade}s")
                 
-                # Pivot para formato wide (necessário para parallel coordinates)
                 df_wide = df_viz.pivot(index='Entidade', columns='Fase', values='Valor').reset_index()
-                
-                # Criar lista de colunas de fase disponíveis
                 fases_disponiveis = [col for col in df_wide.columns if col != 'Entidade']
                 
                 if len(fases_disponiveis) < 2:
-                    st.warning("⚠️ Necessário pelo menos 2 fases para visualização de trajetórias.")
+                    st.warning("⚠️ Necessário pelo menos 2 fases")
                 else:
-                    # Transformar para formato longo novamente para Altair
                     df_plot = df_viz.copy()
                     df_plot['Fase'] = df_plot['Fase'].astype(str)
                     
-                    # Criar gráfico com Altair
                     brush = alt.selection_interval(encodings=['y'])
                     
                     base = alt.Chart(df_plot).mark_line(
@@ -801,12 +1252,11 @@ if not df.empty:
                         ],
                         opacity=alt.condition(brush, alt.value(0.8), alt.value(0.2))
                     ).properties(
-                        width=800,
-                        height=500,
+                        width=700,
+                        height=400,
                         title=f'Evolução de {label_entidade}s: {prova_sel} - {coorte_drill}'
                     ).add_params(brush)
                     
-                    # Adicionar linha de média
                     media_por_fase = df_plot.groupby('Fase')['Valor'].mean().reset_index()
                     
                     linha_media = alt.Chart(media_por_fase).mark_line(
@@ -841,18 +1291,14 @@ if not df.empty:
                     
                     st.altair_chart(chart_final, use_container_width=True)
                     
-                    # Estatísticas da seleção
+                    # Estatísticas
                     st.markdown("#### 📈 Estatísticas da Seleção")
                     col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                     
                     n_entidades = df_viz['Entidade'].nunique()
-                    
-                    # Contar alunos únicos nos dados filtrados (importante para ver impacto do filtro de coorte)
                     n_alunos_unicos = df_drill_filtrado[col_aluno].nunique() if col_aluno in df_drill_filtrado.columns else 0
-                    
                     media_geral = df_viz['Valor'].mean()
                     
-                    # Calcular tendência (comparar primeira e última fase)
                     fases_ord = sorted(df_viz['Fase'].unique())
                     if len(fases_ord) >= 2:
                         primeira_fase = df_viz[df_viz['Fase'] == fases_ord[0]]['Valor'].mean()
@@ -866,83 +1312,52 @@ if not df.empty:
                     variancia = df_viz['Valor'].std()
                     
                     with col_stat1:
-                        # Mostrar número de entidades E número de alunos únicos
                         valor_card1 = f"{n_entidades} / {n_alunos_unicos}"
                         titulo_card1 = f"{label_entidade}s / Alunos"
-                        
-                        st.markdown(
-                            criar_metric_card(
-                                valor=valor_card1,
-                                titulo=titulo_card1,
-                                icone="fas fa-layer-group",
-                                cor_box=(52, 152, 219),
-                                cor_fonte=(255, 255, 255)
-                            ),
-                            unsafe_allow_html=True
-                        )
+                        st.markdown(criar_metric_card(
+                            valor=valor_card1,
+                            titulo=titulo_card1,
+                            icone="fas fa-layer-group",
+                            cor_box=(52, 152, 219),
+                            cor_fonte=(255, 255, 255)
+                        ), unsafe_allow_html=True)
                     
                     with col_stat2:
-                        st.markdown(
-                            criar_metric_card(
-                                valor=f"{media_geral:.2f}",
-                                titulo=f"{metrica_axis_title} Médio",
-                                icone="fas fa-chart-line",
-                                cor_box=(46, 204, 113),
-                                cor_fonte=(255, 255, 255)
-                            ),
-                            unsafe_allow_html=True
-                        )
+                        st.markdown(criar_metric_card(
+                            valor=f"{media_geral:.2f}",
+                            titulo=f"{metrica_axis_title} Médio",
+                            icone="fas fa-chart-line",
+                            cor_box=(46, 204, 113),
+                            cor_fonte=(255, 255, 255)
+                        ), unsafe_allow_html=True)
                     
                     with col_stat3:
-                        st.markdown(
-                            criar_metric_card(
-                                valor=f"{tendencia_icon} {tendencia:+.2f}",
-                                titulo="Tendência",
-                                icone="fas fa-arrow-trend-up" if tendencia > 0 else "fas fa-arrow-trend-down",
-                                cor_box=(155, 89, 182),
-                                cor_fonte=(255, 255, 255)
-                            ),
-                            unsafe_allow_html=True
-                        )
+                        st.markdown(criar_metric_card(
+                            valor=f"{tendencia_icon} {tendencia:+.2f}",
+                            titulo="Tendência",
+                            icone="fas fa-arrow-trend-up" if tendencia > 0 else "fas fa-arrow-trend-down",
+                            cor_box=(155, 89, 182),
+                            cor_fonte=(255, 255, 255)
+                        ), unsafe_allow_html=True)
                     
                     with col_stat4:
-                        st.markdown(
-                            criar_metric_card(
-                                valor=f"±{variancia:.2f}",
-                                titulo="Variabilidade",
-                                icone="fas fa-chart-area",
-                                cor_box=(230, 126, 34),
-                                cor_fonte=(255, 255, 255)
-                            ),
-                            unsafe_allow_html=True
-                        )
-                    
-                    # Informativo sobre os dados das estatísticas
-                    filtros_ativos = []
-                    if coorte_drill != 'Todas':
-                        filtros_ativos.append(f"**{coorte_drill}**")
-                    if escolas_selecionadas:
-                        filtros_ativos.append(f"**{len(escolas_selecionadas)} escola(s)**")
-                    if nivel_viz in ['Turmas', 'Alunos'] and turmas_selecionadas:
-                        filtros_ativos.append(f"**{len(turmas_selecionadas)} turma(s)**")
-                    if nivel_viz == 'Alunos' and alunos_selecionados:
-                        filtros_ativos.append(f"**{len(alunos_selecionados)} aluno(s)**")
-                    
-                    if filtros_ativos:
-                        st.caption(f"📊 Estatísticas calculadas com base nos filtros: {', '.join(filtros_ativos)}")
-                    else:
-                        st.caption(f"📊 Estatísticas calculadas com todos os dados de **{prova_sel}**")
+                        st.markdown(criar_metric_card(
+                            valor=f"±{variancia:.2f}",
+                            titulo="Variabilidade",
+                            icone="fas fa-chart-area",
+                            cor_box=(230, 126, 34),
+                            cor_fonte=(255, 255, 255)
+                        ), unsafe_allow_html=True)
         
         except ImportError:
-            st.error("❌ Biblioteca Altair não encontrada. Instale com: `pip install altair`")
-            st.info("💡 Usando visualização alternativa com Plotly...")
+            st.error("❌ Altair não encontrada")
+            st.info("💡 Usando Plotly...")
             
-            # Fallback para Plotly se Altair não estiver disponível
             if nivel_viz == 'Escolas':
                 col_agrupamento = col_escola
                 label_entidade = 'Escola'
             elif nivel_viz == 'Turmas':
-                col_agrupamento = col_turma
+                col_agrupamento = col_turma_h
                 label_entidade = 'Turma'
             else:
                 col_agrupamento = col_aluno
@@ -967,274 +1382,120 @@ if not df.empty:
             fig.update_layout(height=500)
             st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
+st.markdown("---")
 
-# ================= ANÁLISE GRANULAR POR QUESTÃO ==================
-st.markdown("### Análise Granular por Questão")
-st.caption("Análise detalhada do desempenho por questão específica, mostrando evolução e competências melhor assimiladas.")
-
-if not df.empty:
-    # Identificar colunas de questões (Q1_Pre, Q1_Pos, Q2_Pre, Q2_Pos, etc.)
-    questao_cols = [col for col in df.columns if col.startswith('Q') and ('_Pre' in col or '_Pos' in col)]
+# ========== EVOLUÇÃO INDIVIDUAL (EXPANDER) ==========
+with st.expander("👨‍🎓 **EVOLUÇÃO INDIVIDUAL**", expanded=False):
+    # Filtro de aluno baseado nos filtros principais (Prova, Fases, Escolas)
+    st.markdown("**Selecione um aluno para análise individual:**")
     
-    if questao_cols:
-        # Extrair números das questões disponíveis
-        questoes_nums = set()
-        for col in questao_cols:
-            if '_Pre' in col:
-                q_num = col.split('_Pre')[0]
-                questoes_nums.add(q_num)
+    # Criar dicionário com IDs e suas fases participadas
+    if not df.empty:
+        aluno_fases = df.groupby('ID_Anonimizado')['Fase'].apply(
+            lambda x: ', '.join(sorted([str(int(f)) for f in x.dropna().unique()]))
+        ).to_dict()
         
-        questoes_nums = sorted(list(questoes_nums), key=lambda x: int(x[1:]))  # Ordenar Q1, Q2, Q3...
+        # Criar lista de opções formatadas: "ID - Fases: X, Y, Z"
+        opcoes_alunos = ["<selecione>"] + [
+            f"{id_aluno} - Fases: {fases}" 
+            for id_aluno, fases in sorted(aluno_fases.items())
+        ]
         
-        # 1. Calcular percentual de acerto por questão
-        analise_questoes = []
+        aluno_selecionado = st.selectbox(
+            "🔒 Aluno para Análise Individual",
+            opcoes_alunos,
+            key="aluno_individual_evolucao"
+        )
         
-        for q_num in questoes_nums:
-            col_pre = f"{q_num}_Pre"
-            col_pos = f"{q_num}_Pos"
-            
-            if col_pre in df.columns and col_pos in df.columns:
-                # Calcular percentuais (assumindo que 1 = acerto, 0 = erro)
-                pct_pre = (df[col_pre].sum() / df[col_pre].count()) * 100 if df[col_pre].count() > 0 else 0
-                pct_pos = (df[col_pos].sum() / df[col_pos].count()) * 100 if df[col_pos].count() > 0 else 0
-                variacao = pct_pos - pct_pre
-                
-                analise_questoes.append({
-                    'Questão': q_num,
-                    '% Acerto Pré': pct_pre,
-                    '% Acerto Pós': pct_pos,
-                    'Variação (%)': variacao
-                })
+        # Extrair apenas o ID do aluno da seleção
+        if aluno_selecionado != "<selecione>":
+            id_anonimizado_sel = aluno_selecionado.split(" - Fases:")[0]
+        else:
+            id_anonimizado_sel = "<selecione>"
+    else:
+        st.warning("⚠️ Nenhum aluno encontrado com os filtros selecionados")
+        id_anonimizado_sel = "<selecione>"
+    
+    st.markdown("---")
+    
+    if id_anonimizado_sel and id_anonimizado_sel != "<selecione>":
+        df_ind = df[df['ID_Anonimizado'] == id_anonimizado_sel].sort_values('Fase')
         
-        if analise_questoes:
-            df_analise = pd.DataFrame(analise_questoes)
+        if df_ind.empty:
+            st.info("Aluno não encontrado com filtros atuais")
+        else:
+            # Tabela detalhada
+            df_show = df_ind[['Fase','Escola','Turma','Score_Pre','Score_Pos']].copy()
+            df_show['Delta'] = df_show['Score_Pos'] - df_show['Score_Pre']
+            df_show = df_show.rename(columns={
+                'Score_Pre': 'Pré-Teste',
+                'Score_Pos': 'Pós-Teste'
+            })
             
-            # 2. Tabela de Evolução por Competência (ordenada pela maior variação)
-            df_analise_sorted = df_analise.sort_values('Variação (%)', ascending=False)
-            
-            st.markdown("#### Tabela de Evolução por Competência")
-            st.caption("Questões ordenadas pela maior variação (melhoria) no percentual de acerto")
-            
-            # Formatação da tabela com cores
-            def style_variacao(val):
+            def style_delta(val):
                 if pd.isna(val):
                     return ''
                 elif val > 0:
-                    return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold'  # Verde
-                elif val < 0:
-                    return 'background-color: #fdf2f2; color: #721c24; font-weight: bold'  # Vermelho
+                    return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold; border-left: 4px solid #28a745'
+                elif val == 0:
+                    return 'background-color: #f1f3f4; color: #495057; font-weight: bold; border-left: 4px solid #6c757d'
                 else:
-                    return 'background-color: #f1f3f4; color: #495057; font-weight: bold'  # Cinza
+                    return 'background-color: #fdf2f2; color: #721c24; font-weight: bold; border-left: 4px solid #dc3545'
             
-            styled_analise = (df_analise_sorted.style
-                             .map(style_variacao, subset=['Variação (%)'])
-                             .format({
-                                 '% Acerto Pré': '{:.1f}%',
-                                 '% Acerto Pós': '{:.1f}%',
-                                 'Variação (%)': '{:+.1f}%'
-                             }))
+            styled_df = (df_show.style
+                         .map(style_delta, subset=['Delta'])
+                         .format({
+                             'Pré-Teste': '{:.1f}',
+                             'Pós-Teste': '{:.1f}',
+                             'Delta': '{:+.1f}'
+                         }))
             
-            st.dataframe(styled_analise, use_container_width=True)
-            # 3. Gráfico de Evolução por Questão
-            st.markdown("#### Gráfico de Evolução por Questão")
-            st.caption("Comparação visual do desempenho pré vs pós por questão. Linhas conectam os percentuais, mostrando a evolução.")
+            st.dataframe(styled_df, use_container_width=True)
             
-            # Preparar dados para o gráfico lollipop
-            df_lollipop = df_analise.copy()
-            df_lollipop = df_lollipop.sort_values('Variação (%)', ascending=True)  # Melhor variação no topo
+            # Gráficos lado a lado
+            col_ev1, col_ev2 = st.columns(2)
             
-            # Criar gráfico lollipop usando plotly
-            fig_lollipop = go.Figure()
-            
-            # Adicionar linhas conectoras
-            for i, row in df_lollipop.iterrows():
-                fig_lollipop.add_trace(go.Scatter(
-                    x=[row['% Acerto Pré'], row['% Acerto Pós']],
-                    y=[row['Questão'], row['Questão']],
-                    mode='lines',
-                    line=dict(color='lightgray', width=2),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
-            
-            # Adicionar pontos do Pré-teste
-            fig_lollipop.add_trace(go.Scatter(
-                x=df_lollipop['% Acerto Pré'],
-                y=df_lollipop['Questão'],
-                mode='markers',
-                marker=dict(color='#dc3545', size=8),
-                name='Pré-Teste',
-                hovertemplate='<b>%{y}</b><br>Pré-Teste: %{x:.1f}%<extra></extra>'
-            ))
-            
-            # Adicionar pontos do Pós-teste
-            fig_lollipop.add_trace(go.Scatter(
-                x=df_lollipop['% Acerto Pós'],
-                y=df_lollipop['Questão'],
-                mode='markers',
-                marker=dict(color='#28a745', size=8),
-                name='Pós-Teste',
-                hovertemplate='<b>%{y}</b><br>Pós-Teste: %{x:.1f}%<extra></extra>'
-            ))
-            
-            # Adicionar linha horizontal separando questões com variação positiva/neutra das negativas
-            # Encontrar a posição da linha divisória (entre variação >= 0 e < 0)
-            questoes_positivas = df_lollipop[df_lollipop['Variação (%)'] >= 0]
-            questoes_negativas = df_lollipop[df_lollipop['Variação (%)'] < 0]
-            
-            if len(questoes_negativas) > 0 and len(questoes_positivas) > 0:
-                # Encontrar a posição entre a última questão negativa e a primeira positiva
-                ultima_negativa_idx = df_lollipop[df_lollipop['Variação (%)'] < 0].index[-1]
-                primeira_positiva_idx = df_lollipop[df_lollipop['Variação (%)'] >= 0].index[0]
+            with col_ev1:
+                long_scores = (df_ind.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos'],
+                                          var_name='Momento', value_name='Score')
+                                     .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}))
                 
-                # Como os dados estão ordenados por variação crescente, a linha vai entre essas posições
-                posicao_linha = (df_lollipop.index.get_loc(ultima_negativa_idx) + 
-                               df_lollipop.index.get_loc(primeira_positiva_idx)) / 2
+                fig_scores = px.line(long_scores, x='Fase', y='Score', color='Momento', markers=True,
+                                   title=f'Pré vs Pós - {id_anonimizado_sel}',
+                                   labels={'Momento': 'Teste'})
                 
-                # Adicionar linha horizontal
-                fig_lollipop.add_hline(
-                    y=posicao_linha,
-                    line_dash="dash",
-                    line_color="orange",
-                    line_width=2,
-                    opacity=0.7,
-                    annotation_text="Limite Melhoria/Declínio",
-                    annotation_position="top right",
-                    annotation_font_size=12,
-                    annotation_font_color="orange"
+                fig_scores.update_layout(
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=[2, 3, 4],
+                        ticktext=['2', '3', '4'],
+                        title='Fase'
+                    )
                 )
+                st.plotly_chart(fig_scores, use_container_width=True)
             
-            fig_lollipop.update_layout(
-                title='Evolução do Percentual de Acerto por Questão',
-                xaxis_title='Percentual de Acerto (%)',
-                yaxis_title='Questão',
-                showlegend=True,
-                height=max(400, len(questoes_nums) * 25),  # Altura dinâmica baseada no número de questões
-                margin=dict(l=80, r=20, t=60, b=40)
-            )
-            
-            st.plotly_chart(fig_lollipop, use_container_width=True)
-            
-            # Insights adicionais
-            with st.expander("💡 Análise Granular", expanded=False):
-                melhor_questao = df_analise_sorted.iloc[0]
-                pior_questao = df_analise_sorted.iloc[-1]
-                media_variacao = df_analise['Variação (%)'].mean()
+            with col_ev2:
+                df_delta = df_ind.copy()
+                df_delta['Delta'] = df_delta['Score_Pos'] - df_delta['Score_Pre']
                 
-                st.markdown(f"""
-                **📈 Maior Melhoria:** {melhor_questao['Questão']} com variação de **{melhor_questao['Variação (%)']:+.1f}%**
+                fig_delta = px.line(df_delta, x='Fase', y='Delta', markers=True,
+                                  title=f'Delta - {id_anonimizado_sel}',
+                                  labels={'Delta': 'Delta (Pós - Pré)'})
                 
-                **📉 Menor Melhoria:** {pior_questao['Questão']} com variação de **{pior_questao['Variação (%)']:+.1f}%**
+                fig_delta.update_layout(
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=[2, 3, 4],
+                        ticktext=['2', '3', '4'],
+                        title='Fase'
+                    )
+                )
+                fig_delta.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
                 
-                **📊 Variação Média:** **{media_variacao:+.1f}%** entre todas as questões
-                
-                **🎯 Questões com Melhoria Significativa (>10% na variação):** {len(df_analise[df_analise['Variação (%)'] > 10])} questões
-                
-                **⚠️ Questões com Declínio:** {len(df_analise[df_analise['Variação (%)'] < 0])} questões
-                """)
-        else:
-            st.info("Não foram encontradas questões com dados válidos para análise.")
+                st.plotly_chart(fig_delta, use_container_width=True)
     else:
-        st.info("Dataset não contém colunas de questões individuais (Q1_Pre, Q1_Pos, etc.).")
-else:
-    st.info("Nenhum dado disponível para análise granular.")
+        st.info("� Selecione um aluno na lista acima para visualizar sua evolução individual detalhada")
 
-# ================= EVOLUÇÃO INDIVIDUAL ==================
-st.subheader("Evolução Individual (Pré vs Pós por Fase)")
-if id_anonimizado_sel and id_anonimizado_sel != "<selecione>":
-    df_ind = df[df['ID_Anonimizado'] == id_anonimizado_sel].sort_values('Fase')
-    if df_ind.empty:
-        st.info("Aluno não encontrado com filtros atuais.")
-    else:
-        # Tabela detalhada
-        df_show = df_ind[['Fase','Escola','Turma','Score_Pre','Score_Pos']].copy()
-        df_show['Delta'] = df_show['Score_Pos'] - df_show['Score_Pre']
-        # Renomear colunas para nomes mais amigáveis
-        df_show = df_show.rename(columns={
-            'Score_Pre': 'Pré-Teste',
-            'Score_Pos': 'Pós-Teste'
-        })
-        
-        # Função para estilizar a coluna Delta com cores melhoradas e fonte em negrito
-        def style_delta(val):
-            if pd.isna(val):
-                return ''
-            elif val > 0:
-                return 'background-color: #e8f5e8; color: #2d5016; font-weight: bold; border-left: 4px solid #28a745'  # Verde mais suave
-            elif val == 0:
-                return 'background-color: #f1f3f4; color: #495057; font-weight: bold; border-left: 4px solid #6c757d'  # Cinza neutro
-            else:  # val < 0
-                return 'background-color: #fdf2f2; color: #721c24; font-weight: bold; border-left: 4px solid #dc3545'  # Vermelho mais suave
-        
-        # Aplicar estilo à tabela com formatação de números
-        styled_df = (df_show.style
-                     .map(style_delta, subset=['Delta'])
-                     .format({
-                         'Pré-Teste': '{:.1f}',
-                         'Pós-Teste': '{:.1f}',
-                         'Delta': '{:+.1f}'  # Formato com sinal + ou -
-                     }))
-        st.dataframe(styled_df, use_container_width=True)
-
-        # Gráficos lado a lado: Pré/Pós-Teste e Delta
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Gráfico de Pré-Teste vs Pós-Teste (sem Delta)
-            long_scores = (df_ind.melt(id_vars=['Fase'], value_vars=['Score_Pre','Score_Pos'],
-                                      var_name='Momento', value_name='Score')
-                                 .replace({'Score_Pre':'Pré-Teste','Score_Pos':'Pós-Teste'}))
-            
-            fig_scores = px.line(long_scores, x='Fase', y='Score', color='Momento', markers=True,
-                               title=f'Evolução Pré vs Pós - {id_anonimizado_sel}',
-                               labels={'Momento': 'Teste'})
-            
-            # Configurar eixo X com ticks discretos
-            fig_scores.update_layout(
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=[2, 3, 4],
-                    ticktext=['2', '3', '4'],
-                    title='Fase'
-                )
-            )
-            st.plotly_chart(fig_scores, use_container_width=True)
-        
-        with col2:
-            # Gráfico somente do Delta
-            df_delta = df_ind.copy()
-            df_delta['Delta'] = df_delta['Score_Pos'] - df_delta['Score_Pre']
-            
-            fig_delta = px.line(df_delta, x='Fase', y='Delta', markers=True,
-                              title=f'Evolução Delta - {id_anonimizado_sel}',
-                              labels={'Delta': 'Delta (Pós - Pré)'})
-            
-            # Configurar eixo X com ticks discretos e adicionar linha zero de referência
-            fig_delta.update_layout(
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=[2, 3, 4],
-                    ticktext=['2', '3', '4'],
-                    title='Fase'
-                )
-            )
-            # Adicionar linha horizontal no zero para referência
-            fig_delta.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-            
-            st.plotly_chart(fig_delta, use_container_width=True)
-
-        # Deltas
-        # fig_delta = px.bar(df_show, x='Fase', y='Delta', title='Delta (Pós - Pré) por Fase',
-        #                    text='Delta')
-        # st.plotly_chart(fig_delta, use_container_width=True)
-else:
-    st.info("Selecione um aluno para ver evolução individual.")
-
-# (Seção de continuidade longitudinal removida conforme solicitação do usuário)
-# (Seção de distribuição de deltas removida conforme solicitação do usuário)
-
-# ================= FOOTER ==================
+# ========== FOOTER ==========
 st.markdown("---")
-st.caption("Dashboard desenvolvido por Elton Sarmanho • Utilize filtros na barra lateral para refinar a análise.")
-
+st.caption("Dashboard desenvolvido por Elton Sarmanho • Utilize filtros no topo para refinar a análise")
