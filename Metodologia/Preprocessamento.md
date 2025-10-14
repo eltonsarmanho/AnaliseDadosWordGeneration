@@ -32,7 +32,6 @@ graph TD
     style K fill:#fff3cd
 ```
 
-![Diagrama de Pré-processamento](Preprocessamento.png)
 
 ---
 
