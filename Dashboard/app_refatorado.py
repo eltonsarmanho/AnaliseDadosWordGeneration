@@ -728,18 +728,6 @@ if not df.empty:
                         palavras_teste = df_analise_sorted['Palavra'].tolist()
                         palavras_matched = [p for p in palavras_teste if palavra_ensinada_match(p, palavras_ensinadas_todas)]
                         
-                        # 🔍 DEBUG MODE: Mostrar análise detalhada
-                        DEBUG_MODE = True
-                        if DEBUG_MODE:
-                            st.info("**🔍 DEBUG MODE - Análise de Correspondências**")
-                            col_d1, col_d2 = st.columns(2)
-                            with col_d1:
-                                st.write(f"**Palavras Detectadas ({len(palavras_matched)}):**")
-                                st.write(", ".join(sorted(palavras_matched)))
-                            with col_d2:
-                                st.write(f"**Palavras Ensinadas ({len(palavras_ensinadas_todas)}):**")
-                                st.write(", ".join(sorted(palavras_ensinadas_todas)))
-                        
                         st.caption(f"🟡 *Palavras destacadas em amarelo foram ensinadas no WordGen ({len(palavras_matched)} de {len(palavras_teste)} palavras do teste)*")
                         
                         # Debug: mostrar algumas correspondências (apenas em desenvolvimento)
