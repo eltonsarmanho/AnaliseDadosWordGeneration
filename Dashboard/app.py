@@ -7,6 +7,7 @@ from data_loader import get_datasets
 import unicodedata, re, math
 import numpy as np
 from datetime import datetime, date
+import altair as alt
 
 st.set_page_config(
     page_title="Dashboard Longitudinal WordGen", 
@@ -440,38 +441,50 @@ with tab_dist:
             st.markdown("#### Distribuição por Sexo")
             
             if 'Sexo' in df.columns and not df['Sexo'].isna().all():
-                import plotly.express as px
-                
                 # Contar alunos únicos por sexo
                 dist_sexo = df.groupby('Sexo')['ID_Unico'].nunique().reset_index()
                 dist_sexo.columns = ['Sexo', 'Quantidade']
                 dist_sexo['Percentual'] = (dist_sexo['Quantidade'] / dist_sexo['Quantidade'].sum() * 100).round(1)
+                dist_sexo['Label'] = dist_sexo.apply(
+                    lambda row: f"{row['Quantidade']} ({row['Percentual']}%)", axis=1
+                )
                 
-                fig_sexo = px.bar(
-                    dist_sexo, 
-                    x='Sexo', 
-                    y='Quantidade',
-                    text='Quantidade',
-                    color='Sexo',
-                    color_discrete_map={'Masculino': '#636EFA', 'Feminino': '#EF553B'},
-                    labels={'Quantidade': 'Número de Alunos'},
+                # Cores customizadas para cada sexo
+                color_scale = alt.Scale(
+                    domain=['Masculino', 'Feminino'],
+                    range=['#636EFA', '#EF553B']
+                )
+                
+                chart_sexo = alt.Chart(dist_sexo).mark_bar().encode(
+                    x=alt.X('Sexo:N', 
+                           title='Sexo',
+                           axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y('Quantidade:Q', 
+                           title='Número de Alunos'),
+                    color=alt.Color('Sexo:N', 
+                                   scale=color_scale,
+                                   legend=None),
+                    tooltip=[
+                        alt.Tooltip('Sexo:N', title='Sexo'),
+                        alt.Tooltip('Quantidade:Q', title='Alunos'),
+                        alt.Tooltip('Percentual:Q', title='Percentual (%)', format='.1f')
+                    ]
+                ).properties(
                     height=350
                 )
                 
-                fig_sexo.update_traces(
-                    texttemplate='%{text}<br>(%{customdata}%)',
-                    textposition='outside',
-                    customdata=dist_sexo['Percentual']
+                # Adicionar labels no topo das barras
+                text_sexo = chart_sexo.mark_text(
+                    align='center',
+                    baseline='bottom',
+                    dy=-5,
+                    fontSize=12,
+                    fontWeight='bold'
+                ).encode(
+                    text='Label:N'
                 )
                 
-                fig_sexo.update_layout(
-                    showlegend=False,
-                    xaxis_title="Sexo",
-                    yaxis_title="Número de Alunos",
-                    margin=dict(t=10, b=10, l=10, r=10)
-                )
-                
-                st.plotly_chart(fig_sexo, use_container_width=True)
+                st.altair_chart(chart_sexo + text_sexo, use_container_width=True)
             else:
                 st.info("📊 Dados de sexo não disponíveis para os filtros selecionados")
     
@@ -481,12 +494,13 @@ with tab_dist:
             st.markdown("#### Distribuição por Faixa Etária")
             
             if 'FaixaEtaria' in df.columns and not df['FaixaEtaria'].isna().all():
-                import plotly.express as px
-                
                 # Contar alunos únicos por faixa etária
                 dist_idade = df.groupby('FaixaEtaria')['ID_Unico'].nunique().reset_index()
                 dist_idade.columns = ['FaixaEtaria', 'Quantidade']
                 dist_idade['Percentual'] = (dist_idade['Quantidade'] / dist_idade['Quantidade'].sum() * 100).round(1)
+                dist_idade['Label'] = dist_idade.apply(
+                    lambda row: f"{row['Quantidade']} ({row['Percentual']}%)", axis=1
+                )
                 
                 # Ordenar as faixas corretamente
                 ordem_faixas = ['< 10 anos', '10-11 anos', '12-13 anos', '14-15 anos', '≥ 16 anos']
@@ -497,32 +511,37 @@ with tab_dist:
                 )
                 dist_idade = dist_idade.sort_values('FaixaEtaria')
                 
-                fig_idade = px.bar(
-                    dist_idade,
-                    x='FaixaEtaria',
-                    y='Quantidade',
-                    text='Quantidade',
-                    color='FaixaEtaria',
-                    color_discrete_sequence=px.colors.sequential.Viridis,
-                    labels={'Quantidade': 'Número de Alunos', 'FaixaEtaria': 'Faixa Etária'},
+                chart_idade = alt.Chart(dist_idade).mark_bar().encode(
+                    x=alt.X('FaixaEtaria:N',
+                           title='Faixa Etária',
+                           sort=ordem_faixas,
+                           axis=alt.Axis(labelAngle=-45)),
+                    y=alt.Y('Quantidade:Q',
+                           title='Número de Alunos'),
+                    color=alt.Color('FaixaEtaria:N',
+                                   scale=alt.Scale(scheme='viridis'),
+                                   legend=None),
+                    tooltip=[
+                        alt.Tooltip('FaixaEtaria:N', title='Faixa Etária'),
+                        alt.Tooltip('Quantidade:Q', title='Alunos'),
+                        alt.Tooltip('Percentual:Q', title='Percentual (%)', format='.1f')
+                    ]
+                ).properties(
                     height=350
                 )
                 
-                fig_idade.update_traces(
-                    texttemplate='%{text}<br>(%{customdata}%)',
-                    textposition='outside',
-                    customdata=dist_idade['Percentual']
+                # Adicionar labels
+                text_idade = chart_idade.mark_text(
+                    align='center',
+                    baseline='bottom',
+                    dy=-5,
+                    fontSize=11,
+                    fontWeight='bold'
+                ).encode(
+                    text='Label:N'
                 )
                 
-                fig_idade.update_layout(
-                    showlegend=False,
-                    xaxis_title="Faixa Etária",
-                    yaxis_title="Número de Alunos",
-                    xaxis_tickangle=-45,
-                    margin=dict(t=10, b=70, l=10, r=10)
-                )
-                
-                st.plotly_chart(fig_idade, use_container_width=True)
+                st.altair_chart(chart_idade + text_idade, use_container_width=True)
             else:
                 st.info("📊 Dados de idade não disponíveis para os filtros selecionados")
 
@@ -531,8 +550,6 @@ with tab_perf:
     st.markdown("#### Performance por Sexo (Pré vs Pós-Teste)")
     
     if 'Sexo' in df.columns and not df['Sexo'].isna().all():
-        import plotly.graph_objects as go
-        
         # Preparar dados em formato longo
         df_perf_sexo = df.melt(
             id_vars=['Sexo', 'ID_Unico'],
@@ -545,42 +562,81 @@ with tab_perf:
             'Score_Pos': 'Pós-Teste'
         })
         
-        fig_perf_sexo = px.box(
-            df_perf_sexo,
-            x='Sexo',
-            y='Score',
-            color='Momento',
-            color_discrete_map={'Pré-Teste': '#636EFA', 'Pós-Teste': '#EF553B'},
-            labels={'Score': 'Score', 'Sexo': 'Sexo'},
-            height=400,
-            points='outliers'
+        # Remover NaN para evitar problemas nos tooltips
+        df_perf_sexo = df_perf_sexo.dropna(subset=['Score'])
+        
+        # Calcular médias para cada grupo
+        medias_sexo = df_perf_sexo.groupby(['Sexo', 'Momento'], as_index=False)['Score'].mean()
+        medias_sexo.columns = ['Sexo', 'Momento', 'Media']
+        
+        # Criar escala de cores
+        color_scale = alt.Scale(
+            domain=['Pré-Teste', 'Pós-Teste'],
+            range=['#636EFA', '#EF553B']
         )
         
-        # Adicionar médias como linha pontilhada
-        for sexo in df_perf_sexo['Sexo'].unique():
-            for momento in ['Pré-Teste', 'Pós-Teste']:
-                media = df_perf_sexo[(df_perf_sexo['Sexo'] == sexo) & 
-                                     (df_perf_sexo['Momento'] == momento)]['Score'].mean()
-                if not np.isnan(media):
-                    # Adicionar anotação com a média
-                    fig_perf_sexo.add_annotation(
-                        x=sexo,
-                        y=media,
-                        text=f"μ={media:.1f}",
-                        showarrow=False,
-                        font=dict(size=10, color='white'),
-                        bgcolor='rgba(0,0,0,0.5)',
-                        borderpad=2
-                    )
-        
-        fig_perf_sexo.update_layout(
-            xaxis_title="Sexo",
-            yaxis_title="Score",
-            legend_title="Momento",
-            margin=dict(t=10, b=10, l=10, r=10)
+        # Escala de offset para separar os boxplots
+        offset_scale = alt.Scale(
+            domain=['Pré-Teste', 'Pós-Teste'],
+            range=[-50, 50]
         )
         
-        st.plotly_chart(fig_perf_sexo, use_container_width=True)
+        # Criar boxplot base
+        boxplot_sexo = alt.Chart(df_perf_sexo).mark_boxplot(
+            size=40,
+            opacity=0.7
+        ).encode(
+            x=alt.X('Sexo:N', title='Sexo', axis=alt.Axis(labelAngle=0)),
+            y=alt.Y('Score:Q', title='Score', scale=alt.Scale(zero=False)),
+            color=alt.Color('Momento:N', scale=color_scale, legend=alt.Legend(title='Momento')),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+        ).properties(
+            height=400
+        )
+        
+        # Adicionar círculos com as médias
+        pontos_media_sexo = alt.Chart(medias_sexo).mark_point(
+            size=100,
+            filled=True,
+            opacity=0.9,
+            stroke='white',
+            strokeWidth=2
+        ).encode(
+            x=alt.X('Sexo:N'),
+            y=alt.Y('Media:Q'),
+            color=alt.Color('Momento:N', scale=color_scale, legend=None),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+            tooltip=[
+                alt.Tooltip('Sexo:N', title='Sexo'),
+                alt.Tooltip('Momento:N', title='Momento'),
+                alt.Tooltip('Media:Q', title='Média', format='.2f')
+            ]
+        )
+        
+        # Adicionar labels de média acima dos círculos
+        text_media_sexo = alt.Chart(medias_sexo).mark_text(
+            align='center',
+            baseline='bottom',
+            dy=-12,
+            fontSize=11,
+            fontWeight='bold'
+        ).encode(
+            x=alt.X('Sexo:N'),
+            y=alt.Y('Media:Q'),
+            text=alt.Text('Media:Q', format='.1f'),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+            color=alt.value('black')
+        )
+        
+        chart_final_sexo = (boxplot_sexo + pontos_media_sexo + text_media_sexo).configure_axis(
+            labelFontSize=11,
+            titleFontSize=13
+        ).configure_legend(
+            titleFontSize=12,
+            labelFontSize=11
+        )
+        
+        st.altair_chart(chart_final_sexo, use_container_width=True)
         
         # Estatísticas por sexo
         col_stat1, col_stat2 = st.columns(2)
@@ -602,8 +658,6 @@ with tab_perf:
     st.markdown("#### Performance por Faixa Etária (Pré vs Pós-Teste)")
     
     if 'FaixaEtaria' in df.columns and not df['FaixaEtaria'].isna().all():
-        import plotly.express as px
-        
         # Preparar dados
         df_perf_idade = df.melt(
             id_vars=['FaixaEtaria', 'ID_Unico'],
@@ -616,6 +670,9 @@ with tab_perf:
             'Score_Pos': 'Pós-Teste'
         })
         
+        # Remover NaN para evitar problemas nos tooltips
+        df_perf_idade = df_perf_idade.dropna(subset=['Score', 'FaixaEtaria'])
+        
         # Ordenar faixas
         ordem_faixas = ['< 10 anos', '10-11 anos', '12-13 anos', '14-15 anos', '≥ 16 anos']
         df_perf_idade['FaixaEtaria'] = pd.Categorical(
@@ -625,26 +682,85 @@ with tab_perf:
         )
         df_perf_idade = df_perf_idade.sort_values('FaixaEtaria')
         
-        fig_perf_idade = px.box(
-            df_perf_idade,
-            x='FaixaEtaria',
-            y='Score',
-            color='Momento',
-            color_discrete_map={'Pré-Teste': '#636EFA', 'Pós-Teste': '#EF553B'},
-            labels={'Score': 'Score', 'FaixaEtaria': 'Faixa Etária'},
-            height=400,
-            points='outliers'
+        # Calcular médias
+        medias_idade = df_perf_idade.groupby(['FaixaEtaria', 'Momento'], as_index=False)['Score'].mean()
+        medias_idade.columns = ['FaixaEtaria', 'Momento', 'Media']
+        
+        # Criar escala de cores
+        color_scale = alt.Scale(
+            domain=['Pré-Teste', 'Pós-Teste'],
+            range=['#636EFA', '#EF553B']
         )
         
-        fig_perf_idade.update_layout(
-            xaxis_title="Faixa Etária",
-            yaxis_title="Score",
-            legend_title="Momento",
-            xaxis_tickangle=-45,
-            margin=dict(t=10, b=70, l=10, r=10)
+        # Escala de offset
+        offset_scale = alt.Scale(
+            domain=['Pré-Teste', 'Pós-Teste'],
+            range=[-35, 35]
         )
         
-        st.plotly_chart(fig_perf_idade, use_container_width=True)
+        # Criar boxplot
+        boxplot_idade = alt.Chart(df_perf_idade).mark_boxplot(
+            size=30,
+            opacity=0.7
+        ).encode(
+            x=alt.X('FaixaEtaria:N', 
+                   title='Faixa Etária',
+                   sort=ordem_faixas,
+                   axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y('Score:Q', 
+                   title='Score',
+                   scale=alt.Scale(zero=False)),
+            color=alt.Color('Momento:N', 
+                           scale=color_scale,
+                           legend=alt.Legend(title='Momento')),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale)
+        ).properties(
+            height=400
+        )
+        
+        # Adicionar círculos com as médias
+        pontos_media_idade = alt.Chart(medias_idade).mark_point(
+            size=80,
+            filled=True,
+            opacity=0.9,
+            stroke='white',
+            strokeWidth=2
+        ).encode(
+            x=alt.X('FaixaEtaria:N', sort=ordem_faixas),
+            y=alt.Y('Media:Q'),
+            color=alt.Color('Momento:N', scale=color_scale, legend=None),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+            tooltip=[
+                alt.Tooltip('FaixaEtaria:N', title='Faixa Etária'),
+                alt.Tooltip('Momento:N', title='Momento'),
+                alt.Tooltip('Media:Q', title='Média', format='.2f')
+            ]
+        )
+        
+        # Adicionar labels de média acima dos círculos
+        text_media_idade = alt.Chart(medias_idade).mark_text(
+            align='center',
+            baseline='bottom',
+            dy=-12,
+            fontSize=10,
+            fontWeight='bold'
+        ).encode(
+            x=alt.X('FaixaEtaria:N', sort=ordem_faixas),
+            y=alt.Y('Media:Q'),
+            text=alt.Text('Media:Q', format='.1f'),
+            xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+            color=alt.value('black')
+        )
+        
+        chart_final_idade = (boxplot_idade + pontos_media_idade + text_media_idade).configure_axis(
+            labelFontSize=11,
+            titleFontSize=13
+        ).configure_legend(
+            titleFontSize=12,
+            labelFontSize=11
+        )
+        
+        st.altair_chart(chart_final_idade, use_container_width=True)
         
         # Tabela de estatísticas por faixa etária
         st.markdown("**Estatísticas por Faixa Etária**")
@@ -765,7 +881,9 @@ if not df.empty:
                     ).mark_point(
                         size=80,
                         filled=True,
-                        opacity=0.8
+                        opacity=0.9,
+                        stroke='white',
+                        strokeWidth=2
                     ).encode(
                         x=alt.X('Fase_str:N'),
                         y=alt.Y('Media:Q'),
@@ -779,7 +897,25 @@ if not df.empty:
                         ]
                     )
                     
-                    combined = alt.layer(boxplot_layer, pontos_media_layer).properties(
+                    # Adicionar labels de média acima dos círculos
+                    text_media_layer = base_chart.transform_aggregate(
+                        Media='mean(Score)',
+                        groupby=['Fase', 'Fase_str', coluna_turma, 'Momento']
+                    ).mark_text(
+                        align='center',
+                        baseline='bottom',
+                        dy=-12,
+                        fontSize=10,
+                        fontWeight='bold'
+                    ).encode(
+                        x=alt.X('Fase_str:N'),
+                        y=alt.Y('Media:Q'),
+                        text=alt.Text('Media:Q', format='.1f'),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                        color=alt.value('black')
+                    )
+                    
+                    combined = alt.layer(boxplot_layer, pontos_media_layer, text_media_layer).properties(
                         width=facet_width,
                         height=380
                     )
@@ -827,7 +963,9 @@ if not df.empty:
                     pontos_media = alt.Chart(medias).mark_point(
                         size=100,
                         filled=True,
-                        opacity=0.8
+                        opacity=0.9,
+                        stroke='white',
+                        strokeWidth=2
                     ).encode(
                         x=alt.X('Fase_str:N'),
                         y=alt.Y('Media:Q'),
@@ -840,9 +978,24 @@ if not df.empty:
                         ]
                     )
                     
+                    # Adicionar labels de média acima dos círculos
+                    text_media = alt.Chart(medias).mark_text(
+                        align='center',
+                        baseline='bottom',
+                        dy=-12,
+                        fontSize=10,
+                        fontWeight='bold'
+                    ).encode(
+                        x=alt.X('Fase_str:N'),
+                        y=alt.Y('Media:Q'),
+                        text=alt.Text('Media:Q', format='.1f'),
+                        xOffset=alt.XOffset('Momento:N', scale=offset_scale),
+                        color=alt.value('black')
+                    )
+                    
                     titulo = 'Distribuição Pré-Teste vs Pós-Teste por Fase'
                     
-                    chart_final = (boxplot + pontos_media).properties(
+                    chart_final = (boxplot + pontos_media + text_media).properties(
                         title=titulo
                     ).configure_axis(
                         labelFontSize=12,
@@ -1326,7 +1479,7 @@ with st.expander("📊 **DISTRIBUIÇÃO DE GANHOS INDIVIDUAIS**", expanded=False
                 st.altair_chart(chart_final, use_container_width=True)
                 
                 # Insights adicionais
-                st.markdown("#### 💡 Insights da Distribuição")
+                st.markdown("#### 💡 Sobre a Distribuição")
                 
                 col_insight1, col_insight2 = st.columns(2)
                 

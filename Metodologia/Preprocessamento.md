@@ -4,7 +4,7 @@ Este documento descreve as etapas detalhadas do pré-processamento dos dados col
 
 ## Visão Geral
 
-O pré-processamento é uma etapa fundamental para garantir a qualidade e consistência dos dados antes das análises estatísticas. O processo é dividido em **9 etapas principais** que são aplicadas sequencialmente aos dados brutos, além de uma etapa adicional de detecção de sexo por nome.
+O pré-processamento é uma etapa fundamental para garantir a qualidade e consistência dos dados antes das análises estatísticas. O processo é dividido em **10 etapas principais** que são aplicadas sequencialmente aos dados brutos, incluindo detecção de sexo e mapeamento de datas de aniversário.
 
 ---
 
@@ -21,21 +21,22 @@ graph TD
     G --> H[2.7: Criar IDs Únicos]
     H --> I[2.8: Verificar Presença Pré+Pós]
     I --> J[2.9: Detecção de Sexo]
-    J --> K{Validação Final}
-    K -->|Aprovado| L[Dados Consolidados]
-    K -->|Problemas| M[Revisão Manual]
-    M --> B
+    J --> K[2.10: Mapear Data Aniversário]
+    K --> L{Validação Final}
+    L -->|Aprovado| M[Dados Consolidados]
+    L -->|Problemas| N[Revisão Manual]
+    N --> B
     
     style A fill:#e1f5ff
-    style L fill:#d4edda
-    style M fill:#f8d7da
-    style K fill:#fff3cd
+    style M fill:#d4edda
+    style N fill:#f8d7da
+    style L fill:#fff3cd
 ```
 
 
 ---
 
-## **Pré-processamento Completo (8 etapas)**
+## **Pré-processamento Completo (10 etapas)**
 
 ### **2.1: Completar Dados Faltantes de Escola/Turma**
 
@@ -373,26 +374,213 @@ O sistema utiliza uma abordagem multi-camadas para maximizar precisão:
 
 ---
 
+### **2.10: Mapeamento e Inserção de Data de Aniversário**
+
+**Objetivo:** Enriquecer os datasets longitudinais com informações de data de nascimento dos alunos, permitindo análises demográficas por idade e faixa etária.
+
+**Fonte de Dados:**
+- Arquivos CSV em `Data/DadosGerais/`:
+  - `Dados1.csv`
+  - `Dados2.csv`
+  - `Dados3.csv`
+
+**Processo de Mapeamento:**
+
+O sistema realiza um matching robusto entre os nomes dos alunos nos datasets longitudinais e os dados de aniversário disponíveis nos arquivos gerais.
+
+**Etapas do Processo:**
+
+1. **Normalização de Nomes:**
+   - **Remoção de acentos:** NFD unicode normalization
+   - **Conversão para maiúsculas:** Uniformização de grafia
+   - **Remoção de caracteres especiais:** Hífens, apóstrofos, pontos
+   - **Padronização de espaços:** Múltiplos espaços → Espaço único
+   
+   ```python
+   Exemplo:
+   "José da Silva-Neto" → "JOSE DA SILVA NETO"
+   "Maria D'Angelo" → "MARIA DANGELO"
+   ```
+
+2. **Carregamento de Dados de Aniversário:**
+   - Leitura de todos os arquivos CSV em `Data/DadosGerais/`
+   - Identificação da coluna de nome (primeira coluna não vazia)
+   - Identificação da coluna de data (primeira coluna com padrão DD/MM/YYYY)
+   - Tratamento de arquivos malformados (skiprows automático)
+   - Construção de dicionário: `{nome_normalizado: data_aniversario}`
+
+3. **Matching e Inserção:**
+   - Para cada registro nos datasets longitudinais:
+     - Normalizar o nome do aluno
+     - Buscar correspondência no dicionário de aniversários
+     - Inserir data encontrada na coluna `DataAniversario`
+     - Manter vazio (não NA) se não encontrar correspondência
+
+4. **Backup Automático:**
+   - Criação de arquivo backup antes da modificação
+   - Formato: `{arquivo}.backup_antes_aniversario`
+   - Preservação dos dados originais
+
+**Resultados do Mapeamento:**
+
+**Dataset TDE (`TDE_longitudinal.csv`):**
+- Total de registros: 4,572
+- Registros com DataAniversario: 4,171 (91.2%)
+- Registros sem DataAniversario: 401 (8.8%)
+- Alunos únicos com data: ~3,600
+
+**Dataset Vocabulário (`vocabulario_longitudinal.csv`):**
+- Total de registros: 4,393
+- Registros com DataAniversario: 3,984 (90.7%)
+- Registros sem DataAniversario: 409 (9.3%)
+- Alunos únicos com data: ~3,500
+
+**Fonte de Dados de Aniversário:**
+- Total de datas únicas carregadas: 3,609
+- Arquivos processados: 2 (Dados2.csv, Dados3.csv)
+- Dados1.csv: Ignorado (formato inválido ou headers corrompidos)
+
+**Formato da Coluna Adicionada:**
+- **Nome:** `DataAniversario`
+- **Formato:** DD/MM/YYYY (ex: 17/03/2012)
+- **Tipo:** String
+- **Valores possíveis:**
+  - Data válida: "15/04/2010"
+  - Sem correspondência: "" (string vazia)
+
+**Utilização no Dashboard:**
+
+A coluna `DataAniversario` é usada para calcular dinamicamente:
+
+1. **Idade (anos completos):**
+   ```python
+   Idade = calcular_idade(DataAniversario, data_referencia=hoje)
+   ```
+   - Suporta formatos: DD/MM/YYYY e YYYY-MM-DD
+   - Ajusta para aniversários ainda não ocorridos no ano
+
+2. **Faixa Etária (5 grupos):**
+   ```python
+   FaixaEtaria = criar_faixas_etarias(Idade)
+   ```
+   - < 10 anos
+   - 10-11 anos
+   - 12-13 anos
+   - 14-15 anos
+   - ≥ 16 anos
+
+**Análises Demográficas Habilitadas:**
+
+Com a adição da data de aniversário, o dashboard oferece:
+
+1. **Filtros Demográficos:**
+   - Filtro por Sexo (Masculino/Feminino)
+   - Filtro por Faixa Etária (5 grupos)
+   - Filtro por Idade Específica (slider de range)
+
+2. **Visualizações de Distribuição:**
+   - Gráfico de barras: Distribuição por Sexo
+   - Gráfico de barras: Distribuição por Faixa Etária
+   - Percentuais e contagens absolutas
+
+3. **Análises de Performance:**
+   - Boxplots: Performance por Sexo (Pré vs Pós)
+   - Boxplots: Performance por Faixa Etária (Pré vs Pós)
+   - Estatísticas de ganho por grupo demográfico
+   - Identificação de disparidades de performance
+
+**Tratamento de Dados Ausentes:**
+
+- **Estratégia:** Análises demográficas excluem automaticamente registros sem data
+- **Dashboard:** Exibe mensagens informativas quando dados não disponíveis
+- **Impacto:** ~9% dos registros não participam de análises de idade
+- **Motivos da ausência:**
+  - Aluno não consta nos arquivos de dados gerais
+  - Divergência de grafia do nome (não normalizado adequadamente)
+  - Dados de aniversário não coletados na escola
+
+**Validação de Qualidade:**
+
+- **Taxa de Match:** 91% (TDE) e 90.7% (Vocabulário)
+- **Consistência:** Datas validadas no formato DD/MM/YYYY
+- **Plausibilidade:** Idades entre 8 e 18 anos (faixa esperada para ensino fundamental)
+- **Integridade:** Backups criados antes de qualquer modificação
+
+**Scripts Associados:**
+- `Modules/Preprocessamento/adicionar_data_aniversario.py` - Script principal de mapeamento
+- Funções principais:
+  - `normalizar_nome()` - Normalização robusta de nomes
+  - `carregar_datas_aniversario()` - Leitura dos arquivos de dados gerais
+  - `adicionar_coluna_aniversario()` - Matching e inserção
+  - `validar_resultado()` - Validação e estatísticas
+
+**Exemplo de Execução:**
+
+```bash
+cd /path/to/AnaliseDadosWordGeneration
+python Modules/Preprocessamento/adicionar_data_aniversario.py
+```
+
+**Saída Esperada:**
+```
+=== Processamento Iniciado ===
+Carregando dados de aniversário...
+  ✓ Dados2.csv: 1,805 registros
+  ✓ Dados3.csv: 1,804 registros
+Total de datas únicas: 3,609
+
+Processando TDE_longitudinal.csv...
+  ✓ Backup criado
+  ✓ 4,171 matches encontrados (91.2%)
+  ✗ 401 sem correspondência (8.8%)
+
+Processando vocabulario_longitudinal.csv...
+  ✓ Backup criado
+  ✓ 3,984 matches encontrados (90.7%)
+  ✗ 409 sem correspondência (9.3%)
+
+=== Processamento Concluído ===
+```
+
+**Considerações de Privacidade:**
+
+- Datas de aniversário são usadas apenas para cálculo de idade
+- Não há identificação nominal nos gráficos do dashboard
+- Visualizações mostram apenas dados agregados por grupo
+- Conformidade com LGPD mantida
+
+**Melhorias Futuras:**
+
+- Expandir fontes de dados de aniversário
+- Implementar matching fuzzy para nomes com pequenas variações
+- Coletar dados de aniversário diretamente nas escolas
+- Validar idades calculadas contra ano escolar esperado
+
+---
+
 ## Validação Final
 
-Após completar as 9 etapas, é realizada uma validação final que verifica:
+Após completar as 10 etapas, é realizada uma validação final que verifica:
 
 1. **Integridade dos Dados:**
    - Todos os campos essenciais preenchidos
    - Valores dentro dos intervalos esperados
    - Consistência entre fases
    - ID_únicos válidos e sem duplicações
+   - Coluna DataAniversario presente nos datasets longitudinais
 
 2. **Qualidade dos Dados:**
    - Taxa de participação adequada (≥25% de questões respondidas)
    - Distribuição equilibrada entre grupos etários (A: 6º/7º, B: 8º/9º)
    - Ausência de outliers extremos
    - Presença de dados Pré e Pós para análises de ganho
+   - Taxa de cobertura de datas de aniversário > 90%
 
 3. **Preparação para Análise:**
    - Estrutura padronizada (colunas normalizadas)
    - IDs únicos funcionais e consistentes
    - Coluna Sexo preenchida para análises demográficas
+   - Coluna DataAniversario para análises por idade/faixa etária
    - Dados prontos para consolidação e visualização
 
 4. **Rastreabilidade:**
@@ -400,6 +588,7 @@ Após completar as 9 etapas, é realizada uma validação final que verifica:
    - Documentação de transformações aplicadas
    - Estatísticas de pré-processamento registradas
    - Scripts de reprocessamento disponíveis
+   - Logs de matching de datas de aniversário
 
 ---
 
@@ -443,6 +632,7 @@ Modules/
 │   ├── verificar_integridade_ids.py       # Validação de consistência
 │   ├── limpar_datasets_consolidados.py    # Limpeza e normalização
 │   ├── refatorar_dados_longitudinais.py   # Estruturação para dashboard
+│   ├── adicionar_data_aniversario.py      # Mapeamento de datas de nascimento
 │   └── gerar_relatorios_por_fase.py       # Geração de relatórios HTML
 │
 ├── DetectorSexo/
@@ -473,11 +663,18 @@ Modules/
    - Aplicação de normalização padronizada
    - Validação de unicidade e consistência
 
-5. **Estruturação para Dashboard:**
+5. **Mapeamento de Datas de Aniversário:**
+   - Leitura de dados gerais (Data/DadosGerais/*.csv)
+   - Matching por nome normalizado
+   - Adição da coluna DataAniversario
+   - Taxa de cobertura: ~91%
+
+6. **Estruturação para Dashboard:**
    - Criação de arquivos longitudinais
    - Otimização para visualizações interativas
+   - Cálculo dinâmico de Idade e FaixaEtaria
 
-6. **Geração de Relatórios:**
+7. **Geração de Relatórios:**
    - Relatórios HTML por fase
    - Análises estatísticas e visualizações
 
@@ -491,8 +688,10 @@ Modules/
 - **Taxa de Participação:** % de questões respondidas por participante
 - **Consistência de IDs:** Verificação de duplicações e formato
 - **Distribuição de Sexo:** Balanceamento de gênero identificado
-- **Taxa de Indeterminados:** % de nomes sem sexo identificado
+- **Taxa de Indeterminados (Sexo):** % de nomes sem sexo identificado
+- **Taxa de Cobertura (Aniversário):** % de registros com data de nascimento
 - **Integridade Referencial:** Consistência entre TDE e Vocabulário
+- **Plausibilidade de Idades:** Idades calculadas dentro da faixa esperada (8-18 anos)
 
 ### **Relatórios de Qualidade:**
 
@@ -502,6 +701,8 @@ Estatísticas geradas automaticamente após cada etapa:
 - Registros inválidos por participação insuficiente
 - Distribuição por escola, turma e fase
 - Taxa de sucesso na detecção de sexo
+- Taxa de matching de datas de aniversário
+- Distribuição de idades e faixas etárias
 
 ---
 
@@ -522,8 +723,15 @@ Estatísticas geradas automaticamente após cada etapa:
 - Otimização de performance para grandes volumes
 - Integração com novos modelos de LLM
 - Detecção automática de anomalias nos dados
+- Implementar matching fuzzy para datas de aniversário
+- Expandir fontes de dados demográficos
+- Validação cruzada de idades com ano escolar
+- Coleta direta de dados demográficos nas escolas
 
 ---
 
-**Última Atualização:** 14 de outubro de 2025
+**Última Atualização:** 16 de outubro de 2025
 **Status:** ✅ Todos os módulos operacionais e validados
+**Cobertura de Dados Demográficos:**
+- Sexo: ~95% identificados automaticamente
+- Data de Aniversário: ~91% (TDE) e ~90.7% (Vocabulário)
