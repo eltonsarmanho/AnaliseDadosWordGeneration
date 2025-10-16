@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 from data_loader import get_datasets
 import unicodedata, re, math
 import numpy as np
+from datetime import datetime, date
 
 st.set_page_config(
     page_title="Dashboard Longitudinal WordGen", 
@@ -70,6 +71,69 @@ def load_data():
         vocab['Turma'] = vocab['Turma'].apply(normalizar_turma)
     
     return tde, vocab
+
+def calcular_idade(data_nascimento_str, data_referencia=None):
+    """
+    Calcula idade a partir da data de nascimento.
+    
+    Args:
+        data_nascimento_str: String com data de nascimento (formato: DD/MM/YYYY ou YYYY-MM-DD)
+        data_referencia: Data de referência para cálculo (default: hoje)
+    
+    Returns:
+        Idade em anos (int) ou None se não puder calcular
+    """
+    if pd.isna(data_nascimento_str) or data_nascimento_str == '':
+        return None
+    
+    if data_referencia is None:
+        data_referencia = date.today()
+    
+    try:
+        # Tentar formato DD/MM/YYYY
+        if '/' in str(data_nascimento_str):
+            data_nasc = datetime.strptime(str(data_nascimento_str), '%d/%m/%Y').date()
+        # Tentar formato YYYY-MM-DD
+        elif '-' in str(data_nascimento_str):
+            data_nasc = datetime.strptime(str(data_nascimento_str), '%Y-%m-%d').date()
+        else:
+            return None
+        
+        # Calcular idade
+        idade = data_referencia.year - data_nasc.year
+        
+        # Ajustar se ainda não fez aniversário este ano
+        if (data_referencia.month, data_referencia.day) < (data_nasc.month, data_nasc.day):
+            idade -= 1
+        
+        return idade if idade >= 0 else None
+        
+    except (ValueError, AttributeError):
+        return None
+
+def criar_faixas_etarias(idade):
+    """
+    Cria faixas etárias para agrupamento.
+    
+    Args:
+        idade: Idade em anos
+        
+    Returns:
+        String com faixa etária ou None
+    """
+    if pd.isna(idade) or idade is None:
+        return None
+    
+    if idade < 10:
+        return "< 10 anos"
+    elif idade < 12:
+        return "10-11 anos"
+    elif idade < 14:
+        return "12-13 anos"
+    elif idade < 16:
+        return "14-15 anos"
+    else:
+        return "≥ 16 anos"
 
 @st.cache_data(show_spinner=False)
 def carregar_palavras_ensinadas():
@@ -193,6 +257,16 @@ def criar_metric_card(valor, titulo, icone, cor_box=(0, 123, 255), cor_fonte=(25
 
 # ========== LOAD DATA ==========
 tde_df, vocab_df = load_data()
+
+# Calcular idade para ambos os datasets
+if 'DataAniversario' in tde_df.columns:
+    tde_df['Idade'] = tde_df['DataAniversario'].apply(calcular_idade)
+    tde_df['FaixaEtaria'] = tde_df['Idade'].apply(criar_faixas_etarias)
+
+if 'DataAniversario' in vocab_df.columns:
+    vocab_df['Idade'] = vocab_df['DataAniversario'].apply(calcular_idade)
+    vocab_df['FaixaEtaria'] = vocab_df['Idade'].apply(criar_faixas_etarias)
+
 PROVAS = {"TDE": tde_df, "VOCABULÁRIO": vocab_df}
 
 # ========== HEADER ==========
@@ -261,6 +335,43 @@ with st.expander("🔍 **FILTROS DE ANÁLISE**", expanded=True):
             turmas_sel = st.multiselect(label_turmas, turmas_disponiveis, key="turmas_multiselect")
             if turmas_sel:
                 df = df[df[coluna_turma].isin(turmas_sel)]
+    
+    # SEGUNDA LINHA - Filtros demográficos (Sexo e Idade)
+    st.markdown("---")
+    col_d1, col_d2, col_d3 = st.columns([1, 1.5, 2])
+    
+    with col_d1:
+        # Filtro de Sexo
+        if 'Sexo' in df.columns:
+            sexos_disponiveis = sorted([s for s in df['Sexo'].dropna().unique() if s != ''])
+            sexo_sel = st.multiselect("👤 Sexo", sexos_disponiveis, default=[])
+            if sexo_sel:
+                df = df[df['Sexo'].isin(sexo_sel)]
+    
+    with col_d2:
+        # Filtro de Faixa Etária
+        if 'FaixaEtaria' in df.columns:
+            faixas_disponiveis = [f for f in ["< 10 anos", "10-11 anos", "12-13 anos", "14-15 anos", "≥ 16 anos"] 
+                                  if f in df['FaixaEtaria'].unique()]
+            faixa_sel = st.multiselect("🎂 Faixa Etária", faixas_disponiveis, default=[])
+            if faixa_sel:
+                df = df[df['FaixaEtaria'].isin(faixa_sel)]
+    
+    with col_d3:
+        # Filtro de Idade Específica (range slider)
+        if 'Idade' in df.columns:
+            idades_validas = df['Idade'].dropna()
+            if len(idades_validas) > 0:
+                idade_min = int(idades_validas.min())
+                idade_max = int(idades_validas.max())
+                idade_range = st.slider(
+                    "📊 Idade Específica (anos)",
+                    min_value=idade_min,
+                    max_value=idade_max,
+                    value=(idade_min, idade_max),
+                    step=1
+                )
+                df = df[(df['Idade'] >= idade_range[0]) & (df['Idade'] <= idade_range[1])]
 
 st.markdown("---")
 
@@ -311,6 +422,256 @@ with col5:
         val_str, "Tamanho do Efeito", icone,
         cor_box, cor_fonte
     ), unsafe_allow_html=True)
+
+st.markdown("---")
+
+# ========== ANÁLISE DEMOGRÁFICA ==========
+st.subheader("👥 Análise Demográfica")
+
+# Criar abas para organizar visualizações demográficas
+tab_dist, tab_perf = st.tabs(["📊 Distribuição", "📈 Performance por Perfil"])
+
+with tab_dist:
+    col_dist1, col_dist2 = st.columns(2, gap="large")
+    
+    # Gráfico 1: Distribuição por Sexo
+    with col_dist1:
+        with st.container(border=True):
+            st.markdown("#### Distribuição por Sexo")
+            
+            if 'Sexo' in df.columns and not df['Sexo'].isna().all():
+                import plotly.express as px
+                
+                # Contar alunos únicos por sexo
+                dist_sexo = df.groupby('Sexo')['ID_Unico'].nunique().reset_index()
+                dist_sexo.columns = ['Sexo', 'Quantidade']
+                dist_sexo['Percentual'] = (dist_sexo['Quantidade'] / dist_sexo['Quantidade'].sum() * 100).round(1)
+                
+                fig_sexo = px.bar(
+                    dist_sexo, 
+                    x='Sexo', 
+                    y='Quantidade',
+                    text='Quantidade',
+                    color='Sexo',
+                    color_discrete_map={'Masculino': '#636EFA', 'Feminino': '#EF553B'},
+                    labels={'Quantidade': 'Número de Alunos'},
+                    height=350
+                )
+                
+                fig_sexo.update_traces(
+                    texttemplate='%{text}<br>(%{customdata}%)',
+                    textposition='outside',
+                    customdata=dist_sexo['Percentual']
+                )
+                
+                fig_sexo.update_layout(
+                    showlegend=False,
+                    xaxis_title="Sexo",
+                    yaxis_title="Número de Alunos",
+                    margin=dict(t=10, b=10, l=10, r=10)
+                )
+                
+                st.plotly_chart(fig_sexo, use_container_width=True)
+            else:
+                st.info("📊 Dados de sexo não disponíveis para os filtros selecionados")
+    
+    # Gráfico 2: Distribuição por Faixa Etária
+    with col_dist2:
+        with st.container(border=True):
+            st.markdown("#### Distribuição por Faixa Etária")
+            
+            if 'FaixaEtaria' in df.columns and not df['FaixaEtaria'].isna().all():
+                import plotly.express as px
+                
+                # Contar alunos únicos por faixa etária
+                dist_idade = df.groupby('FaixaEtaria')['ID_Unico'].nunique().reset_index()
+                dist_idade.columns = ['FaixaEtaria', 'Quantidade']
+                dist_idade['Percentual'] = (dist_idade['Quantidade'] / dist_idade['Quantidade'].sum() * 100).round(1)
+                
+                # Ordenar as faixas corretamente
+                ordem_faixas = ['< 10 anos', '10-11 anos', '12-13 anos', '14-15 anos', '≥ 16 anos']
+                dist_idade['FaixaEtaria'] = pd.Categorical(
+                    dist_idade['FaixaEtaria'], 
+                    categories=ordem_faixas, 
+                    ordered=True
+                )
+                dist_idade = dist_idade.sort_values('FaixaEtaria')
+                
+                fig_idade = px.bar(
+                    dist_idade,
+                    x='FaixaEtaria',
+                    y='Quantidade',
+                    text='Quantidade',
+                    color='FaixaEtaria',
+                    color_discrete_sequence=px.colors.sequential.Viridis,
+                    labels={'Quantidade': 'Número de Alunos', 'FaixaEtaria': 'Faixa Etária'},
+                    height=350
+                )
+                
+                fig_idade.update_traces(
+                    texttemplate='%{text}<br>(%{customdata}%)',
+                    textposition='outside',
+                    customdata=dist_idade['Percentual']
+                )
+                
+                fig_idade.update_layout(
+                    showlegend=False,
+                    xaxis_title="Faixa Etária",
+                    yaxis_title="Número de Alunos",
+                    xaxis_tickangle=-45,
+                    margin=dict(t=10, b=70, l=10, r=10)
+                )
+                
+                st.plotly_chart(fig_idade, use_container_width=True)
+            else:
+                st.info("📊 Dados de idade não disponíveis para os filtros selecionados")
+
+with tab_perf:
+    # Performance por Sexo
+    st.markdown("#### Performance por Sexo (Pré vs Pós-Teste)")
+    
+    if 'Sexo' in df.columns and not df['Sexo'].isna().all():
+        import plotly.graph_objects as go
+        
+        # Preparar dados em formato longo
+        df_perf_sexo = df.melt(
+            id_vars=['Sexo', 'ID_Unico'],
+            value_vars=['Score_Pre', 'Score_Pos'],
+            var_name='Momento',
+            value_name='Score'
+        )
+        df_perf_sexo['Momento'] = df_perf_sexo['Momento'].replace({
+            'Score_Pre': 'Pré-Teste',
+            'Score_Pos': 'Pós-Teste'
+        })
+        
+        fig_perf_sexo = px.box(
+            df_perf_sexo,
+            x='Sexo',
+            y='Score',
+            color='Momento',
+            color_discrete_map={'Pré-Teste': '#636EFA', 'Pós-Teste': '#EF553B'},
+            labels={'Score': 'Score', 'Sexo': 'Sexo'},
+            height=400,
+            points='outliers'
+        )
+        
+        # Adicionar médias como linha pontilhada
+        for sexo in df_perf_sexo['Sexo'].unique():
+            for momento in ['Pré-Teste', 'Pós-Teste']:
+                media = df_perf_sexo[(df_perf_sexo['Sexo'] == sexo) & 
+                                     (df_perf_sexo['Momento'] == momento)]['Score'].mean()
+                if not np.isnan(media):
+                    # Adicionar anotação com a média
+                    fig_perf_sexo.add_annotation(
+                        x=sexo,
+                        y=media,
+                        text=f"μ={media:.1f}",
+                        showarrow=False,
+                        font=dict(size=10, color='white'),
+                        bgcolor='rgba(0,0,0,0.5)',
+                        borderpad=2
+                    )
+        
+        fig_perf_sexo.update_layout(
+            xaxis_title="Sexo",
+            yaxis_title="Score",
+            legend_title="Momento",
+            margin=dict(t=10, b=10, l=10, r=10)
+        )
+        
+        st.plotly_chart(fig_perf_sexo, use_container_width=True)
+        
+        # Estatísticas por sexo
+        col_stat1, col_stat2 = st.columns(2)
+        for idx, sexo in enumerate(sorted(df['Sexo'].dropna().unique())):
+            df_sexo = df[df['Sexo'] == sexo]
+            with col_stat1 if idx == 0 else col_stat2:
+                st.markdown(f"**{sexo}**")
+                pre_mean = df_sexo['Score_Pre'].mean()
+                pos_mean = df_sexo['Score_Pos'].mean()
+                ganho = pos_mean - pre_mean
+                st.write(f"- Pré: {pre_mean:.2f} | Pós: {pos_mean:.2f}")
+                st.write(f"- Ganho: {ganho:.2f} ({(ganho/pre_mean*100):.1f}%)")
+    else:
+        st.info("📊 Dados de sexo não disponíveis")
+    
+    st.markdown("---")
+    
+    # Performance por Faixa Etária
+    st.markdown("#### Performance por Faixa Etária (Pré vs Pós-Teste)")
+    
+    if 'FaixaEtaria' in df.columns and not df['FaixaEtaria'].isna().all():
+        import plotly.express as px
+        
+        # Preparar dados
+        df_perf_idade = df.melt(
+            id_vars=['FaixaEtaria', 'ID_Unico'],
+            value_vars=['Score_Pre', 'Score_Pos'],
+            var_name='Momento',
+            value_name='Score'
+        )
+        df_perf_idade['Momento'] = df_perf_idade['Momento'].replace({
+            'Score_Pre': 'Pré-Teste',
+            'Score_Pos': 'Pós-Teste'
+        })
+        
+        # Ordenar faixas
+        ordem_faixas = ['< 10 anos', '10-11 anos', '12-13 anos', '14-15 anos', '≥ 16 anos']
+        df_perf_idade['FaixaEtaria'] = pd.Categorical(
+            df_perf_idade['FaixaEtaria'],
+            categories=ordem_faixas,
+            ordered=True
+        )
+        df_perf_idade = df_perf_idade.sort_values('FaixaEtaria')
+        
+        fig_perf_idade = px.box(
+            df_perf_idade,
+            x='FaixaEtaria',
+            y='Score',
+            color='Momento',
+            color_discrete_map={'Pré-Teste': '#636EFA', 'Pós-Teste': '#EF553B'},
+            labels={'Score': 'Score', 'FaixaEtaria': 'Faixa Etária'},
+            height=400,
+            points='outliers'
+        )
+        
+        fig_perf_idade.update_layout(
+            xaxis_title="Faixa Etária",
+            yaxis_title="Score",
+            legend_title="Momento",
+            xaxis_tickangle=-45,
+            margin=dict(t=10, b=70, l=10, r=10)
+        )
+        
+        st.plotly_chart(fig_perf_idade, use_container_width=True)
+        
+        # Tabela de estatísticas por faixa etária
+        st.markdown("**Estatísticas por Faixa Etária**")
+        
+        stats_list = []
+        for faixa in ordem_faixas:
+            df_faixa = df[df['FaixaEtaria'] == faixa]
+            if len(df_faixa) > 0:
+                pre_mean = df_faixa['Score_Pre'].mean()
+                pos_mean = df_faixa['Score_Pos'].mean()
+                ganho = pos_mean - pre_mean
+                n_alunos = df_faixa['ID_Unico'].nunique()
+                
+                stats_list.append({
+                    'Faixa Etária': faixa,
+                    'N Alunos': n_alunos,
+                    'Pré (μ)': f"{pre_mean:.2f}",
+                    'Pós (μ)': f"{pos_mean:.2f}",
+                    'Ganho': f"{ganho:.2f}",
+                    'Ganho %': f"{(ganho/pre_mean*100):.1f}%"
+                })
+        
+        if stats_list:
+            df_stats = pd.DataFrame(stats_list)
+            st.dataframe(df_stats, use_container_width=True, hide_index=True)
+    else:
+        st.info("📊 Dados de idade não disponíveis")
 
 st.markdown("---")
 
