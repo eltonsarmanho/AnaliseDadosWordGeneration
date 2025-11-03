@@ -268,7 +268,13 @@ class PipelineFase5:
         
         # Identifica colunas de questões
         colunas_questoes = [col for col in df.columns if col.startswith('Q') and not col.startswith('Q_')]
-        
+        # Filtro 0: remover 2 ANO e 5 ANO
+        print("     - Filtro 0: Removendo séries 2 ANO e 5 ANO...")
+        antes_filtro_0 = len(df)
+        df = df[~df['Serie'].isin(['2 ANO', '5 ANO'])]
+        removidos_filtro_0 = antes_filtro_0 - len(df)
+        print(f"       Removidos {removidos_filtro_0} registros de séries 2 ANO e 5 ANO")
+
         # Filtro 1: Remove testes em branco
         print("     - Filtro 1: Removendo testes em branco...")
         df_filtrado = df.dropna(subset=colunas_questoes, how='all')
@@ -282,12 +288,19 @@ class PipelineFase5:
         removidos_duplicatas = antes_duplicatas - len(df_filtrado)
         print(f"       Removidos {removidos_duplicatas} registros duplicados")
         
-        # Filtro 3: Mantém apenas pares completos (Pré E Pós)
-        print("     - Filtro 3: Mantendo apenas pares completos (Pré E Pós)...")
+        # Filtro 3: Remover registros onde coluna escola é nulla ou vazio
+        print("     - Filtro 3: Removendo registros com escola nulla ou vazia...")
+        antes_escola = len(df_filtrado)
+        df_filtrado = df_filtrado[~df_filtrado['Escola'].isna() & (df_filtrado['Escola'] != '')]
+        removidos_escola = antes_escola - len(df_filtrado)
+        print(f"       Removidos {removidos_escola} registros sem escola válida")
+        
+
+        # Filtro 4: Mantém apenas pares completos (Pré E Pós)
+        print("     - Filtro 4: Mantendo apenas pares completos (Pré E Pós)...")
         fase_counts = df_filtrado.groupby('ID_Aluno')['Fase'].nunique()
         alunos_completos = fase_counts[fase_counts == 2].index
-        df_pareado = df_filtrado[df_filtrado['ID_Aluno'].isin(alunos_completos)]
-        
+        df_pareado = df_filtrado[df_filtrado['ID_Aluno'].isin(alunos_completos)]        
         removidos_incompletos = len(df_filtrado) - len(df_pareado)
         print(f"       Removidos {removidos_incompletos} alunos sem par Pré/Pós")
         

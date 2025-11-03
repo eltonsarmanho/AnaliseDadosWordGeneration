@@ -1,0 +1,408 @@
+{
+  "matematica": [
+    {
+      "habilidade": "H01A",
+      "media_delta": -0.074,
+      "cohen_d": -0.129,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H02A",
+      "media_delta": 0.016,
+      "cohen_d": 0.036,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H02B",
+      "media_delta": 0.16,
+      "cohen_d": 0.369,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H03A",
+      "media_delta": 0.007,
+      "cohen_d": 0.017,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H03B",
+      "media_delta": 0.233,
+      "cohen_d": 0.481,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H04A",
+      "media_delta": -0.028,
+      "cohen_d": -0.048,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H05B",
+      "media_delta": -0.119,
+      "cohen_d": -0.197,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H06A",
+      "media_delta": -0.098,
+      "cohen_d": -0.227,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H06B",
+      "media_delta": -0.068,
+      "cohen_d": -0.154,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H07A",
+      "media_delta": -0.264,
+      "cohen_d": -0.483,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H08A",
+      "media_delta": -0.14,
+      "cohen_d": -0.245,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H09A",
+      "media_delta": 0.295,
+      "cohen_d": 0.469,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H10A",
+      "media_delta": -0.367,
+      "cohen_d": -0.583,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H11A",
+      "media_delta": -0.063,
+      "cohen_d": -0.145,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H11B",
+      "media_delta": -0.002,
+      "cohen_d": -0.005,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H12A",
+      "media_delta": 0.188,
+      "cohen_d": 0.39,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H12B",
+      "media_delta": -0.033,
+      "cohen_d": -0.089,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H13A",
+      "media_delta": -0.243,
+      "cohen_d": -0.509,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H13B",
+      "media_delta": -0.012,
+      "cohen_d": -0.041,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H14A",
+      "media_delta": -0.142,
+      "cohen_d": -0.227,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H15A",
+      "media_delta": 0.164,
+      "cohen_d": 0.351,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H15B",
+      "media_delta": -0.022,
+      "cohen_d": -0.061,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H16A",
+      "media_delta": -0.205,
+      "cohen_d": -0.346,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H17A",
+      "media_delta": -0.016,
+      "cohen_d": -0.031,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H18B",
+      "media_delta": -0.197,
+      "cohen_d": -0.325,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H19A",
+      "media_delta": -0.298,
+      "cohen_d": -0.587,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H19B",
+      "media_delta": -0.045,
+      "cohen_d": -0.14,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H20A",
+      "media_delta": -0.088,
+      "cohen_d": -0.198,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H20B",
+      "media_delta": -0.144,
+      "cohen_d": -0.322,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H21A",
+      "media_delta": -0.01,
+      "cohen_d": -0.023,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H21B",
+      "media_delta": 0.004,
+      "cohen_d": 0.013,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H22A",
+      "media_delta": -0.14,
+      "cohen_d": -0.295,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H22B",
+      "media_delta": 0.016,
+      "cohen_d": 0.055,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H23B",
+      "media_delta": -0.03,
+      "cohen_d": -0.092,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H24A",
+      "media_delta": -0.083,
+      "cohen_d": -0.192,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H25B",
+      "media_delta": 0.113,
+      "cohen_d": 0.31,
+      "disciplina": "Matemática"
+    },
+    {
+      "habilidade": "H26A",
+      "media_delta": 0.003,
+      "cohen_d": 0.008,
+      "disciplina": "Matemática"
+    }
+  ],
+  "portugues": [
+    {
+      "habilidade": "H01R",
+      "media_delta": -0.554,
+      "cohen_d": -0.787,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H02A",
+      "media_delta": 0.072,
+      "cohen_d": 0.157,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H02R",
+      "media_delta": -0.193,
+      "cohen_d": -0.408,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H03R",
+      "media_delta": -0.146,
+      "cohen_d": -0.227,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H04A",
+      "media_delta": -0.243,
+      "cohen_d": -0.502,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H04R",
+      "media_delta": 0.014,
+      "cohen_d": 0.032,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H05R",
+      "media_delta": -0.331,
+      "cohen_d": -0.343,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H06A",
+      "media_delta": -0.129,
+      "cohen_d": -0.277,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H06R",
+      "media_delta": -0.232,
+      "cohen_d": -0.479,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H07A",
+      "media_delta": -0.143,
+      "cohen_d": -0.338,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H07R",
+      "media_delta": -0.231,
+      "cohen_d": -0.468,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H08A",
+      "media_delta": -0.21,
+      "cohen_d": -0.296,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H09A",
+      "media_delta": -0.143,
+      "cohen_d": -0.319,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H09R",
+      "media_delta": -0.128,
+      "cohen_d": -0.264,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H10A",
+      "media_delta": -0.249,
+      "cohen_d": -0.338,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H11A",
+      "media_delta": -0.159,
+      "cohen_d": -0.248,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H12A",
+      "media_delta": -0.22,
+      "cohen_d": -0.343,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H12R",
+      "media_delta": 0.025,
+      "cohen_d": 0.064,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H13A",
+      "media_delta": -0.138,
+      "cohen_d": -0.297,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H13R",
+      "media_delta": -0.045,
+      "cohen_d": -0.107,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H14A",
+      "media_delta": 0.016,
+      "cohen_d": 0.037,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H14R",
+      "media_delta": -0.123,
+      "cohen_d": -0.267,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H15A",
+      "media_delta": -0.174,
+      "cohen_d": -0.216,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H16A",
+      "media_delta": -0.061,
+      "cohen_d": -0.156,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H16R",
+      "media_delta": -0.094,
+      "cohen_d": -0.217,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H17A",
+      "media_delta": -0.153,
+      "cohen_d": -0.257,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H18A",
+      "media_delta": -0.002,
+      "cohen_d": -0.003,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H18R",
+      "media_delta": -0.146,
+      "cohen_d": -0.229,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H19A",
+      "media_delta": -0.228,
+      "cohen_d": -0.37,
+      "disciplina": "Língua Portuguesa"
+    },
+    {
+      "habilidade": "H20R",
+      "media_delta": 0.147,
+      "cohen_d": 0.318,
+      "disciplina": "Língua Portuguesa"
+    }
+  ]
+}

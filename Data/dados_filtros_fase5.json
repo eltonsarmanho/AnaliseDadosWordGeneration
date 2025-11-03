@@ -1,0 +1,19 @@
+{
+  "escolas": [
+    "emeb expedito porfirio dos santos",
+    "emeb padre anchieta",
+    "emeb professor ricardo vieira de lima",
+    "emeb professora maria queiroz ferro",
+    "emef padre jose dos santos mousinho"
+  ],
+  "series": [
+    "6º ANO",
+    "7º ANO",
+    "8º ANO",
+    "9º ANO"
+  ],
+  "disciplinas": [
+    "Matemática",
+    "Língua Portuguesa"
+  ]
+}
