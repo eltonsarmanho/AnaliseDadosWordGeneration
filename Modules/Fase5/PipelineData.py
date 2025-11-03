@@ -103,7 +103,7 @@ class PipelineFase5:
     
     def criar_id_aluno(self, row):
         """
-        Cria ID único do aluno usando hash baseado apenas no nome completo
+        Cria ID único do aluno usando hash de dados identificadores
         
         Args:
             row: Linha do DataFrame
@@ -111,10 +111,9 @@ class PipelineFase5:
         Returns:
             String com hash MD5
         """
-        # Usa apenas o nome completo normalizado para criar ID único
-        # Isso evita problemas com diferenças nos nomes das escolas entre Pré e Pós
-        nome_normalizado = self.normalizar_texto(row['Nome'])
-        return hashlib.md5(nome_normalizado.encode()).hexdigest()[:12]
+        # Usa nome, escola, série e turma para criar ID único (colunas em maiúscula)
+        identificador = f"{row['Nome']}_{row['Escola']}_{row['Serie']}_{row['Turma']}"
+        return hashlib.md5(identificador.encode()).hexdigest()[:12]
     
     def carregar_gabarito(self, arquivo_gabarito: Path):
         """
