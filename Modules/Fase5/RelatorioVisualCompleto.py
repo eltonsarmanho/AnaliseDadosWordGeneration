@@ -845,9 +845,10 @@ class GeradorVisualizacoesFase5:
 
         <h2 class="section">🏆 Comparações Entre Escolas e Séries</h2>
         <div class="figs-dual">
-            <div class="fig" id="grafico-ranking-escolas">
-                <img src="{graficos_base64['ranking_escolas']}" alt="Ranking de Escolas" style="width: 100%; height: auto;">
-                <div class="caption">Top 10 escolas por effect size (Cohen's d) em cada disciplina</div>
+            <div class="fig" id="comparacao-escolas">
+                <div id="comparacao-escolas-conteudo">
+                    <div class="loading">Carregando comparação entre escolas...</div>
+                </div>
             </div>
             <div class="fig" id="grafico-series-comparacao">
                 <div id="comparacao-series-conteudo">
@@ -989,7 +990,8 @@ function atualizarDados() {
     const dadosFiltrados = filtrarDados(escola, serie, disciplina);
     
     atualizarIndicadores(dadosFiltrados);
-    atualizarComparacaoSeries(dadosFiltrados);
+    atualizarGraficosInterativos(dadosFiltrados);  // Nova função para gráficos
+    atualizarComparacaoEscolasESeries(dadosFiltrados);  // Renomeada
     atualizarHabilidades(dadosFiltrados);
     atualizarQualidadeDados(dadosFiltrados);
     atualizarRecomendacoes(dadosFiltrados);
@@ -1102,12 +1104,65 @@ function atualizarIndicadores(dadosFiltrados) {
     container.innerHTML = cards;
 }
 
+// Função para atualizar gráficos interativos baseados nos filtros
+function atualizarGraficosInterativos(dadosFiltrados) {
+    const disciplina = document.getElementById('disciplinaSelect').value;
+    const escola = document.getElementById('escolaSelect').value;
+    const serie = document.getElementById('serieSelect').value;
+    
+    // Atualizar gráfico de evolução se necessário
+    const graficoEvolucao = document.getElementById('grafico-evolucao-geral');
+    if (escola !== 'todas' || serie !== 'todas') {
+        // Criar gráfico específico para os filtros aplicados
+        criarGraficoEvolucaoFiltrado(dadosFiltrados, graficoEvolucao);
+    }
+    
+    // Atualizar distribuição de crescimento se necessário
+    const graficoDistribuicao = document.getElementById('grafico-distribuicao-crescimento');
+    if (escola !== 'todas' || serie !== 'todas') {
+        criarGraficoDistribuicaoFiltrado(dadosFiltrados, graficoDistribuicao);
+    }
+}
+
+// Função para atualizar comparações entre escolas e séries
+function atualizarComparacaoEscolasESeries(dadosFiltrados) {
+    atualizarComparacaoEscolas(dadosFiltrados);
+    atualizarComparacaoSeries(dadosFiltrados);
+}
+
+// Função para atualizar comparação entre escolas
+function atualizarComparacaoEscolas(dadosFiltrados) {
+    const container = document.getElementById('comparacao-escolas-conteudo');
+    const disciplina = document.getElementById('disciplinaSelect').value;
+    
+    let conteudo = '<div style="padding: 15px;">';
+    conteudo += '<h3 style="text-align: center; margin-bottom: 15px; color: #6a11cb;">🏫 Comparação por Escola</h3>';
+    
+    if (disciplina === 'ambas' || disciplina === 'matematica') {
+        const estatsMat = calcularEstatisticasPorEscola(dadosFiltrados.matematica, 'Matemática');
+        conteudo += '<h4 style="color: #1e40af; margin-bottom: 10px;">📐 Matemática - Comparação por Escola</h4>';
+        conteudo += criarTabelaComparacaoEscolas(estatsMat);
+    }
+    
+    if (disciplina === 'ambas' || disciplina === 'portugues') {
+        const estatsPort = calcularEstatisticasPorEscola(dadosFiltrados.portugues, 'Língua Portuguesa');
+        conteudo += '<h4 style="color: #059669; margin-bottom: 10px; margin-top: 20px;">📝 Língua Portuguesa - Comparação por Escola</h4>';
+        conteudo += criarTabelaComparacaoEscolas(estatsPort);
+    }
+    
+    conteudo += '</div>';
+    conteudo += '<div class="caption">Análise comparativa detalhada entre escolas por disciplina</div>';
+    
+    container.innerHTML = conteudo;
+}
+
 // Função para atualizar comparação entre séries
 function atualizarComparacaoSeries(dadosFiltrados) {
     const container = document.getElementById('comparacao-series-conteudo');
     const disciplina = document.getElementById('disciplinaSelect').value;
     
     let conteudo = '<div style="padding: 15px;">';
+    conteudo += '<h3 style="text-align: center; margin-bottom: 15px; color: #6a11cb;">📚 Comparação por Série</h3>';
     
     if (disciplina === 'ambas' || disciplina === 'matematica') {
         const estatsMat = calcularEstatisticasPorSerie(dadosFiltrados.matematica, 'Matemática');
@@ -1147,7 +1202,90 @@ function calcularEstatisticasPorSerie(dados, disciplina) {
     return resultado;
 }
 
-// Função para criar tabela de comparação
+// Função auxiliar para calcular estatísticas por escola
+function calcularEstatisticasPorEscola(dados, disciplina) {
+    const escolas = [...new Set(dados.map(row => row.Escola))].filter(escola => escola && escola.trim());
+    const resultado = [];
+    
+    escolas.forEach(escola => {
+        const dadosEscola = dados.filter(row => row.Escola === escola);
+        if (dadosEscola.length >= 5) { // Mínimo de 5 alunos por escola
+            const stats = calcularEstatisticas(dadosEscola);
+            resultado.push({
+                escola: escola,
+                disciplina: disciplina,
+                ...stats
+            });
+        }
+    });
+    
+    // Ordenar por Cohen's d (descrescente)
+    return resultado.sort((a, b) => parseFloat(b.cohenD) - parseFloat(a.cohenD));
+}
+
+// Função para criar gráfico de evolução filtrado
+function criarGraficoEvolucaoFiltrado(dadosFiltrados, container) {
+    // Implementação simplificada - usar texto por enquanto
+    const disciplina = document.getElementById('disciplinaSelect').value;
+    
+    let conteudo = '<div style="padding: 20px; text-align: center;">';
+    conteudo += '<h4>📊 Evolução Filtrada</h4>';
+    
+    if (disciplina === 'ambas' || disciplina === 'matematica') {
+        const estatsMat = calcularEstatisticas(dadosFiltrados.matematica);
+        conteudo += `<p><strong>Matemática:</strong> ${estatsMat.n} alunos | Δ = ${estatsMat.mediaDelta} | Cohen's d = ${estatsMat.cohenD}</p>`;
+    }
+    
+    if (disciplina === 'ambas' || disciplina === 'portugues') {
+        const estatsPort = calcularEstatisticas(dadosFiltrados.portugues);
+        conteudo += `<p><strong>Português:</strong> ${estatsPort.n} alunos | Δ = ${estatsPort.mediaDelta} | Cohen's d = ${estatsPort.cohenD}</p>`;
+    }
+    
+    conteudo += '</div>';
+    conteudo += '<div class="caption">Dados específicos para os filtros aplicados</div>';
+    
+    container.innerHTML = conteudo;
+}
+
+// Função para criar gráfico de distribuição filtrado
+function criarGraficoDistribuicaoFiltrado(dadosFiltrados, container) {
+    // Implementação simplificada - usar resumo estatístico
+    const disciplina = document.getElementById('disciplinaSelect').value;
+    
+    let conteudo = '<div style="padding: 20px;">';
+    conteudo += '<h4 style="text-align: center;">📈 Distribuição de Crescimento</h4>';
+    
+    if (disciplina === 'ambas' || disciplina === 'matematica') {
+        const estatsMat = calcularEstatisticas(dadosFiltrados.matematica);
+        conteudo += `
+            <div style="background: #f0f8ff; padding: 10px; margin: 10px 0; border-radius: 6px;">
+                <strong>📐 Matemática:</strong><br>
+                • Melhoraram: ${estatsMat.percMelhoraram}%<br>
+                • Pioraram: ${estatsMat.percPioraram}%<br>
+                • Mantiveram: ${estatsMat.percMantiveram}%
+            </div>
+        `;
+    }
+    
+    if (disciplina === 'ambas' || disciplina === 'portugues') {
+        const estatsPort = calcularEstatisticas(dadosFiltrados.portugues);
+        conteudo += `
+            <div style="background: #f0fdf4; padding: 10px; margin: 10px 0; border-radius: 6px;">
+                <strong>📝 Português:</strong><br>
+                • Melhoraram: ${estatsPort.percMelhoraram}%<br>
+                • Pioraram: ${estatsPort.percPioraram}%<br>
+                • Mantiveram: ${estatsPort.percMantiveram}%
+            </div>
+        `;
+    }
+    
+    conteudo += '</div>';
+    conteudo += '<div class="caption">Percentuais de estudantes por tipo de evolução</div>';
+    
+    container.innerHTML = conteudo;
+}
+
+// Função para criar tabela de comparação por séries
 function criarTabelaComparacao(estatisticas) {
     if (estatisticas.length === 0) return '<p style="text-align: center; color: #6b7280;">Nenhum dado disponível para esta disciplina</p>';
     
@@ -1202,6 +1340,78 @@ function criarTabelaComparacao(estatisticas) {
             <p style="margin: 0; font-size: 12px;"><strong>🏆 Melhor Performance:</strong> 
             ${melhorSerie.serie} com Cohen's d = ${melhorSerie.cohenD} 
             (${melhorSerie.percMelhoraram}% dos estudantes melhoraram)</p>
+        </div>
+    `;
+    
+    return tabela;
+}
+
+// Função para criar tabela de comparação por escolas
+function criarTabelaComparacaoEscolas(estatisticas) {
+    if (estatisticas.length === 0) return '<p style="text-align: center; color: #6b7280;">Nenhum dado disponível para esta disciplina</p>';
+    
+    // Limitar a 15 escolas para evitar tabelas muito longas
+    const estatisticasLimitadas = estatisticas.slice(0, 15);
+    
+    let tabela = `
+        <table style="width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 12px;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 8px 6px; text-align: left; font-weight: 600;">Escola</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">N</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">Pré</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">Pós</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">Δ</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">Cohen's d</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">% ↗</th>
+                    <th style="padding: 8px 6px; text-align: center; font-weight: 600;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    estatisticasLimitadas.forEach((stats, index) => {
+        const cohenD = parseFloat(stats.cohenD);
+        const corCohend = cohenD >= 0.4 ? '#059669' : cohenD >= 0.2 ? '#f59e0b' : '#dc2626';
+        const statusIcon = cohenD >= 0.4 ? '✅' : cohenD >= 0.2 ? '⚠️' : '🔍';
+        const statusTexto = cohenD >= 0.4 ? 'Efetivo' : cohenD >= 0.2 ? 'Moderado' : 'Limitado';
+        
+        // Truncar nome da escola se muito longo
+        const nomeEscola = stats.escola.length > 30 ? 
+            stats.escola.substring(0, 27) + '...' : stats.escola;
+        
+        // Cor de fundo alternada
+        const corFundo = index % 2 === 0 ? '#ffffff' : '#f9fafb';
+        
+        tabela += `
+            <tr style="border-bottom: 1px solid #e5e7eb; background-color: ${corFundo};">
+                <td style="padding: 6px; font-weight: 500; font-size: 11px;" title="${stats.escola}">${nomeEscola}</td>
+                <td style="padding: 6px; text-align: center;">${stats.n}</td>
+                <td style="padding: 6px; text-align: center;">${stats.mediaPre}</td>
+                <td style="padding: 6px; text-align: center;">${stats.mediaPos}</td>
+                <td style="padding: 6px; text-align: center; color: ${parseFloat(stats.mediaDelta) >= 0 ? '#059669' : '#dc2626'}; font-weight: 600;">
+                    ${parseFloat(stats.mediaDelta) >= 0 ? '+' : ''}${stats.mediaDelta}
+                </td>
+                <td style="padding: 6px; text-align: center; color: ${corCohend}; font-weight: 600;">${stats.cohenD}</td>
+                <td style="padding: 6px; text-align: center;">${stats.percMelhoraram}%</td>
+                <td style="padding: 6px; text-align: center; font-size: 11px;">${statusIcon}</td>
+            </tr>
+        `;
+    });
+    
+    tabela += '</tbody></table>';
+    
+    // Adicionar interpretação
+    const melhorEscola = estatisticasLimitadas[0]; // Já está ordenada
+    const totalEscolas = estatisticas.length;
+    
+    tabela += `
+        <div style="margin-top: 10px; padding: 8px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #0284c7;">
+            <p style="margin: 0; font-size: 11px;">
+                <strong>🏆 Melhor Escola:</strong> ${melhorEscola.escola.substring(0, 40)}${melhorEscola.escola.length > 40 ? '...' : ''}<br>
+                Cohen's d = ${melhorEscola.cohenD} | ${melhorEscola.percMelhoraram}% melhoraram
+            </p>
+            ${totalEscolas > 15 ? `<p style="margin: 4px 0 0 0; font-size: 10px; color: #6b7280;">Mostrando top 15 de ${totalEscolas} escolas</p>` : ''}
         </div>
     `;
     

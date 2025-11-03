@@ -3,104 +3,104 @@
     {
       "escola": "emeb padre anchieta",
       "disciplina": "Matemática",
-      "n": 218,
-      "media_pre": 7.41,
-      "media_pos": 6.07,
-      "media_delta": -1.34,
-      "cohen_d": -0.306,
-      "perc_melhoraram": 35.3
+      "n": 334,
+      "media_pre": 6.08,
+      "media_pos": 4.72,
+      "media_delta": -0.93,
+      "cohen_d": -0.26,
+      "perc_melhoraram": 22.5
     },
     {
       "escola": "emeb professora maria queiroz ferro",
       "disciplina": "Matemática",
-      "n": 339,
-      "media_pre": 7.7,
-      "media_pos": 5.47,
-      "media_delta": -2.23,
-      "cohen_d": -0.464,
-      "perc_melhoraram": 26.5
+      "n": 464,
+      "media_pre": 6.7,
+      "media_pos": 4.7,
+      "media_delta": -1.82,
+      "cohen_d": -0.41,
+      "perc_melhoraram": 20.0
     },
     {
       "escola": "emef padre jose dos santos mousinho",
       "disciplina": "Matemática",
-      "n": 190,
-      "media_pre": 8.53,
-      "media_pos": 6.33,
-      "media_delta": -2.2,
-      "cohen_d": -0.462,
-      "perc_melhoraram": 26.8
+      "n": 277,
+      "media_pre": 7.39,
+      "media_pos": 5.56,
+      "media_delta": -1.86,
+      "cohen_d": -0.426,
+      "perc_melhoraram": 20.2
     },
     {
       "escola": "emeb professor ricardo vieira de lima",
       "disciplina": "Matemática",
-      "n": 496,
-      "media_pre": 7.97,
-      "media_pos": 6.44,
-      "media_delta": -1.53,
-      "cohen_d": -0.35,
-      "perc_melhoraram": 28.0
+      "n": 712,
+      "media_pre": 6.63,
+      "media_pos": 5.38,
+      "media_delta": -1.05,
+      "cohen_d": -0.284,
+      "perc_melhoraram": 19.2
     },
     {
       "escola": "emeb expedito porfirio dos santos",
       "disciplina": "Matemática",
-      "n": 47,
-      "media_pre": 6.32,
-      "media_pos": 6.17,
-      "media_delta": -0.15,
-      "cohen_d": -0.037,
-      "perc_melhoraram": 40.4
+      "n": 189,
+      "media_pre": 4.06,
+      "media_pos": 3.83,
+      "media_delta": -0.03,
+      "cohen_d": -0.011,
+      "perc_melhoraram": 12.7
     }
   ],
   "portugues": [
     {
-      "escola": "emeb expedito porfirio dos santos",
-      "disciplina": "Língua Portuguesa",
-      "n": 76,
-      "media_pre": 7.62,
-      "media_pos": 5.0,
-      "media_delta": -2.62,
-      "cohen_d": -0.552,
-      "perc_melhoraram": 22.4
-    },
-    {
       "escola": "emeb padre anchieta",
       "disciplina": "Língua Portuguesa",
-      "n": 212,
-      "media_pre": 9.08,
-      "media_pos": 4.53,
-      "media_delta": -4.55,
-      "cohen_d": -0.899,
-      "perc_melhoraram": 12.3
+      "n": 305,
+      "media_pre": 7.11,
+      "media_pos": 4.11,
+      "media_delta": -3.24,
+      "cohen_d": -0.695,
+      "perc_melhoraram": 8.9
     },
     {
       "escola": "emeb professora maria queiroz ferro",
       "disciplina": "Língua Portuguesa",
-      "n": 288,
-      "media_pre": 8.93,
-      "media_pos": 4.58,
-      "media_delta": -4.35,
-      "cohen_d": -0.91,
-      "perc_melhoraram": 14.2
+      "n": 515,
+      "media_pre": 6.83,
+      "media_pos": 3.7,
+      "media_delta": -2.62,
+      "cohen_d": -0.608,
+      "perc_melhoraram": 8.2
     },
     {
       "escola": "emef padre jose dos santos mousinho",
       "disciplina": "Língua Portuguesa",
-      "n": 186,
-      "media_pre": 9.45,
-      "media_pos": 5.19,
-      "media_delta": -4.26,
-      "cohen_d": -0.797,
-      "perc_melhoraram": 16.1
+      "n": 290,
+      "media_pre": 8.13,
+      "media_pos": 4.15,
+      "media_delta": -3.39,
+      "cohen_d": -0.682,
+      "perc_melhoraram": 10.0
     },
     {
       "escola": "emeb professor ricardo vieira de lima",
       "disciplina": "Língua Portuguesa",
-      "n": 459,
-      "media_pre": 9.24,
-      "media_pos": 5.06,
-      "media_delta": -4.18,
-      "cohen_d": -0.811,
-      "perc_melhoraram": 17.4
+      "n": 675,
+      "media_pre": 7.8,
+      "media_pos": 4.13,
+      "media_delta": -2.82,
+      "cohen_d": -0.605,
+      "perc_melhoraram": 11.6
+    },
+    {
+      "escola": "emeb expedito porfirio dos santos",
+      "disciplina": "Língua Portuguesa",
+      "n": 186,
+      "media_pre": 6.17,
+      "media_pos": 2.85,
+      "media_delta": -1.28,
+      "cohen_d": -0.345,
+      "perc_melhoraram": 11.3
     }
   ]
 }
