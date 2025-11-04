@@ -12,6 +12,7 @@ from pathlib import Path
 import warnings
 import base64
 from io import BytesIO
+import re
 warnings.filterwarnings('ignore')
 
 # Configurações de estilo
@@ -59,6 +60,111 @@ class GeradorVisualizacoesFase5:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         print("✅ Dados preparados com sucesso")
+    
+    def _normalizar_serie_label(self, serie):
+        """Normaliza rótulos de série para comparação consistente"""
+        if not isinstance(serie, str):
+            return None
+        serie = serie.strip().upper().replace('°', 'º')
+        if not serie:
+            return None
+        if 'ANO' not in serie:
+            # Extrair apenas dígitos se vier como '6'
+            digitos = re.search(r"\d+", serie)
+            if digitos:
+                serie = f"{digitos.group()}º ANO"
+            else:
+                serie = f"{serie}º ANO"
+        return serie
+
+    def _ordenar_series(self, serie):
+        """Define ordem numérica para as séries"""
+        if not isinstance(serie, str):
+            return 999
+        serie = serie.upper()
+        match = re.search(r"\d+", serie)
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                return 999
+        return 999
+
+    def _filtrar_dataframe(self, df, escola, serie_label):
+        """Aplica filtros de escola e série sobre um DataFrame"""
+        dados = df
+        if escola != 'todas':
+            dados = dados[dados['Escola'] == escola]
+        if serie_label != 'todas':
+            serie_norm = self._normalizar_serie_label(serie_label)
+            dados = dados[dados['Serie'].fillna('').str.upper() == serie_norm]
+        return dados
+
+    def _plotar_mensagem_sem_dados(self, ax, mensagem):
+        """Exibe mensagem centralizada quando não há dados suficientes"""
+        ax.text(0.5, 0.5, mensagem, ha='center', va='center', fontsize=12)
+        ax.set_axis_off()
+
+    def _plotar_evolucao_por_disciplina(self, ax, dados, titulo, cor_pre, cor_pos):
+        """Plota barras de evolução pré/pós por série"""
+        if dados.empty:
+            self._plotar_mensagem_sem_dados(ax, 'Sem dados após aplicar filtros')
+            return
+        dados = dados.copy()
+        dados['Serie'] = dados['Serie'].fillna('').apply(self._normalizar_serie_label)
+        dados = dados[dados['Serie'].notna()]
+        if dados.empty:
+            self._plotar_mensagem_sem_dados(ax, 'Sem dados após aplicar filtros')
+            return
+        resumo = dados.groupby('Serie', as_index=False)[['Total_Acertos_Pré', 'Total_Acertos_Pós']].mean()
+        if resumo.empty:
+            self._plotar_mensagem_sem_dados(ax, 'Sem dados suficientes')
+            return
+        resumo = resumo.sort_values(by='Serie', key=lambda s: s.apply(self._ordenar_series))
+        series = resumo['Serie'].tolist()
+        pre = resumo['Total_Acertos_Pré'].tolist()
+        pos = resumo['Total_Acertos_Pós'].tolist()
+        x = np.arange(len(series))
+        width = 0.35
+        ax.bar(x - width/2, pre, width, label='Pré-teste', alpha=0.75, color=cor_pre)
+        ax.bar(x + width/2, pos, width, label='Pós-teste', alpha=0.75, color=cor_pos)
+        ax.set_xlabel('Série')
+        ax.set_ylabel('Média de Acertos')
+        ax.set_title(titulo)
+        ax.set_xticks(x)
+        ax.set_xticklabels(series, rotation=15)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    def _plotar_distribuicao_por_disciplina(self, ax, dados, titulo, cor):
+        """Plota histograma da distribuição de ganhos"""
+        if dados.empty:
+            self._plotar_mensagem_sem_dados(ax, 'Sem dados após aplicar filtros')
+            return
+        deltas = dados['Delta_Total_Acertos'].dropna()
+        if len(deltas) < 3:
+            mensagem = 'Menos de 3 registros para distribuir'
+            if len(deltas) == 0:
+                mensagem = 'Nenhum dado disponível'
+            self._plotar_mensagem_sem_dados(ax, mensagem)
+            return
+        ax.hist(deltas, bins=20, alpha=0.75, color=cor, edgecolor='black')
+        media_delta = deltas.mean()
+        ax.axvline(media_delta, color='red', linestyle='--', label=f'Média: {media_delta:.2f}')
+        ax.set_xlabel('Crescimento (pontos)')
+        ax.set_ylabel('Frequência')
+        ax.set_title(titulo)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    def _converter_figura_para_base64(self, fig):
+        """Converte figura Matplotlib para string base64"""
+        buffer = BytesIO()
+        fig.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+        buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close(fig)
+        return f"data:image/png;base64,{img_base64}"
     
     def gerar_dados_filtros(self):
         """Gera dados estruturados para os filtros do HTML"""
@@ -446,6 +552,9 @@ class GeradorVisualizacoesFase5:
         # 3. Ranking de escolas
         graficos['ranking_escolas'] = self.criar_grafico_ranking_base64()
         
+        # 4. Conjuntos filtrados para uso dinâmico
+        graficos['filtrados'] = self.gerar_graficos_filtrados_base64()
+        
         print("✅ Gráficos convertidos para base64")
         return graficos
     
@@ -623,6 +732,60 @@ class GeradorVisualizacoesFase5:
         plt.close()
         
         return f"data:image/png;base64,{img_base64}"
+
+    def gerar_grafico_evolucao_filtrado_base64(self, dados_mat, dados_port, disciplina):
+        """Gera gráfico de evolução considerando filtros aplicados"""
+        if disciplina == 'ambas':
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+            self._plotar_evolucao_por_disciplina(axes[0], dados_mat, 'Evolução - Matemática', 'lightblue', 'darkblue')
+            self._plotar_evolucao_por_disciplina(axes[1], dados_port, 'Evolução - Língua Portuguesa', 'lightgreen', 'darkgreen')
+        elif disciplina == 'matematica':
+            fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+            self._plotar_evolucao_por_disciplina(ax, dados_mat, 'Evolução - Matemática', 'lightblue', 'darkblue')
+        else:
+            fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+            self._plotar_evolucao_por_disciplina(ax, dados_port, 'Evolução - Língua Portuguesa', 'lightgreen', 'darkgreen')
+        plt.tight_layout()
+        return self._converter_figura_para_base64(fig)
+
+    def gerar_grafico_distribuicao_filtrado_base64(self, dados_mat, dados_port, disciplina):
+        """Gera gráfico de distribuição considerando filtros aplicados"""
+        if disciplina == 'ambas':
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+            self._plotar_distribuicao_por_disciplina(axes[0], dados_mat, 'Distribuição - Matemática', 'royalblue')
+            self._plotar_distribuicao_por_disciplina(axes[1], dados_port, 'Distribuição - Língua Portuguesa', 'seagreen')
+        elif disciplina == 'matematica':
+            fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+            self._plotar_distribuicao_por_disciplina(ax, dados_mat, 'Distribuição - Matemática', 'royalblue')
+        else:
+            fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+            self._plotar_distribuicao_por_disciplina(ax, dados_port, 'Distribuição - Língua Portuguesa', 'seagreen')
+        plt.tight_layout()
+        return self._converter_figura_para_base64(fig)
+
+    def gerar_graficos_filtrados_base64(self):
+        """Gera coleção de gráficos filtrados para todas as combinações relevantes"""
+        print("🧩 Gerando variações filtradas de gráficos...")
+        disciplinas = ['ambas', 'matematica', 'portugues']
+        escolas = sorted({e for e in self.df_matematica['Escola'].dropna().unique()} |
+                         {e for e in self.df_portugues['Escola'].dropna().unique()})
+        series = sorted({self._normalizar_serie_label(s) for s in self.df_matematica['Serie'].dropna().unique()} |
+                        {self._normalizar_serie_label(s) for s in self.df_portugues['Serie'].dropna().unique()},
+                        key=self._ordenar_series)
+        combinacoes = {
+            'evolucao': {},
+            'distribuicao': {}
+        }
+        for disciplina in disciplinas:
+            for escola in ['todas'] + escolas:
+                for serie in ['todas'] + [s for s in series if s]:
+                    dados_mat = self._filtrar_dataframe(self.df_matematica, escola, serie)
+                    dados_port = self._filtrar_dataframe(self.df_portugues, escola, serie)
+                    chave = f"{disciplina}|{escola}|{serie if serie else 'todas'}"
+                    combinacoes['evolucao'][chave] = self.gerar_grafico_evolucao_filtrado_base64(dados_mat, dados_port, disciplina)
+                    combinacoes['distribuicao'][chave] = self.gerar_grafico_distribuicao_filtrado_base64(dados_mat, dados_port, disciplina)
+        print(f"✅ {len(combinacoes['evolucao'])} variações de evolução e {len(combinacoes['distribuicao'])} distribuições geradas")
+        return combinacoes
     
     def gerar_html_integrado(self, graficos_base64):
         """Gera HTML com dados e gráficos integrados"""
@@ -829,11 +992,11 @@ class GeradorVisualizacoesFase5:
         <h2 class="section">📈 Evolução de Performance</h2>
         <div class="figs-dual">
             <div class="fig" id="grafico-evolucao-geral">
-                <img src="{graficos_base64['evolucao_series']}" alt="Evolução por Série" style="width: 100%; height: auto;">
+                <img id="img-evolucao-performance" src="{graficos_base64['evolucao_series']}" alt="Evolução por Série" style="width: 100%; height: auto;">
                 <div class="caption">Evolução das médias pré/pós teste por série em ambas as disciplinas</div>
             </div>
             <div class="fig" id="grafico-distribuicao-crescimento">
-                <img src="{graficos_base64['distribuicao_crescimento']}" alt="Distribuição de Crescimento" style="width: 100%; height: auto;">
+                <img id="img-distribuicao-crescimento" src="{graficos_base64['distribuicao_crescimento']}" alt="Distribuição de Crescimento" style="width: 100%; height: auto;">
                 <div class="caption">Distribuição dos ganhos individuais de aprendizagem</div>
             </div>
         </div>
@@ -884,6 +1047,13 @@ const DADOS_INTEGRADOS = {{
     sample_data: {{
         matematica: `{dados_mat_sample}`,
         portugues: `{dados_port_sample}`
+    }},
+    graficos: {{
+        padrao: {{
+            evolucao: "{graficos_base64['evolucao_series']}",
+            distribuicao: "{graficos_base64['distribuicao_crescimento']}"
+        }},
+        filtrados: {json.dumps(graficos_base64.get('filtrados', {}), ensure_ascii=False)}
     }}
 }};
 
@@ -957,6 +1127,36 @@ function carregarDados() {{
     def obter_javascript_completo(self):
         """Retorna o JavaScript completo para o HTML integrado"""
         return '''
+function formatarNomeEscola(escola) {
+    if (!escola || escola === 'todas') {
+        return 'Todas as Escolas';
+    }
+    return escola.toLowerCase().replace(/\\b\\w/g, l => l.toUpperCase());
+}
+
+function obterSerieChave(serieValor) {
+    if (!serieValor || serieValor === 'todas') {
+        return 'todas';
+    }
+    const chave = `${serieValor}º ANO`;
+    return chave.toUpperCase().replace('°', 'º');
+}
+
+function montarLegendaFiltros(escola, serieValor, disciplina) {
+    const partes = [];
+    if (disciplina && disciplina !== 'ambas') {
+        const nomeDisciplina = disciplina === 'matematica' ? 'Matemática' : 'Língua Portuguesa';
+        partes.push(`Disciplina: ${nomeDisciplina}`);
+    }
+    if (escola && escola !== 'todas') {
+        partes.push(`Escola: ${formatarNomeEscola(escola)}`);
+    }
+    if (serieValor && serieValor !== 'todas') {
+        partes.push(`Série: ${serieValor}º ano`);
+    }
+    return partes.join(' • ');
+}
+
 // Função para popular os filtros
 function popularFiltros() {
     if (!dadosCarregados) return;
@@ -1108,19 +1308,45 @@ function atualizarIndicadores(dadosFiltrados) {
 function atualizarGraficosInterativos(dadosFiltrados) {
     const disciplina = document.getElementById('disciplinaSelect').value;
     const escola = document.getElementById('escolaSelect').value;
-    const serie = document.getElementById('serieSelect').value;
-    
-    // Atualizar gráfico de evolução se necessário
-    const graficoEvolucao = document.getElementById('grafico-evolucao-geral');
-    if (escola !== 'todas' || serie !== 'todas') {
-        // Criar gráfico específico para os filtros aplicados
-        criarGraficoEvolucaoFiltrado(dadosFiltrados, graficoEvolucao);
+    const serieSelecionada = document.getElementById('serieSelect').value;
+    const serieChave = obterSerieChave(serieSelecionada);
+    const chaveGrafico = `${disciplina}|${escola}|${serieChave}`;
+
+    const graficosPadrao = (DADOS_INTEGRADOS.graficos && DADOS_INTEGRADOS.graficos.padrao) ? DADOS_INTEGRADOS.graficos.padrao : {};
+    const graficosFiltrados = (DADOS_INTEGRADOS.graficos && DADOS_INTEGRADOS.graficos.filtrados) ? DADOS_INTEGRADOS.graficos.filtrados : {};
+
+    const imgEvolucao = document.getElementById('img-evolucao-performance');
+    const imgDistribuicao = document.getElementById('img-distribuicao-crescimento');
+    const captionEvolucao = document.querySelector('#grafico-evolucao-geral .caption');
+    const captionDistribuicao = document.querySelector('#grafico-distribuicao-crescimento .caption');
+
+    const graficoEvolucaoFiltrado = graficosFiltrados.evolucao ? graficosFiltrados.evolucao[chaveGrafico] : null;
+    const graficoDistribuicaoFiltrado = graficosFiltrados.distribuicao ? graficosFiltrados.distribuicao[chaveGrafico] : null;
+
+    const legenda = montarLegendaFiltros(escola, serieSelecionada, disciplina);
+
+    if (graficoEvolucaoFiltrado) {
+        imgEvolucao.src = graficoEvolucaoFiltrado;
+        if (captionEvolucao) {
+            captionEvolucao.innerHTML = legenda ? `Evolução das médias (${legenda})` : 'Evolução das médias pré/pós teste por série em ambas as disciplinas';
+        }
+    } else if (graficosPadrao.evolucao) {
+        imgEvolucao.src = graficosPadrao.evolucao;
+        if (captionEvolucao) {
+            captionEvolucao.innerHTML = 'Evolução das médias pré/pós teste por série em ambas as disciplinas';
+        }
     }
-    
-    // Atualizar distribuição de crescimento se necessário
-    const graficoDistribuicao = document.getElementById('grafico-distribuicao-crescimento');
-    if (escola !== 'todas' || serie !== 'todas') {
-        criarGraficoDistribuicaoFiltrado(dadosFiltrados, graficoDistribuicao);
+
+    if (graficoDistribuicaoFiltrado) {
+        imgDistribuicao.src = graficoDistribuicaoFiltrado;
+        if (captionDistribuicao) {
+            captionDistribuicao.innerHTML = legenda ? `Distribuição de crescimento (${legenda})` : 'Distribuição dos ganhos individuais de aprendizagem';
+        }
+    } else if (graficosPadrao.distribuicao) {
+        imgDistribuicao.src = graficosPadrao.distribuicao;
+        if (captionDistribuicao) {
+            captionDistribuicao.innerHTML = 'Distribuição dos ganhos individuais de aprendizagem';
+        }
     }
 }
 
@@ -1221,68 +1447,6 @@ function calcularEstatisticasPorEscola(dados, disciplina) {
     
     // Ordenar por Cohen's d (descrescente)
     return resultado.sort((a, b) => parseFloat(b.cohenD) - parseFloat(a.cohenD));
-}
-
-// Função para criar gráfico de evolução filtrado
-function criarGraficoEvolucaoFiltrado(dadosFiltrados, container) {
-    // Implementação simplificada - usar texto por enquanto
-    const disciplina = document.getElementById('disciplinaSelect').value;
-    
-    let conteudo = '<div style="padding: 20px; text-align: center;">';
-    conteudo += '<h4>📊 Evolução Filtrada</h4>';
-    
-    if (disciplina === 'ambas' || disciplina === 'matematica') {
-        const estatsMat = calcularEstatisticas(dadosFiltrados.matematica);
-        conteudo += `<p><strong>Matemática:</strong> ${estatsMat.n} alunos | Δ = ${estatsMat.mediaDelta} | Cohen's d = ${estatsMat.cohenD}</p>`;
-    }
-    
-    if (disciplina === 'ambas' || disciplina === 'portugues') {
-        const estatsPort = calcularEstatisticas(dadosFiltrados.portugues);
-        conteudo += `<p><strong>Português:</strong> ${estatsPort.n} alunos | Δ = ${estatsPort.mediaDelta} | Cohen's d = ${estatsPort.cohenD}</p>`;
-    }
-    
-    conteudo += '</div>';
-    conteudo += '<div class="caption">Dados específicos para os filtros aplicados</div>';
-    
-    container.innerHTML = conteudo;
-}
-
-// Função para criar gráfico de distribuição filtrado
-function criarGraficoDistribuicaoFiltrado(dadosFiltrados, container) {
-    // Implementação simplificada - usar resumo estatístico
-    const disciplina = document.getElementById('disciplinaSelect').value;
-    
-    let conteudo = '<div style="padding: 20px;">';
-    conteudo += '<h4 style="text-align: center;">📈 Distribuição de Crescimento</h4>';
-    
-    if (disciplina === 'ambas' || disciplina === 'matematica') {
-        const estatsMat = calcularEstatisticas(dadosFiltrados.matematica);
-        conteudo += `
-            <div style="background: #f0f8ff; padding: 10px; margin: 10px 0; border-radius: 6px;">
-                <strong>📐 Matemática:</strong><br>
-                • Melhoraram: ${estatsMat.percMelhoraram}%<br>
-                • Pioraram: ${estatsMat.percPioraram}%<br>
-                • Mantiveram: ${estatsMat.percMantiveram}%
-            </div>
-        `;
-    }
-    
-    if (disciplina === 'ambas' || disciplina === 'portugues') {
-        const estatsPort = calcularEstatisticas(dadosFiltrados.portugues);
-        conteudo += `
-            <div style="background: #f0fdf4; padding: 10px; margin: 10px 0; border-radius: 6px;">
-                <strong>📝 Português:</strong><br>
-                • Melhoraram: ${estatsPort.percMelhoraram}%<br>
-                • Pioraram: ${estatsPort.percPioraram}%<br>
-                • Mantiveram: ${estatsPort.percMantiveram}%
-            </div>
-        `;
-    }
-    
-    conteudo += '</div>';
-    conteudo += '<div class="caption">Percentuais de estudantes por tipo de evolução</div>';
-    
-    container.innerHTML = conteudo;
 }
 
 // Função para criar tabela de comparação por séries
