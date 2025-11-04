@@ -1024,7 +1024,7 @@ class GeradorVisualizacoesFase5:
             <div class="loading">Carregando indicadores de qualidade...</div>
         </div>
 
-        <h2 class="section">💡 Insights e Recomendações</h2>
+        <h2 class="section">💡 Recomendações</h2>
         <div class="recomendacoes" id="recomendacoesContainer">
             <div class="loading">Gerando recomendações...</div>
         </div>
@@ -1748,7 +1748,6 @@ function atualizarQualidadeDados(dadosFiltrados) {
     const totalPort = dadosFiltrados.portugues.length;
     
     container.innerHTML = `
-        <h3>📋 Relatório de Qualidade dos Dados</h3>
         <div class="grupo-item">
             <div class="grupo-titulo">📊 Amostra e Representatividade</div>
             <div class="grupo-detalhes">
