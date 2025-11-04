@@ -975,7 +975,6 @@ class GeradorVisualizacoesFase5:
             <div class="filter-group">
                 <div class="filter-label">📖 Disciplina</div>
                 <select class="filter-select" id="disciplinaSelect" onchange="atualizarDados()">
-                    <option value="ambas">Matemática + Língua Portuguesa</option>
                     <option value="matematica">Matemática</option>
                     <option value="portugues">Língua Portuguesa</option>
                 </select>
