@@ -1226,12 +1226,31 @@ function calcularEstatisticas(dados, prefixo = 'Total_Acertos') {
     const valoresDelta = dados.map(row => parseFloat(row[colunaDelta]) || 0);
     
     const n = dados.length;
-    const mediaPre = valoresPre.reduce((a, b) => a + b, 0) / n;
-    const mediaPos = valoresPos.reduce((a, b) => a + b, 0) / n;
-    const mediaDelta = valoresDelta.reduce((a, b) => a + b, 0) / n;
+    if (n === 0) {
+        return {
+            n: 0,
+            mediaPre: '0.00',
+            mediaPos: '0.00',
+            mediaDelta: '0.00',
+            cohenD: '0.000',
+            percMelhoraram: '0.0',
+            percPioraram: '0.0',
+            percMantiveram: '0.0',
+            totalMelhoraram: 0,
+            totalPioraram: 0,
+            totalMantiveram: 0
+        };
+    }
+
+    const somaPre = valoresPre.reduce((a, b) => a + b, 0);
+    const somaPos = valoresPos.reduce((a, b) => a + b, 0);
+    const somaDelta = valoresDelta.reduce((a, b) => a + b, 0);
+    const mediaPre = somaPre / n;
+    const mediaPos = somaPos / n;
+    const mediaDelta = somaDelta / n;
     
     const varianceDelta = valoresDelta.reduce((acc, val) => acc + Math.pow(val - mediaDelta, 2), 0) / n;
-    const desvioPadraoDelta = Math.sqrt(varianceDelta);
+    const desvioPadraoDelta = varianceDelta > 0 ? Math.sqrt(varianceDelta) : 0;
     
     const cohenD = desvioPadraoDelta !== 0 ? mediaDelta / desvioPadraoDelta : 0;
     
@@ -1247,59 +1266,136 @@ function calcularEstatisticas(dados, prefixo = 'Total_Acertos') {
         cohenD: cohenD.toFixed(3),
         percMelhoraram: ((melhoraram / n) * 100).toFixed(1),
         percPioraram: ((pioraram / n) * 100).toFixed(1),
-        percMantiveram: ((mantiveram / n) * 100).toFixed(1)
+        percMantiveram: ((mantiveram / n) * 100).toFixed(1),
+        totalMelhoraram: melhoraram,
+        totalPioraram: pioraram,
+        totalMantiveram: mantiveram
     };
+}
+
+function combinarDadosAmbas(dadosMat, dadosPort) {
+    const mapa = new Map();
+    const adicionar = (row = {}) => {
+        const id = row.ID_Aluno || `${row.Nome || ''}-${row.Escola || ''}-${row.Serie || ''}`;
+        if (!mapa.has(id)) {
+            mapa.set(id, {
+                pre: [],
+                pos: [],
+                delta: []
+            });
+        }
+        const registro = mapa.get(id);
+        const pre = parseFloat(row['Total_Acertos_Pré']);
+        const pos = parseFloat(row['Total_Acertos_Pós']);
+        const delta = parseFloat(row['Delta_Total_Acertos']);
+        if (!Number.isNaN(pre)) registro.pre.push(pre);
+        if (!Number.isNaN(pos)) registro.pos.push(pos);
+        if (!Number.isNaN(delta)) registro.delta.push(delta);
+    };
+    (dadosMat || []).forEach(adicionar);
+    (dadosPort || []).forEach(adicionar);
+    return Array.from(mapa.values()).map(registro => {
+        const media = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        return {
+            'Total_Acertos_Pré': media(registro.pre),
+            'Total_Acertos_Pós': media(registro.pos),
+            'Delta_Total_Acertos': media(registro.delta)
+        };
+    });
+}
+
+function obterDadosIndicadores(dadosFiltrados, disciplina) {
+    if (disciplina === 'matematica') {
+        return { dados: dadosFiltrados.matematica || [], rotulo: 'Estudantes de Matemática' };
+    }
+    if (disciplina === 'portugues') {
+        return { dados: dadosFiltrados.portugues || [], rotulo: 'Estudantes de Língua Portuguesa' };
+    }
+    return {
+        dados: combinarDadosAmbas(dadosFiltrados.matematica, dadosFiltrados.portugues),
+        rotulo: 'Estudantes (Matemática + Língua Portuguesa)'
+    };
+}
+
+function classificarEffectSize(valor) {
+    const d = parseFloat(valor);
+    if (Number.isNaN(d)) {
+        return { texto: 'Sem dados suficientes', classe: 'yellow' };
+    }
+    if (d >= 0.6) {
+        return { texto: 'Impacto Excelente 🏆', classe: 'green' };
+    }
+    if (d >= 0.4) {
+        return { texto: 'Bom Resultado ✅', classe: 'green' };
+    }
+    if (d >= 0.2) {
+        return { texto: 'Resultado Moderado ⚠️', classe: 'yellow' };
+    }
+    if (d > 0) {
+        return { texto: 'Ganho Discreto 🔍', classe: 'yellow' };
+    }
+    return { texto: 'Sem ganho aparente', classe: 'red' };
+}
+
+function formatarDelta(valor) {
+    const numero = parseFloat(valor);
+    if (Number.isNaN(numero)) return '0.0';
+    const sinal = numero >= 0 ? '+' : '';
+    return `${sinal}${numero.toFixed(1)}`;
+}
+
+function formatarPercentual(valor) {
+    const numero = parseFloat(valor);
+    if (Number.isNaN(numero)) return '0%';
+    return `${numero.toFixed(1)}%`;
 }
 
 // Função para atualizar indicadores
 function atualizarIndicadores(dadosFiltrados) {
     const container = document.getElementById('cardsContainer');
     const disciplina = document.getElementById('disciplinaSelect').value;
-    
-    let cards = '';
-    
-    if (disciplina === 'ambas' || disciplina === 'matematica') {
-        const estatsMat = calcularEstatisticas(dadosFiltrados.matematica);
-        cards += `
-            <div class="card math">
-                <div class="card-label">📐 Matemática - Participantes</div>
-                <div class="valor">${estatsMat.n}</div>
-                <div class="desc">estudantes analisados</div>
-            </div>
-            <div class="card math">
-                <div class="card-label">📐 Evolução Média</div>
-                <div class="valor">${estatsMat.mediaDelta}</div>
-                <div class="desc">pontos de crescimento</div>
-            </div>
-            <div class="card ${parseFloat(estatsMat.cohenD) >= 0.4 ? 'green' : 'yellow'}">
-                <div class="card-label">📐 Effect Size (Cohen's d)</div>
-                <div class="valor">${estatsMat.cohenD}</div>
-                <div class="desc">${parseFloat(estatsMat.cohenD) >= 0.4 ? 'Significativo' : 'Moderado'}</div>
+    const { dados, rotulo } = obterDadosIndicadores(dadosFiltrados, disciplina);
+    const estatisticas = calcularEstatisticas(dados);
+
+    if (!dados || dados.length === 0 || estatisticas.n === 0) {
+        container.innerHTML = `
+            <div class="card red">
+                <div class="card-label">⚠️ Sem dados disponíveis</div>
+                <div class="valor">0</div>
+                <div class="desc">Ajuste os filtros para visualizar os indicadores</div>
             </div>
         `;
+        return;
     }
-    
-    if (disciplina === 'ambas' || disciplina === 'portugues') {
-        const estatsPort = calcularEstatisticas(dadosFiltrados.portugues);
-        cards += `
-            <div class="card port">
-                <div class="card-label">📝 Língua Portuguesa - Participantes</div>
-                <div class="valor">${estatsPort.n}</div>
-                <div class="desc">estudantes analisados</div>
-            </div>
-            <div class="card port">
-                <div class="card-label">📝 Evolução Média</div>
-                <div class="valor">${estatsPort.mediaDelta}</div>
-                <div class="desc">pontos de crescimento</div>
-            </div>
-            <div class="card ${parseFloat(estatsPort.cohenD) >= 0.4 ? 'green' : 'yellow'}">
-                <div class="card-label">📝 Effect Size (Cohen's d)</div>
-                <div class="valor">${estatsPort.cohenD}</div>
-                <div class="desc">${parseFloat(estatsPort.cohenD) >= 0.4 ? 'Significativo' : 'Moderado'}</div>
-            </div>
-        `;
-    }
-    
+
+    const deltaFormatado = formatarDelta(estatisticas.mediaDelta);
+    const percentualEvolucao = formatarPercentual(estatisticas.percMelhoraram);
+    const efeito = classificarEffectSize(estatisticas.cohenD);
+    const classeEfeito = efeito.classe ? ` ${efeito.classe}` : '';
+
+    const cards = `
+        <div class="card">
+            <div class="card-label">👤 Nº de Participantes</div>
+            <div class="valor">${estatisticas.n}</div>
+            <div class="desc">${rotulo}</div>
+        </div>
+        <div class="card math">
+            <div class="card-label">🧮 Ganho Médio (Delta)</div>
+            <div class="valor">${deltaFormatado} acertos</div>
+            <div class="desc">Média da coluna Δ Total_Acertos</div>
+        </div>
+        <div class="card${classeEfeito}">
+            <div class="card-label">🎯 Tamanho do Efeito</div>
+            <div class="valor">d = ${parseFloat(estatisticas.cohenD).toFixed(2)}</div>
+            <div class="desc">${efeito.texto}</div>
+        </div>
+        <div class="card port">
+            <div class="card-label">📈 % de Alunos que Evoluíram</div>
+            <div class="valor">${percentualEvolucao}</div>
+            <div class="desc">${estatisticas.totalMelhoraram} de ${estatisticas.n} estudantes</div>
+        </div>
+    `;
+
     container.innerHTML = cards;
 }
 
