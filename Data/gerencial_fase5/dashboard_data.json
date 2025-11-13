@@ -1,0 +1,32 @@
+{
+  "resumo_geral": {
+    "total_alunos_matematica": 1290,
+    "total_alunos_portugues": 1221,
+    "total_escolas": 5,
+    "data_processamento": "2025-11-13 17:03:13"
+  },
+  "estatisticas_gerais": {
+    "matematica": {
+      "n": 1290,
+      "media_pre": 7.83,
+      "media_pos": 6.1,
+      "media_delta": -1.73,
+      "cohen_d": -0.38,
+      "perc_melhoraram": 29.1,
+      "perc_pioraram": 59.7,
+      "desvio_padrao_pre": 4.2,
+      "desvio_padrao_pos": 3.02
+    },
+    "portugues": {
+      "n": 1221,
+      "media_pre": 9.07,
+      "media_pos": 4.87,
+      "media_delta": -4.2,
+      "cohen_d": -0.829,
+      "perc_melhoraram": 15.9,
+      "perc_pioraram": 77.0,
+      "desvio_padrao_pre": 4.69,
+      "desvio_padrao_pos": 2.49
+    }
+  }
+}
