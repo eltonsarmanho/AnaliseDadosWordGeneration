@@ -1,0 +1,20 @@
+flowchart TD
+    A["Raw data from assessments (Stages 2, 3, 4)"] --> B["Record cleaning"]
+    B --> B1["Remove duplicates and invalid entries"]
+    B --> B2["Handle missing or inconsistent key information"]
+    B --> B3["Standardize categorical information (schools, classes, grades)"]
+    B1 --> C["Construction of indicators"]
+    B2 --> C
+    B3 --> C
+    C --> C1["Compute pre-test and post-test total scores"]
+    C --> C2["Compute individual gains (post − pre)"]
+    C --> C3["Estimate effect sizes and proportions of improvement"]
+    C --> C4["Differentiate targeted vs. non-targeted contents (when applicable)"]
+    C1 --> D["Organization by cohorts and stages"]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    D --> D1["Group students by stage, grade, and class"]
+    D --> D2["Describe cohort profiles (distribution of students and schools)"]
+    D1 --> E["Prepared dataset for within-stage and longitudinal analyses"]
+    D2 --> E
